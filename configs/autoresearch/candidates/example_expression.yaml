@@ -1,6 +1,6 @@
-name: close_below_ohlc_mean_reversal_20_60_v1
-family: price_position
-expression: "Mean((($open + $high + $low + $close) / 4 - $close) / (($open + $high + $low + $close) / 4), 20) + Mean((($open + $high + $low + $close) / 4 - $close) / (($open + $high + $low + $close) / 4), 60)"
+name: open_high_mid_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open + $high - 2 * $close) / $close, 20) + Mean(($open + $high - 2 * $close) / $close, 60)"
 direction: 1
-description: "20 and 60 day blend of how far the close sits below the daily OHLC average; stocks repeatedly finishing weak versus the full-session average price rank higher."
-expected_behavior: "Tests a low-complexity price-position reversal signal adjacent to, but distinct from, the reviewed high-low midpoint and open-to-close selling-pressure variants. Mean((($open + $high + $low + $close) / 4 - $close) / (($open + $high + $low + $close) / 4), 20) captures recent weak closing location versus the daily OHLC average, while the 60 day term captures persistent full-session closing weakness. Higher values should favor names with sustained poor closing location that may be prone to reversal. The expression uses only allowed open, high, low, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
+description: "20 and 60 day blend of how far the close finishes below the open-high midpoint, scaled by close; persistent weak closes versus the upper intraday anchor rank higher."
+expected_behavior: "Tests a low-complexity reversal signal in the selling-pressure family without repeating the discarded full OHLC average variant. Mean(($open + $high - 2 * $close) / $close, 20) captures recent closes below the open-high midpoint, while the 60 day term captures more persistent closing weakness. Higher values should favor names with sustained intraday selling pressure that may be prone to reversal. The expression uses only allowed open, high, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
