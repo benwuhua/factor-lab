@@ -1,6 +1,6 @@
-name: close_from_high_reversal_20_60_v1
-family: price_position
-expression: "Mean(($high - $close) / $high, 20) + Mean(($high - $close) / $high, 60)"
+name: high_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open - $close) / $high, 20) + Mean(($open - $close) / $high, 60)"
 direction: 1
-description: "20 and 60 day close discount from intraday high; stocks that repeatedly close well below their session highs rank higher."
-expected_behavior: "Tests a simple price-position reversal signal distinct from the discarded open-to-low downside excursion and pure upper-shadow relief ideas. Mean(($high - $close) / $high, 20) captures recent inability to hold intraday highs, while the 60 day term captures persistent close-from-high pressure. Higher values should favor names with repeated close weakness relative to the session high that may mean revert over the evaluation horizon. The expression uses only allowed high and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 and 60 day intraday selling-pressure reversal normalized by the session high; stocks with repeated closes below open as a share of high rank higher."
+expected_behavior: "Tests a low-complexity denominator variant of the reviewed open-, close-, low-, and HL-mid-normalized selling-pressure reversal family without repeating the discarded close-from-high, low-rebound, downside-clipping, turnover-confirmation, or high-complexity OHLC-average ideas. Mean(($open - $close) / $high, 20) captures recent close-below-open pressure scaled by the day's upper trading anchor, while the 60 day term captures persistent pressure. Normalizing by high should damp denominator noise from weak closes or deep lows while preserving the same interpretable intraday reversal premise. The expression uses only allowed open, close, and high fields; allowed 20 and 60 day windows; and two allowed Mean operators."
