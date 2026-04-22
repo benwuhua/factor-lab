@@ -1,6 +1,6 @@
-name: close_low_mid_norm_selling_pressure_reversal_20_60_v1
+name: steady_low_norm_selling_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open-$close)/(($close+$low)/2),20)+Mean(($open-$close)/(($close+$low)/2),60)"
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Std(($open-$close)/$low,20)"
 direction: 1
-description: "20 and 60 day intraday selling-pressure reversal normalized by the close-low midpoint; stocks with repeated closes below open relative to the lower closing anchor rank higher."
-expected_behavior: "Tests a low-complexity lower-anchor normalization that has not appeared in the ledger: the close-low midpoint sits between the strong low-normalized selling-pressure idea and the lower closing location of the bar. Mean(($open-$close)/(($close+$low)/2),20) captures recent close-below-open pressure scaled by the close-low anchor, while the 60 day term captures persistent pressure. This should emphasize names repeatedly finishing weak near the daily low without adding discarded turnover confirmation, crashed window choices, or the high-complexity OHLC-average extension. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day steadiness penalty; stocks with repeated close-below-open pressure and fewer one-off spikes rank higher."
+expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal with one simple volatility penalty rather than adding discarded turnover confirmation or high-complexity OHLC averaging. The two Mean terms capture recent and persistent close-below-open pressure as a share of the session low, while subtracting Std(($open-$close)/$low,20) favors steadier exhaustion over noisy single-day pressure. This keeps the economic premise interpretable: persistent weak closes near the lower price anchor may revert, but unstable pressure is penalized. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; two Mean operators; and one Std operator."
