@@ -1,6 +1,6 @@
-name: turnover_confirmed_open_pressure_reversal_20_60_v1
+name: steady_open_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open-$close)/$open,20)+Mean(($open-$close)/$open,60)+Corr(($open-$close)/$open,$turnover,20)"
+expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60) - Std(($open - $close) / $open, 20)"
 direction: 1
-description: "20 and 60 day open-normalized intraday selling pressure with a 20 day turnover confirmation term; stocks with persistent weak closes and higher turnover on pressure days rank higher."
-expected_behavior: "Keeps the reviewed open-normalized selling-pressure reversal backbone while testing whether sell-pressure days confirmed by normalized trading activity improve reversal strength. The two Mean terms capture recent and persistent close-below-open pressure as a share of open, and Corr(($open-$close)/$open,$turnover,20) favors names where turnover rises on weak intraday closes, a simple capitulation-style signal. This avoids discarded downside clipping, low-rebound, direct turnover weighting, and high-complexity OHLC mean variants. The expression uses allowed open, close, and turnover fields, allowed 20 and 60 day windows, two Mean operators, and one Corr operator."
+description: "20 and 60 day open-normalized intraday selling pressure with a 20 day consistency penalty; stocks with persistent, less erratic weak closes rank higher."
+expected_behavior: "Keeps the reviewed open-normalized selling-pressure reversal backbone while avoiding the crashed turnover confirmation variant. The two Mean terms capture recent and persistent close-below-open pressure as a share of open, while subtracting Std(($open - $close) / $open, 20) penalizes one-off noisy pressure spikes and favors steadier exhaustion. This avoids discarded downside clipping, low-rebound, direct turnover weighting, and high-complexity OHLC mean variants. The expression uses only allowed open and close fields, allowed 20 and 60 day windows, two Mean operators, and one Std operator."
