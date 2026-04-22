@@ -1,6 +1,6 @@
-name: intraday_return_shortfall_reversal_20_v1
+name: open_low_mid_discount_pressure_reversal_20_120_v1
 family: reversal
-expression: "Mean($close/$open-1,20)-($close/$open-1)"
+expression: "Mean((($open+$low)/2-$close)/$low,20)+Mean(($open-$close)/$low,120)"
 direction: 1
-description: "Intraday return shortfall reversal; stocks whose current close/open return is below their recent intraday average rank higher."
-expected_behavior: "This tests a simple intraday underperformance mean-reversion signal. Mean($close/$open-1,20)-($close/$open-1) is positive when today's close/open return is weaker than the stock's own 20 day intraday return baseline, favoring names with unusually poor same-day intraday action for a subsequent reversal. It stays low-complexity with only open and close, the allowed 20 day window, and one allowed Mean operator. It avoids the discarded pure volatility, near-low, and high-complexity normalized divergence paths, and it avoids the turnover confirmation/divergence expressions that previously crashed."
+description: "20 day open-low midpoint discount reversal plus a 120 day low-normalized selling-pressure anchor."
+expected_behavior: "Mean((($open+$low)/2-$close)/$low,20) rewards names whose closes persistently finish below the lower intraday open-low midpoint, capturing weak end-of-day price position on a simple low-normalized scale. Mean(($open-$close)/$low,120) adds a slower persistent selling-pressure anchor without using turnover, volume confirmation, volatility gates, or high-complexity normalization. This tests whether the reviewed open-low midpoint discount idea benefits from a longer pressure memory than the prior 60 day anchor, while avoiding the discarded intraday shortfall, pure volatility, near-low, and crashed turnover-divergence paths. It uses only allowed open, low, and close fields; allowed 20 and 120 day windows; and two allowed Mean operators."
