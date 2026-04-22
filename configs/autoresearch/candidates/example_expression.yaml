@@ -1,6 +1,6 @@
-name: open_high_mid_price_volume_divergence_20_v1
+name: gap3_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr((($open+$high)/2)/Mean(($open+$high)/2,20),$volume/Mean($volume,20),20)"
+expression: "0-Corr(($open/Ref($close,3)-1),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day divergence between the normalized open-high midpoint and normalized traded volume."
-expected_behavior: "A higher value means the rolling correlation between the open-high midpoint, (($open+$high)/2) relative to its 20 day mean, and volume relative to its 20 day mean is lower or negative. This keeps the candidate in the reviewed price-volume divergence family while testing an untried upper intraday anchor distinct from close, open, high, low, high-low midpoint, open-close midpoint, typical price, and high-close upper midpoint variants. It avoids turnover-based paths that have crashed and recent discarded pure volatility or range-position ideas, using only allowed open, high, and volume fields; the allowed 20 day window; and one Corr plus two Mean operators."
+description: "20 day divergence between the 3 day open gap anchor and normalized traded volume."
+expected_behavior: "A higher value means the rolling correlation between the 3 day open gap anchor, $open/Ref($close,3)-1, and volume relative to its 20 day mean is lower or negative. The idea keeps the reviewed open-gap and price-volume divergence themes but tests a cleaner gap-volume confirmation signal rather than another intraday price anchor variant. It avoids turnover expressions that recently crashed and discarded pure volatility, range-position, and intraday-rebound divergence paths, using only allowed open, close, and volume fields; the allowed 3 and 20 day windows; and one Corr, one Ref, and one Mean operator."
