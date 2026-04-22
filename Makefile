@@ -8,8 +8,11 @@ FACTOR ?= arbr_26
 HORIZONS ?= --horizon 5 --horizon 20
 SUMMARY ?= reports/factor_$(FACTOR)_event_backtest_summary_csi300.csv
 SUMMARY_MD ?= reports/factor_$(FACTOR)_event_backtest_summary_csi300.md
+AUTORESEARCH_CONTRACT ?= configs/autoresearch/contracts/csi500_current_v1.yaml
+AUTORESEARCH_SPACE ?= configs/autoresearch/expression_space.yaml
+AUTORESEARCH_CANDIDATE ?= configs/autoresearch/candidates/example_expression.yaml
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -23,12 +26,14 @@ help:
 	@printf "  make event-csi500     Event backtest FACTOR on CSI500 config\n"
 	@printf "  make event-csi300     Event backtest FACTOR on CSI300 config\n"
 	@printf "  make summarize-event  Render Markdown from an event summary CSV\n"
+	@printf "  make autoresearch-expression  Run one controlled expression-factor loop\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
 	@printf "Examples:\n"
 	@printf "  make event-csi300 FACTOR=arbr_26\n"
 	@printf "  make summarize-event FACTOR=arbr_26 SUMMARY=reports/factor_arbr_26_event_backtest_summary_csi300.csv\n"
+	@printf "  make autoresearch-expression AUTORESEARCH_CANDIDATE=configs/autoresearch/candidates/example_expression.yaml\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -94,6 +99,12 @@ summarize-event:
 		--factor $(FACTOR) \
 		--provider-config $(CSI300_PROVIDER) \
 		--command "make event-csi300 FACTOR=$(FACTOR)"
+
+autoresearch-expression:
+	$(PYTHON) scripts/autoresearch/run_expression_loop.py \
+		--contract $(AUTORESEARCH_CONTRACT) \
+		--space $(AUTORESEARCH_SPACE) \
+		--candidate $(AUTORESEARCH_CANDIDATE)
 
 lgb-dry-run:
 	$(PYTHON) scripts/run_lgb_workflow.py \

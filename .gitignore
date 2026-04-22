@@ -16,6 +16,9 @@ reports/*.png
 reports/*
 !reports/
 !reports/README.md
+!reports/autoresearch/
+reports/autoresearch/*
+!reports/autoresearch/README.md
 !reports/joinquant_factorlib/
 !reports/joinquant_factorlib/*.csv
 !reports/joinquant_factorlib/*.json

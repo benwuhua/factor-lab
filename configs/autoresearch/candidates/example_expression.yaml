@@ -1,0 +1,6 @@
+name: mom_skip_60_5_v1
+family: momentum
+expression: "Ref($close, 5) / Ref($close, 60) - 1"
+direction: 1
+description: "60 day momentum skipping the most recent 5 sessions."
+expected_behavior: "Higher values should indicate persistent medium-term strength."
