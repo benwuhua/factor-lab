@@ -1,6 +1,6 @@
-name: amount_damped_low_open_mid_pressure_reversal_20_60_v1
+name: low_turnover_low_norm_pressure_reversal_20_v1
 family: reversal
-expression: "Mean(($open-$close)/(($open+$low)/2),20)/(1+Abs(Mean($amount,20)/Mean($amount,60)-1))"
+expression: "Mean(($open-$close)/$low,20)/(1+Mean($turnover,20))"
 direction: 1
-description: "20 day intraday selling pressure normalized by the open-low midpoint and softly damped by amount instability versus its 60 day baseline."
-expected_behavior: "Tests whether the reviewed low/open normalized selling-pressure reversal is cleaner when the price scale is the open-low midpoint rather than either endpoint. Mean(($open-$close)/(($open+$low)/2),20) rewards repeated closes below open while avoiding the more brittle near-low/downside framing that was discarded. The denominator 1+Abs(Mean($amount,20)/Mean($amount,60)-1) softly penalizes names whose recent traded value is far from its medium-term baseline, reusing amount only as a stability dampener rather than as a price-volume divergence or turnover confirmation signal. This avoids the crashed turnover-confirmation path and the discarded pure volatility, range-compression, near-low, low-rebound, and downside-only ideas. The expression uses only allowed open, close, low, and amount fields; allowed 20 and 60 day windows; and allowed Mean and Abs operators."
+description: "20 day close-below-open pressure scaled by low price and softly penalized by average turnover level."
+expected_behavior: "Tests whether the reviewed low-normalized selling-pressure reversal is cleaner when high-turnover names are damped by their 20 day average turnover level rather than by relative turnover instability. The numerator reuses Mean(($open-$close)/$low,20), rewarding repeated closes below the open on a low-price scale. The denominator 1+Mean($turnover,20) is a low-complexity liquidity penalty, distinct from discarded pure low-turnover, turnover-volatility, turnover-confirmation, and relative turnover-stability variants. It uses only allowed open, close, low, and turnover fields; the allowed 20 day window; and the allowed Mean operator."
