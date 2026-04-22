@@ -1,6 +1,6 @@
-name: normalized_price_volume_divergence_20_v1
+name: normalized_price_amount_divergence_20_v1
 family: divergence
-expression: "0-Corr($close/Mean($close,20),$volume/Mean($volume,20),20)"
+expression: "0-Corr($close/Mean($close,20),$amount/Mean($amount,20),20)"
 direction: 1
-description: "20 day negative correlation between normalized close and normalized volume; stocks where volume expands while relative price is weak rank higher."
-expected_behavior: "Tests a simple price-volume divergence idea distinct from the repeated selling-pressure and low-anchor variants. Higher values indicate lower or negative 20 day correlation between close relative to its 20 day mean and volume relative to its 20 day mean, which may capture capitulation-like volume during price weakness without thresholds, turnover fields, or multi-anchor composites. The expression uses only allowed close and volume fields; the allowed 20 day window; and allowed Mean and Corr operators."
+description: "20 day negative correlation between normalized close and normalized amount; stocks where traded value expands while relative price is weak rank higher."
+expected_behavior: "Tests a simple price-amount divergence idea distinct from the repeated selling-pressure and low-anchor variants. Higher values indicate lower or negative 20 day correlation between close relative to its 20 day mean and traded amount relative to its 20 day mean, which may capture value-backed capitulation during price weakness without thresholds, turnover fields, or multi-anchor composites. The expression uses only allowed close and amount fields; the allowed 20 day window; and allowed Mean and Corr operators."
