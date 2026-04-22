@@ -1,6 +1,6 @@
-name: open_pressure_high_pullback_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60) + (Max($high, 60) - $close) / Max($high, 60)"
+name: close_below_open_low_mid_reversal_20_60_v1
+family: price_position
+expression: "Mean((($open + $low) / 2 - $close) / (($open + $low) / 2), 20) + Mean((($open + $low) / 2 - $close) / (($open + $low) / 2), 60)"
 direction: 1
-description: "20 and 60 day open-normalized intraday selling pressure plus distance below the 60 day high; stocks with persistent weak closes and a clear pullback from recent highs rank higher."
-expected_behavior: "Keeps the reviewed open-normalized selling-pressure reversal backbone, but replaces the 20 day volatility penalty with a simple price-position term. The two Mean terms capture recent and persistent close-below-open pressure as a share of open, while (Max($high, 60) - $close) / Max($high, 60) favors names that have pulled back from their 60 day high without using low-rebound, turnover-confirmation, downside clipping, or high-complexity OHLC averaging ideas that previously failed or became too complex. The expression uses only allowed open, close, and high fields; allowed 20 and 60 day windows; two Mean operators; and Max over an allowed 60 day window."
+description: "20 and 60 day blend of how far the close sits below the daily open-low midpoint; stocks repeatedly finishing near the lower part of the open-to-low zone rank higher."
+expected_behavior: "Tests a low-complexity price-position reversal adjacent to the reviewed close-below-HL-mid and open-normalized selling-pressure families without repeating the discarded high-pullback, low-rebound, downside clipping, turnover-confirmation, or high-complexity OHLC-average variants. The open-low midpoint removes the day's high from the anchor, so the signal focuses on closes that remain weak relative to the open and session low rather than on upper-wick or 60 day ceiling effects. Higher values should favor names with persistent weak closing location that may be prone to mean reversion. The expression uses only allowed open, low, and close fields; allowed 20 and 60 day windows; and two rolling Mean operators."
