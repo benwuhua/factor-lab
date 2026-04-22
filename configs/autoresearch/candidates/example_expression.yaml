@@ -1,6 +1,6 @@
-name: range_compression_low_volatility_20_60_v1
-family: volatility
-expression: "Mean(($low-$high)/$close,20)+Mean(($low-$high)/$close,60)"
+name: typical_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open-$close)/(($high+$low+$close)/3),20)+Mean(($open-$close)/(($high+$low+$close)/3),60)"
 direction: 1
-description: "20 and 60 day negative high-low range normalized by close; higher values indicate lower realized intraday range."
-expected_behavior: "Tests a low-volatility range-compression effect that is separate from the heavily explored selling-pressure and low-anchor reversal families. Stocks with persistently tighter high-low ranges may carry lower noise and better short-horizon risk-adjusted behavior. The expression uses only allowed high, low, and close fields, allowed 20 and 60 day windows, and two Mean operators, avoiding previously discarded or crashed turnover-confirmation, downside-clipping, range-body, low-rebound, and complex OHLC-composite ideas."
+description: "20 and 60 day close-below-open selling-pressure reversal normalized by the daily typical price."
+expected_behavior: "Extends the reviewed 20/60 selling-pressure reversal family with a typical-price denominator that blends high, low, and close without the higher-complexity OHLC composite that was discarded. Mean(($open-$close)/(($high+$low+$close)/3),20) captures recent intraday selling pressure scaled by the day's representative traded level, while the 60 day term captures persistence. Higher values should favor names with repeated weak closes versus opens that may be prone to reversal. The expression uses only allowed open, high, low, and close fields, the allowed 20 and 60 day windows, and two Mean operators, avoiding previously discarded or crashed turnover-confirmation, downside-clipping, range-body, low-rebound, and low-volatility compression ideas."
