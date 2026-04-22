@@ -1,6 +1,6 @@
-name: medium_close_drawdown_midpoint_discount_reversal_20_v1
-family: reversal
-expression: "Ref($close,20)/$close-1+Mean((($open+$low)/2-$close)/$low,20)"
+name: quiet_close_drawdown_reversal_20_60_v1
+family: divergence
+expression: "Ref($close,20)/$close-1+Mean($volume,60)/Mean($volume,20)-1"
 direction: 1
-description: "20 day close-to-close drawdown reversal plus a 20 day open-low midpoint discount pressure term."
-expected_behavior: "Ref($close,20)/$close-1 rewards medium-horizon price drawdowns with clear reversal interpretation, while Mean((($open+$low)/2-$close)/$low,20) adds a low-normalized measure of repeated closes below the open-low midpoint. The candidate avoids turnover and turnover-divergence paths that have crashed, avoids pure volatility and near-60-day-low ideas that were discarded, and keeps complexity below prior multi-anchor pressure variants. It uses only allowed open, low, and close fields; the allowed 20 day window; and allowed Ref and Mean operators."
+description: "20 day close-to-close drawdown reversal confirmed by relatively quiet recent volume versus the 60 day baseline."
+expected_behavior: "Ref($close,20)/$close-1 rewards stocks that have sold off over the medium horizon, while Mean($volume,60)/Mean($volume,20)-1 favors cases where recent 20 day volume is below the 60 day baseline. The economic intuition is an uncrowded reversal: price weakness without elevated trading pressure may mean less forced selling and more room for mean reversion. The candidate avoids turnover fields that have crashed, avoids discarded pure low-volatility and near-60-day-low variants, and keeps complexity low with only allowed close and volume fields; 20 and 60 day windows; and Ref and Mean operators."
