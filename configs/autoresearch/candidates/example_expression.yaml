@@ -1,6 +1,6 @@
-name: quiet_amount_close_drawdown_reversal_20_60_v1
+name: fast_normalized_price_volume_divergence_10_v1
 family: divergence
-expression: "Ref($close,20)/$close-1+Mean($amount,60)/Mean($amount,20)-1"
+expression: "0-Corr($close/Mean($close,10),$volume/Mean($volume,10),10)"
 direction: 1
-description: "20 day close-to-close drawdown reversal confirmed by relatively quiet recent traded amount versus the 60 day baseline."
-expected_behavior: "Ref($close,20)/$close-1 rewards stocks that have sold off over the medium horizon, while Mean($amount,60)/Mean($amount,20)-1 favors cases where recent 20 day traded amount is below the 60 day baseline. The economic intuition is an uncrowded reversal in value traded terms: price weakness without elevated capital participation may mean less forced selling and more room for mean reversion. This keeps the reviewed quiet-drawdown structure but tests amount rather than volume, avoids turnover fields that have crashed, avoids discarded pure low-volatility and near-low variants, and stays low complexity with only allowed close and amount fields; 20 and 60 day windows; and Ref and Mean operators."
+description: "10 day negative correlation between normalized close and normalized volume; stocks where recent volume does not confirm relative price strength rank higher."
+expected_behavior: "Tests a faster version of the reviewed normalized price-volume divergence idea while moving away from the recent 20/60 quiet drawdown and low-normalized selling-pressure variants. Higher values mean the 10 day correlation between close relative to its 10 day mean and volume relative to its 10 day mean is lower or negative, which may capture short-term capitulation or weak volume confirmation before reversal. The candidate avoids turnover fields that have crashed, avoids discarded pure low-volatility, intraday-position divergence, downside-only, and near-low variants, and stays low complexity with only allowed close and volume fields; the 10 day window; and allowed Corr and Mean operators."
