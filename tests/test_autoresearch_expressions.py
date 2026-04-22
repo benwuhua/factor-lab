@@ -17,7 +17,11 @@ class AutoresearchExpressionTests(unittest.TestCase):
                     "windows": [5, 20, 60],
                     "operators": ["Ref", "Mean", "Abs"],
                     "families": ["momentum", "reversal"],
-                    "complexity": {"max_expression_length": 200},
+                    "complexity": {
+                        "max_expression_length": 200,
+                            "max_operator_count": 3,
+                        "max_window_count": 2,
+                    },
                 }
             ),
             encoding="utf-8",
@@ -76,6 +80,28 @@ class AutoresearchExpressionTests(unittest.TestCase):
             candidate_path = self._write_candidate(tmp, "Ref($close, 120) / Ref($close, 60) - 1")
 
             with self.assertRaisesRegex(ValueError, "disallowed window: 120"):
+                load_expression_candidate(candidate_path, space)
+
+    def test_candidate_rejects_too_many_operators(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = load_expression_space(self._write_space(tmp))
+            candidate_path = self._write_candidate(
+                tmp,
+                "Mean(Abs(Ref($close, 5) / Ref($close, 20) - 1), 60)",
+            )
+
+            with self.assertRaisesRegex(ValueError, "operator count exceeds max_operator_count"):
+                load_expression_candidate(candidate_path, space)
+
+    def test_candidate_rejects_too_many_unique_windows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            space = load_expression_space(self._write_space(tmp))
+            candidate_path = self._write_candidate(
+                tmp,
+                "Ref($close, 5) / Ref($close, 20) + Mean($volume, 60)",
+            )
+
+            with self.assertRaisesRegex(ValueError, "window count exceeds max_window_count"):
                 load_expression_candidate(candidate_path, space)
 
     def test_candidate_rejects_disallowed_outer_window_in_nested_expression(self):

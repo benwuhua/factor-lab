@@ -43,7 +43,7 @@ install:
 	$(PIP) install -e .
 
 test:
-	$(PYTHON) -m unittest discover -s tests
+	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests
 
 check-env:
 	$(PYTHON) scripts/check_env.py --provider-config $(CSI500_PROVIDER)

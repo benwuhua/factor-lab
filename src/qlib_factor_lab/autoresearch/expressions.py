@@ -16,6 +16,8 @@ class ExpressionSpace:
     operators: frozenset[str]
     families: frozenset[str]
     max_expression_length: int
+    max_operator_count: int
+    max_window_count: int
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,8 @@ def load_expression_space(path: str | Path) -> ExpressionSpace:
         operators=frozenset(_required_list(data, "operators")),
         families=frozenset(_required_list(data, "families")),
         max_expression_length=int(complexity.get("max_expression_length", 500)),
+        max_operator_count=int(complexity.get("max_operator_count", 20)),
+        max_window_count=int(complexity.get("max_window_count", 6)),
     )
 
 
@@ -76,10 +80,16 @@ def validate_expression_candidate(candidate: ExpressionCandidate, space: Express
     for field in sorted(set(re.findall(r"\$([A-Za-z_][A-Za-z0-9_]*)", candidate.expression))):
         if field not in space.fields:
             raise ValueError(f"disallowed field: {field}")
-    for operator in sorted(set(re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", candidate.expression))):
+    operators = re.findall(r"\b([A-Z][A-Za-z0-9_]*)\s*\(", candidate.expression)
+    if len(operators) > space.max_operator_count:
+        raise ValueError("operator count exceeds max_operator_count")
+    for operator in sorted(set(operators)):
         if operator not in space.operators:
             raise ValueError(f"disallowed operator: {operator}")
-    for window in _extract_operator_windows(candidate.expression):
+    windows = _extract_operator_windows(candidate.expression)
+    if len(set(windows)) > space.max_window_count:
+        raise ValueError("window count exceeds max_window_count")
+    for window in windows:
         if window not in space.windows:
             raise ValueError(f"disallowed window: {window}")
 
