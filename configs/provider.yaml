@@ -1,0 +1,7 @@
+provider_uri: data/qlib/cn_data
+region: cn
+market: csi500
+benchmark: SH000905
+freq: day
+start_time: "2010-01-01"
+end_time: "2020-12-31"

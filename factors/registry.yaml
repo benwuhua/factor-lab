@@ -1,0 +1,41 @@
+factors:
+  - name: ret_5
+    expression: "$close / Ref($close, 5) - 1"
+    direction: 1
+    category: momentum
+    description: "5 day close-to-close return."
+  - name: ret_20
+    expression: "$close / Ref($close, 20) - 1"
+    direction: 1
+    category: momentum
+    description: "20 day close-to-close return."
+  - name: ret_60
+    expression: "$close / Ref($close, 60) - 1"
+    direction: 1
+    category: momentum
+    description: "60 day close-to-close return."
+  - name: reversal_5
+    expression: "Ref($close, 5) / $close - 1"
+    direction: 1
+    category: reversal
+    description: "Short-term reversal candidate based on 5 day price move."
+  - name: vol_20
+    expression: "Std($close / Ref($close, 1) - 1, 20)"
+    direction: -1
+    category: volatility
+    description: "20 day realized volatility; lower volatility is often tested as defensive."
+  - name: vol_adj_mom_20
+    expression: "($close / Ref($close, 20) - 1) / Std($close / Ref($close, 1) - 1, 20)"
+    direction: 1
+    category: momentum
+    description: "20 day momentum scaled by recent realized volatility."
+  - name: turnover_20
+    expression: "Mean($volume, 20) / Mean($volume, 60)"
+    direction: 1
+    category: volume
+    description: "Recent volume activity relative to the medium-term baseline."
+  - name: price_position_20
+    expression: "($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 1e-12)"
+    direction: 1
+    category: price_position
+    description: "Close location in the recent 20 day high-low range."

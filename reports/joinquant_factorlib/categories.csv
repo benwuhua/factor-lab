@@ -1,0 +1,11 @@
+id,name,intro
+8a35b46e9eba231510dd38508a88633f,basics,基础科目及衍生类因子
+99bd9ac4bd9509b95809509106f25ea2,quality,质量类因子
+a43b0539d20a83b4c886fdb32c3c5175,pershare,每股指标因子
+1809929cf65131a52a57268e5874f016,style,风险因子 - 风格因子
+b642019c9bf008387c04a79570a86380,emotion,情绪类因子
+bff12f599abe304b304d94bb0e10597a,growth,成长类因子
+b91603c6cfce800eefd62eef5739973a,risk,风险类因子
+eaa3f1082d430db5bfda6f1b3b212968,technical,技术指标因子
+bccfba9c86d7edf5adfda8c03fb24286,momentum,动量类因子
+fd5f31d5ec0081acc07281c4dc27bce1,style_pro,风险因子 - 新风格因子

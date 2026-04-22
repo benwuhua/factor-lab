@@ -1,0 +1,122 @@
+templates:
+  - name: mom_{window}
+    expression: "$close / Ref($close, {window}) - 1"
+    windows: [5, 10, 20, 60, 120]
+    direction: 1
+    category: candidate_momentum
+    description: "{window} day close-to-close momentum."
+  - name: mom_skip_{lookback}_{skip}
+    expression: "Ref($close, {skip}) / Ref($close, {lookback}) - 1"
+    params:
+      lookback: [20, 60, 120]
+      skip: [5]
+    direction: 1
+    category: candidate_momentum
+    description: "{lookback} day momentum skipping the most recent {skip} sessions."
+  - name: reversal_{window}
+    expression: "Ref($close, {window}) / $close - 1"
+    windows: [3, 5, 10, 20]
+    direction: 1
+    category: candidate_reversal
+    description: "{window} day short-term reversal."
+  - name: intraday_reversal
+    expression: "1 - $close / $open"
+    direction: 1
+    category: candidate_reversal
+    description: "Contrarian signal to the same-day open-to-close return."
+  - name: realized_vol_{window}
+    expression: "Std($close / Ref($close, 1) - 1, {window})"
+    windows: [10, 20, 60]
+    direction: -1
+    category: candidate_volatility
+    description: "{window} day realized volatility; lower values are ranked higher."
+  - name: range_vol_{window}
+    expression: "Mean(($high - $low) / $close, {window})"
+    windows: [10, 20, 60]
+    direction: -1
+    category: candidate_volatility
+    description: "{window} day average intraday high-low range."
+  - name: return_variance_{window}
+    expression: "Std($close / Ref($close, 1) - 1, {window}) * Std($close / Ref($close, 1) - 1, {window})"
+    windows: [20, 60, 120]
+    direction: -1
+    category: candidate_volatility
+    description: "JoinQuant factorlib Variance-style {window} day return variance; lower variance is ranked higher."
+  - name: volume_mom_{window}
+    expression: "Mean($volume, {window}) / Ref(Mean($volume, {window}), {window}) - 1"
+    windows: [5, 20, 60]
+    direction: 1
+    category: candidate_volume_price
+    description: "{window} day volume momentum."
+  - name: pv_corr_{window}
+    expression: "Corr($close / Ref($close, 1) - 1, $volume / Ref($volume, 1) - 1, {window})"
+    windows: [10, 20, 60]
+    direction: 1
+    category: candidate_volume_price
+    description: "{window} day correlation between price return and volume growth."
+  - name: vosc_12_26
+    expression: "(Mean($volume, 12) - Mean($volume, 26)) / (Mean($volume, 12) + 0.000001)"
+    direction: -1
+    category: candidate_volume_price
+    description: "JoinQuant VOSC-style volume oscillator; lower recent volume expansion versus medium volume is ranked higher."
+  - name: davol_{window}
+    expression: "Mean($turnover, {window}) / (Mean($turnover, 120) + 0.000001)"
+    windows: [5, 10, 20]
+    direction: -1
+    category: candidate_turnover
+    description: "JoinQuant DAVOL-style {window} day average turnover divided by 120 day average turnover; lower relative turnover is ranked higher."
+  - name: turnover_mean_{window}
+    expression: "Mean($turnover, {window})"
+    windows: [5, 10, 20, 60]
+    direction: -1
+    category: candidate_turnover
+    description: "JoinQuant VOL-style {window} day average turnover; lower turnover is ranked higher."
+  - name: turnover_volatility_20
+    expression: "Std($turnover, 20)"
+    direction: -1
+    category: candidate_turnover
+    description: "JoinQuant turnover volatility proxy: 20 day standard deviation of turnover; lower volatility is ranked higher."
+  - name: arbr_26
+    expression: "(Sum($high - $open, 26) / (Sum($open - $low, 26) + 0.000001)) - (Sum(Greater($high - Ref($close, 1), 0), 26) / (Sum(Greater(Ref($close, 1) - $low, 0), 26) + 0.000001))"
+    direction: -1
+    category: candidate_emotion
+    description: "JoinQuant ARBR-style sentiment factor over 26 days; lower ARBR is ranked higher based on factorlib screening."
+  - name: boll_position_20
+    expression: "($close - Mean($close, 20)) / (2 * Std($close, 20) + 0.000001)"
+    direction: -1
+    category: candidate_technical
+    description: "JoinQuant Bollinger-band position proxy; lower price position inside the band is ranked higher."
+  - name: amount_mean_{window}
+    expression: "Mean($amount, {window})"
+    windows: [5, 20, 60]
+    direction: 1
+    category: candidate_liquidity
+    description: "{window} day average traded amount as a liquidity proxy."
+  - name: amihud_illiq_{window}
+    expression: "Mean(Abs($close / Ref($close, 1) - 1) / ($amount + 1), {window})"
+    windows: [10, 20, 60]
+    direction: -1
+    category: candidate_liquidity
+    description: "{window} day Amihud-style illiquidity proxy; lower values are ranked higher."
+  - name: price_volume_divergence_{window}
+    expression: "($close / Ref($close, {window}) - 1) - (Mean($volume, {window}) / Ref(Mean($volume, {window}), {window}) - 1)"
+    windows: [10, 20, 60]
+    direction: 1
+    category: candidate_divergence
+    description: "{window} day price momentum minus volume momentum."
+  - name: quiet_breakout_{window}
+    expression: "($close / Ref($close, {window}) - 1) - (Mean($volume, 5) / Mean($volume, {window}) - 1)"
+    windows: [20, 60]
+    direction: 1
+    category: candidate_divergence
+    description: "{window} day price advance not confirmed by recent volume expansion."
+  - name: wangji-factor1
+    expression: "(4 - Abs((Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1) - 0.08) / 0.04) + (Less(Ref($close, 3) / Ref($close, 4) - 1, 0.12) / 0.06) + (Less(Ref($close, 3) / Ref($open, 3) - 1, 0.12) / 0.06) + (Less(Ref($volume, 3) / (Mean(Ref($volume, 4), 10) + 1), 2.5) / 1.5) - ((Abs(Ref($close, 2) / Ref($close, 3) - 1) + Abs(Ref($close, 1) / Ref($close, 2) - 1) + Abs($close / Ref($close, 1) - 1)) / 0.08) - (2.2 * ((Ref($volume, 2) + Ref($volume, 1) + $volume) / (3 * Ref($volume, 3) + 1)))"
+    direction: 1
+    category: candidate_pattern
+    description: "Wangji 14-trading-day pattern similarity score tuned to circled examples: days 1-10 close-range around 8%, capped day-11 price-volume ignition, and days 12-14 low-volume consolidation."
+  - name: wangji-reversal20-combo
+    expression: "If(And(Gt((4 - Abs((Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1) - 0.08) / 0.04) + (Less(Ref($close, 3) / Ref($close, 4) - 1, 0.12) / 0.06) + (Less(Ref($close, 3) / Ref($open, 3) - 1, 0.12) / 0.06) + (Less(Ref($volume, 3) / (Mean(Ref($volume, 4), 10) + 1), 2.5) / 1.5) - ((Abs(Ref($close, 2) / Ref($close, 3) - 1) + Abs(Ref($close, 1) / Ref($close, 2) - 1) + Abs($close / Ref($close, 1) - 1)) / 0.08) - (2.2 * ((Ref($volume, 2) + Ref($volume, 1) + $volume) / (3 * Ref($volume, 3) + 1))), 2.8), Gt(Ref($close, 20) / $close - 1, 0.03)), ((4 - Abs((Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1) - 0.08) / 0.04) + (Less(Ref($close, 3) / Ref($close, 4) - 1, 0.12) / 0.06) + (Less(Ref($close, 3) / Ref($open, 3) - 1, 0.12) / 0.06) + (Less(Ref($volume, 3) / (Mean(Ref($volume, 4), 10) + 1), 2.5) / 1.5) - ((Abs(Ref($close, 2) / Ref($close, 3) - 1) + Abs(Ref($close, 1) / Ref($close, 2) - 1) + Abs($close / Ref($close, 1) - 1)) / 0.08) - (2.2 * ((Ref($volume, 2) + Ref($volume, 1) + $volume) / (3 * Ref($volume, 3) + 1)))) + (3 * Greater(Less(Ref($close, 20) / $close - 1, 0.30), 0) / 0.30), ((4 - Abs((Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1) - 0.08) / 0.04) + (Less(Ref($close, 3) / Ref($close, 4) - 1, 0.12) / 0.06) + (Less(Ref($close, 3) / Ref($open, 3) - 1, 0.12) / 0.06) + (Less(Ref($volume, 3) / (Mean(Ref($volume, 4), 10) + 1), 2.5) / 1.5) - ((Abs(Ref($close, 2) / Ref($close, 3) - 1) + Abs(Ref($close, 1) / Ref($close, 2) - 1) + Abs($close / Ref($close, 1) - 1)) / 0.08) - (2.2 * ((Ref($volume, 2) + Ref($volume, 1) + $volume) / (3 * Ref($volume, 3) + 1)))) - 10)"
+    direction: 1
+    category: candidate_pattern
+    description: "Gate-style combo: first require Wangji shape score, then require 20-day drawdown repair room; boosts qualified patterns by clipped reversal_20."

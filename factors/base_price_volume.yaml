@@ -1,0 +1,31 @@
+categories:
+  momentum:
+    examples: [ret_5, ret_20, ret_60, vol_adj_mom_20]
+  reversal:
+    examples: [reversal_5]
+  volatility:
+    examples: [vol_20]
+  volume:
+    examples: [turnover_20]
+  price_position:
+    examples: [price_position_20]
+  candidate_momentum:
+    examples: [mom_20, mom_skip_60_5]
+  candidate_reversal:
+    examples: [reversal_5, intraday_reversal]
+  candidate_volatility:
+    examples: [realized_vol_20, range_vol_20]
+  candidate_volume_price:
+    examples: [volume_mom_20, pv_corr_20, vosc_12_26]
+  candidate_turnover:
+    examples: [davol_20, turnover_mean_20, turnover_volatility_20]
+  candidate_emotion:
+    examples: [arbr_26]
+  candidate_technical:
+    examples: [boll_position_20]
+  candidate_liquidity:
+    examples: [amount_mean_20, amihud_illiq_20]
+  candidate_divergence:
+    examples: [price_volume_divergence_20, quiet_breakout_60]
+  candidate_pattern:
+    examples: [wangji-factor1]

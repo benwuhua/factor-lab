@@ -1,0 +1,7 @@
+quantiles: 5
+horizons: [1, 5, 10, 20]
+drop_extreme:
+  enabled: false
+neutralize:
+  industry: false
+  market_cap: false

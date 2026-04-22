@@ -1,0 +1,7 @@
+provider_uri: data/qlib/cn_data_current_smoke
+region: cn
+market: all
+benchmark: SH000905
+freq: day
+start_time: '2026-04-01'
+end_time: '2026-04-20'

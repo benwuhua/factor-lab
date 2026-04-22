@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+src/*.egg-info/
+configs/qlib_lgb_workflow*.yaml
+
+# Large local artifacts
+data/qlib/
+data/source/
+data/akshare/
+reports/*.csv
+reports/*.parquet
+reports/*.png
+reports/*
+!reports/
+!reports/joinquant_factorlib/
+!reports/joinquant_factorlib/*.csv
+!reports/joinquant_factorlib/*.json
+mlruns/
+Users/
