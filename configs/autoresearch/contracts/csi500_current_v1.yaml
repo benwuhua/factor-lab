@@ -1,0 +1,14 @@
+name: csi500_current_v1
+provider_config: configs/provider_current.yaml
+universe: csi500_current
+benchmark: SH000905
+start_time: "2015-01-01"
+end_time: "2026-04-20"
+horizons: [5, 20]
+metric: rank_ic_mean
+neutralization:
+  raw: true
+  size_proxy: true
+minimum_observations: 10000
+artifact_root: reports/autoresearch/runs
+ledger_path: reports/autoresearch/expression_results.tsv

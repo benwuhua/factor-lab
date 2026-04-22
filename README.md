@@ -171,6 +171,32 @@ make mine-csi500
 
 The result table includes IC, Rank IC, quintile mean returns, long-short return, turnover, and observation counts.
 
+## Autoresearch
+
+The first controlled autoresearch loop is expression-factor only. It lets an agent edit one candidate YAML while the provider, horizons, neutralization, ledger, and artifact paths stay locked by contract:
+
+```bash
+make autoresearch-expression
+```
+
+Default inputs:
+
+```text
+configs/autoresearch/contracts/csi500_current_v1.yaml
+configs/autoresearch/expression_space.yaml
+configs/autoresearch/candidates/example_expression.yaml
+```
+
+The loop prints a compact summary block, writes raw and size-proxy-neutralized evaluation artifacts, and appends a local ledger under `reports/autoresearch/`. Generated run outputs are ignored by Git.
+
+Summarize the local expression ledger by status:
+
+```bash
+make autoresearch-ledger
+```
+
+The ledger report groups `review`, `discard_candidate`, and `crash` rows, then shows the top review candidates and common discard/crash reasons.
+
 ## Event Backtests
 
 Use event backtests when a factor is closer to an absolute trigger or pattern score than a pure IC feature:

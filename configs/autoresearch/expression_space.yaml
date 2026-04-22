@@ -1,0 +1,35 @@
+fields:
+  - open
+  - high
+  - low
+  - close
+  - volume
+  - amount
+  - turnover
+windows: [3, 5, 10, 20, 60, 120]
+operators:
+  - Ref
+  - Mean
+  - Std
+  - Sum
+  - Max
+  - Min
+  - Abs
+  - Corr
+  - Greater
+  - Less
+  - Gt
+  - And
+  - If
+families:
+  - momentum
+  - reversal
+  - volatility
+  - liquidity
+  - turnover
+  - divergence
+  - price_position
+complexity:
+  max_expression_length: 500
+  max_operator_count: 12
+  max_window_count: 4
