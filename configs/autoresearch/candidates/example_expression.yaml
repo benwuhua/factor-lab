@@ -1,6 +1,6 @@
-name: close_range_position_reversal_20_60_v1
-family: price_position
-expression: "Mean(($high-$close)/($high-$low+0.000001),20)+Mean(($high-$close)/($high-$low+0.000001),60)"
+name: low_position_weighted_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean((($open-$close)/$low)*(($high-$close)/($high-$low+0.000001)),20)+Mean(($open-$close)/$low,60)"
 direction: 1
-description: "20 and 60 day blend of close location within each day's high-low range; stocks repeatedly closing nearer the session low rank higher."
-expected_behavior: "Tests a low-complexity price-position reversal signal related to the reviewed close-below-midpoint idea, but normalizes by the full daily range instead of the price midpoint. Mean(($high-$close)/($high-$low+0.000001),20) captures recent weak closing location, while the 60 day term captures persistent lower-range closes. Higher values should favor names with sustained close-near-low pressure that may mean revert, without using turnover confirmation, volume divergence, threshold clipping, disallowed windows, or high-complexity OHLC composites. The expression uses only allowed high, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 day low-normalized intraday selling pressure weighted by same-day close-near-low position, plus a 60 day low-normalized pressure baseline."
+expected_behavior: "Tests whether the reviewed low-normalized selling-pressure reversal is cleaner when recent down bodies only score strongly if the close also finishes near the session low. Mean((($open-$close)/$low)*(($high-$close)/($high-$low+0.000001)),20) captures recent close-below-open pressure gated by daily range position, while Mean(($open-$close)/$low,60) preserves the persistent pressure backbone that has reviewed well. This avoids the discarded standalone range-body normalization, turnover confirmation, downside clipping, disallowed windows, and high-complexity OHLC composites. The expression uses only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
