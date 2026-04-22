@@ -1,6 +1,6 @@
-name: low_norm_turnover_divergence_reversal_20_v1
-family: divergence
-expression: "Mean(($open-$close)/$low,20)-Corr($close/Mean($close,20),$turnover/Mean($turnover,20),20)"
+name: midpoint_discount_low_norm_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)+Mean((($high+$low)/2-$close)/$close,20)"
 direction: 1
-description: "Low-normalized 20 day selling pressure adjusted by price-turnover divergence."
-expected_behavior: "Tests whether the reliable low-normalized selling-pressure reversal signal improves when recent price movement is not strongly confirmed by turnover. The Mean(($open-$close)/$low,20) term rewards persistent close-below-open pressure on a low-price scale, while subtracting Corr($close/Mean($close,20),$turnover/Mean($turnover,20),20) favors weak or negative price-turnover co-movement. This keeps the expression lower complexity than the discarded normalized volume-divergence variant and avoids the previously crashing turnover-confirmation condition structure."
+description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day close-below-midpoint price-position leg."
+expected_behavior: "Keeps the reviewed low-normalized selling-pressure backbone while adding a compact weak-close position term instead of turnover correlation, volatility damping, or threshold gates. The two Mean(($open-$close)/$low, window) terms reward repeated closes below open relative to the session low, while Mean((($high+$low)/2-$close)/$close,20) favors stocks whose closes sit below the daily high-low midpoint on a return-like scale. This avoids the crashed turnover-divergence and turnover-confirmation paths, the discarded pure volatility/range-compression ideas, and the discarded standalone downside or low-rebound variants while using only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and three Mean operators."
