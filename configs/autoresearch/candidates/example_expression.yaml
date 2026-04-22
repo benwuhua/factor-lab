@@ -1,6 +1,6 @@
-name: open_low_close_mean_norm_selling_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open-$close)/(($open+$low+$close)/3),20)+Mean(($open-$close)/(($open+$low+$close)/3),60)"
+name: low_price_volume_divergence_20_v1
+family: divergence
+expression: "0-Corr($low/Mean($low,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 and 60 day intraday selling-pressure reversal normalized by the open-low-close mean; repeated closes below open rank higher when scaled by a low-biased but less extreme price anchor."
-expected_behavior: "Tests a compact price-position/reversal variant of the reviewed selling-pressure family without adding volume, amount, turnover confirmation, thresholds, or range compression. The denominator (($open+$low+$close)/3) sits between the strong low-normalized anchor and the more stable open/close anchors, so Mean(($open-$close)/(($open+$low+$close)/3),20) captures recent close-below-open pressure while the 60 day term captures persistent pressure on the same scale. This avoids the discarded downside-only, low-rebound, close-from-high, standalone range-position, turnover-volatility, and crash-prone turnover-confirmation ideas. The expression uses only allowed open, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 day negative correlation between normalized low price and normalized volume; stocks where volume expands while intraday lows weaken rank higher."
+expected_behavior: "Tests a compact low-price volume divergence idea distinct from the heavily explored selling-pressure denominator variants. A high value means the 20 day correlation between low relative to its own 20 day mean and volume relative to its own 20 day mean is low or negative, which may capture capitulation-like low prints on rising participation before reversal. This avoids the discarded intraday range-position divergence, pressure-volume divergence, slow close-volume divergence, pure turnover-volatility, downside-only, and crash-prone turnover-confirmation ideas. The expression uses only allowed low and volume fields, the allowed 20 day window, and allowed Mean and Corr operators."
