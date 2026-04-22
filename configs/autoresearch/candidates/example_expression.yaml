@@ -1,6 +1,6 @@
-name: volume_weighted_low_norm_pressure_reversal_20_v1
+name: smoothed_low_norm_selling_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean((($open - $close) / $low) * ($volume / Mean($volume, 20)), 20)"
+expression: "Mean($open - $close, 20) / Mean($low, 20) + Mean($open - $close, 60) / Mean($low, 60)"
 direction: 1
-description: "20 day low-normalized intraday selling pressure weighted by relative volume."
-expected_behavior: "Tests whether close-below-open pressure is more informative when it occurs on above-normal volume. The down-body term (($open - $close) / $low) keeps the reviewed low-anchor reversal premise, while $volume / Mean($volume, 20) scales pressure by recent volume participation rather than using turnover or threshold gates. Higher values indicate repeated weak intraday closes with heavier relative trading, which may reflect capitulation and later mean reversion. This avoids discarded or crash-prone turnover-confirmation, low-rebound, downside-clipping, range-compression, and high-complexity OHLC-average ideas. The expression uses only allowed open, close, low, and volume fields; the allowed 20 day window; and two allowed Mean operators."
+description: "20 and 60 day smoothed low-normalized intraday selling pressure reversal."
+expected_behavior: "Tests whether smoothing both the close-below-open body and the low-price denominator preserves the strong reviewed low_norm_selling_pressure_reversal premise while reducing single-day denominator noise. Higher values indicate persistent weak intraday closes relative to the stock's recent low-price scale, which may reflect capitulation and later mean reversion. This avoids discarded or crash-prone turnover confirmation, downside-only clipping, low-rebound, range-compression, high-pullback, and high-complexity OHLC-average ideas. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and four allowed Mean operators."
