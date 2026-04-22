@@ -1,6 +1,6 @@
-name: volatility_damped_low_norm_pressure_reversal_3_20_v1
-family: reversal
-expression: "Mean(($open-$close)/$low,20)-Std($close/Ref($close,3)-1,20)"
+name: near_60d_low_low_norm_pressure_reversal_20_60_v1
+family: price_position
+expression: "Mean(($open-$close)/$low,20)-($close/Min($low,60)-1)"
 direction: 1
-description: "20 day low-normalized selling pressure penalized by recent three day return volatility."
-expected_behavior: "Tests whether the reviewed low-normalized intraday selling-pressure reversal signal is cleaner when noisy short-horizon price volatility is damped. A high value means closes have tended to finish below opens relative to the low-price scale, but the stock has not had unusually volatile three day close-to-close moves over the same 20 day window. This keeps the expression low complexity while avoiding repeated low-anchor variants, direct range-position reversals, volume or amount divergence confirmations, and crash-prone turnover-confirmation ideas. The expression uses only allowed open, close, and low fields; allowed 3 and 20 day windows; and allowed Mean, Std, and Ref operators."
+description: "20 day low-normalized selling pressure with a simple 60 day low-distance price-position adjustment."
+expected_behavior: "Tests whether the reviewed low-normalized intraday selling-pressure reversal signal is stronger when the current close remains near its 60 day low. A high value means closes have tended to finish below opens relative to the low-price scale, while the stock is not far above the trailing 60 day low, preserving a straightforward capitulation-and-reversion interpretation. This avoids repeating the discarded volatility damping idea, direct upper-shadow and downside-only variants, volume or amount divergence confirmations, and crash-prone turnover confirmation. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and allowed Mean and Min operators."
