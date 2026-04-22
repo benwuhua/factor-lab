@@ -1,6 +1,6 @@
-name: low_anchor_recent_low_reversion_60_5_v1
+name: low_anchor_oc_mid_reversion_60_v1
 family: reversal
-expression: "Mean($low, 60) / Mean($low, 5) - 1"
+expression: "Mean($low, 60) / (($open + $close) / 2) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against the recent 5 day average low; stocks making short-term lows below their longer-run low anchor rank higher."
-expected_behavior: "Extends the reviewed low-anchor reversal family by replacing close/open denominators with a recent low denominator. The 5 day low average smooths single-day low noise while keeping the expression low complexity, using only allowed 5 and 60 day windows, and avoiding previously discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
+description: "60 day low-anchor reversion measured against the current open/close midpoint; stocks trading below their longer-run low anchor on a blended intraday price rank higher."
+expected_behavior: "Extends the reviewed low-anchor reversal family by replacing the single close or open denominator with the current open/close midpoint. This keeps the expression low complexity, uses only the allowed 60 day window, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
