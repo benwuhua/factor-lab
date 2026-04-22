@@ -1,6 +1,6 @@
-name: turnover_damped_hybrid_low_high_pressure_reversal_20_60_v1
+name: turnover_damped_hybrid_low_close_pressure_reversal_20_60_v1
 family: turnover
-expression: "Mean(($open-$close)/($low*(1+$turnover)),20)+Mean(($open-$close)/$high,60)"
+expression: "Mean(($open-$close)/($low*(1+$turnover)),20)+Mean(($open-$close)/$close,60)"
 direction: 1
-description: "20 day turnover-damped low-normalized selling pressure plus a 60 day high-normalized persistent pressure anchor."
-expected_behavior: "Tests whether the reviewed turnover-damped low-normalized recent selling-pressure signal remains strong when the medium-horizon anchor is normalized by the session high rather than open or low. A high value means recent closes have tended to finish below opens relative to the session low after mild turnover damping, with persistent 60 day pressure scaled by the upper price anchor. This avoids the discarded volatility damping, range compression, downside-only, near-low penalty, low-rebound, high-pullback, and turnover-confirmation gate ideas while keeping the expression low complexity. The expression uses only allowed open, close, low, high, and turnover fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 day turnover-damped low-normalized selling pressure plus a 60 day close-normalized persistent pressure anchor."
+expected_behavior: "Tests whether the reviewed turnover-damped low-normalized recent selling-pressure signal remains useful when the medium-horizon anchor is normalized by close instead of high or open. A high value means recent closes have tended to finish below opens relative to the session low after mild turnover damping, with persistent 60 day pressure scaled by the realized closing price. This avoids the discarded volatility damping, range compression, downside-only, near-low penalty, low-rebound, high-pullback, and turnover-confirmation gate ideas while keeping the expression low complexity. The expression uses only allowed open, close, low, and turnover fields; allowed 20 and 60 day windows; and two allowed Mean operators."
