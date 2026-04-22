@@ -1,6 +1,6 @@
-name: low_anchor_lagged_close_reversion_60_5_v1
+name: low_anchor_recent_high_reversion_60_5_v1
 family: reversal
-expression: "Mean($low, 60) / Mean(Ref($close, 5), 5) - 1"
+expression: "Mean($low, 60) / Mean($high, 5) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against a lagged 5 day average close; stocks whose prior-week close level sat below their longer-run low anchor rank higher."
-expected_behavior: "Tests whether the reviewed low-anchor reversal family benefits from using a slower lagged close denominator instead of same-day or immediately recent close anchors. The lagged 5 day denominator should reduce sensitivity to current-day noise while staying low complexity and avoiding previously discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
+description: "60 day low-anchor reversion measured against the recent 5 day average high; stocks whose recent highs remain depressed versus their longer-run low anchor rank higher."
+expected_behavior: "Tests whether the reviewed low-anchor reversal family is more robust when the short-term reference uses recent highs rather than close, open, low, or lagged close anchors. The signal stays low complexity, uses only allowed 5 and 60 day windows, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
