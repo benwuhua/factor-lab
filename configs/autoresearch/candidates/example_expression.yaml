@@ -1,6 +1,6 @@
-name: low_norm_selling_pressure_reversal_10_20_v1
+name: close_norm_selling_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open-$close)/$low,10)+Mean(($open-$close)/$low,20)"
+expression: "Mean(($open-$close)/$close,20)+Mean(($open-$close)/$close,60)"
 direction: 1
-description: "10 day plus 20 day low-normalized intraday selling pressure; stocks that repeatedly close below the open relative to their daily low rank higher."
-expected_behavior: "Tests whether the reviewed low-normalized selling-pressure reversal works better with a faster 10 day component paired with the established 20 day pressure signal, instead of slower 60 or 120 day confirmation. Higher values indicate recent close-below-open pressure scaled by the session low, which may capture short-term selling exhaustion while staying simpler than volume, turnover, or OHLC-composite variants. The expression uses only allowed open, close, and low fields; allowed 10 and 20 day windows; and two allowed Mean operators."
+description: "20 day plus 60 day close-normalized intraday selling pressure; stocks that repeatedly close below the open relative to their close rank higher."
+expected_behavior: "Tests the same persistent close-below-open selling-pressure reversal family as the reviewed open-, low-, high-, and HL-mid-normalized variants, but uses close as the price scale. Higher values indicate sustained intraday selling pressure normalized by the terminal traded price, which may capture short-term exhaustion without adding volume, turnover, thresholds, or composite anchors. The expression uses only allowed open and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
