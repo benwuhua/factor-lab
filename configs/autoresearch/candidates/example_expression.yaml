@@ -1,6 +1,6 @@
-name: fast_high_norm_price_amount_divergence_10_v1
+name: fast_upper_mid_price_volume_divergence_10_v1
 family: divergence
-expression: "0-Corr($high/Mean($high,10),$amount/Mean($amount,10),10)"
+expression: "0-Corr((($high+$close)/2)/Mean(($high+$close)/2,10),$volume/Mean($volume,10),10)"
 direction: 1
-description: "10 day divergence between normalized high-price strength and normalized traded amount."
-expected_behavior: "A higher value means the short-window correlation between normalized highs and normalized traded amount is more negative, favoring stocks whose recent upside price prints are not being confirmed by capital flow. This keeps the reviewed high-norm price amount divergence idea but tests a faster 10 day horizon, while avoiding the crashed turnover-divergence path and discarded range-position ideas. The expression uses only allowed high and amount fields, the allowed 10 day window, and one Corr plus two Mean operators."
+description: "10 day divergence between normalized upper-mid price strength and normalized traded volume."
+expected_behavior: "A higher value means the short-window correlation between the upper-mid price proxy, (high plus close)/2, and traded volume is more negative. This favors stocks whose recent price strength near the upper part of the daily range is not being confirmed by volume, extending the reviewed price-volume divergence family with a faster horizon while avoiding the crashed turnover-divergence path and discarded range-position ideas. The expression uses only allowed high, close, and volume fields, the allowed 10 day window, and one Corr plus two Mean operators."
