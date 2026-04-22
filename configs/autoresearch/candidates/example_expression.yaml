@@ -1,6 +1,6 @@
-name: low_anchor_recent_hlc_reversion_60_5_v1
+name: low_anchor_recent_high_reversion_60_3_v1
 family: reversal
-expression: "Mean($low, 60) / ((Mean($high, 5) + Mean($low, 5) + Mean($close, 5)) / 3) - 1"
+expression: "Mean($low, 60) / Mean($high, 3) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against a recent 5 day HLC composite; stocks whose recent traded range and close sit nearer the longer-run low anchor rank higher."
-expected_behavior: "Tests whether a recent high-low-close denominator keeps the reviewed low-anchor reversal signal while avoiding dependence on the opening print. The candidate uses only allowed high, low, and close fields with 60 and 5 day windows, stays low complexity, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, and disallowed-window ideas."
+description: "60 day low-anchor reversion measured against the recent 3 day high; stocks whose short-term highs remain close to their longer-run low anchor rank higher."
+expected_behavior: "Tests whether a faster 3 day recent-high denominator preserves the reviewed low-anchor reversal signal while improving responsiveness versus the prior 5, 10, and 20 day variants. The expression uses only allowed low and high fields with 60 and 3 day windows, stays very low complexity, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, and disallowed-window ideas."
