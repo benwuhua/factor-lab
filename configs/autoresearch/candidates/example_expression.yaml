@@ -1,6 +1,6 @@
-name: selling_pressure_acceleration_20_60_v1
+name: short_open_norm_selling_pressure_reversal_10_60_v1
 family: reversal
-expression: "Mean(($open - $close) / $open, 20) - Mean(($open - $close) / $open, 60)"
+expression: "Mean(($open - $close) / $open, 10) + Mean(($open - $close) / $open, 60)"
 direction: 1
-description: "Recent open-to-close selling pressure relative to its 60 day baseline, targeting short-term pressure acceleration and reversal."
-expected_behavior: "Tests whether names with 20 day open-to-close weakness that is elevated versus their own 60 day baseline are more likely to mean revert. The signal is positive when recent closes are weak versus opens faster than the longer baseline, while persistent stale pressure is subtracted out. This keeps the successful open-normalized selling pressure family but removes the downside clipping that crashed or discarded recent variants, using only allowed open and close fields, allowed 20 and 60 windows, and two Mean operators."
+description: "10 and 60 day open-normalized intraday selling-pressure reversal blend; stocks with short-term and persistent closes below open rank higher."
+expected_behavior: "Tests a faster recent leg of the reviewed open-normalized selling-pressure family without repeating discarded acceleration, downside clipping, turnover-weighted, or high-complexity OHLC variants. Mean(($open - $close) / $open, 10) captures fresher down-body pressure, while the 60 day leg keeps the persistent exhaustion anchor. Higher values should favor names with renewed short-term selling pressure layered on medium-term intraday weakness. The expression uses only allowed open and close fields, allowed 10 and 60 windows, and two Mean operators."
