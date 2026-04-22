@@ -1,6 +1,6 @@
-name: low_anchor_reversion_60_v1
+name: smooth_low_anchor_reversion_60_5_v1
 family: reversal
-expression: "Mean($low, 60) / $close - 1"
+expression: "Mean($low, 60) / Mean($close, 5) - 1"
 direction: 1
-description: "60 day low-anchor reversion; stocks whose current close is depressed toward their recent average low rank higher."
-expected_behavior: "Tests a simple lower-price anchor that complements reviewed close, open, midpoint, and high-anchor reversion variants while staying distinct from the discarded Min-based distance-from-low idea. The signal should preserve the medium-horizon reversal interpretation without adding turnover, volatility scaling, range normalization, or disallowed windows."
+description: "Smoothed 60 day low-anchor reversion; stocks whose recent 5 day average close sits below their 60 day average low rank higher."
+expected_behavior: "Extends the reviewed low-anchor reversion with the same 5 day denominator smoothing that helped related anchor variants reduce one-day close noise and turnover. The signal stays in the reversal family, uses only allowed 60 and 5 day windows, and avoids the discarded Min-based distance-from-low, turnover-only, VWAP-anchor, volatility-scaled, range-normalized, and disallowed 0 or 1 day window ideas."
