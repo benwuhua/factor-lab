@@ -1,6 +1,6 @@
-name: low_anchor_high_oc_mid_ceiling_reversion_60_3_10_v1
+name: low_anchor_high_hl_mid_ceiling_reversion_60_3_10_v1
 family: reversal
-expression: "Mean($low, 60) / ((Max($high, 3) + Mean(($open + $close) / 2, 10)) / 2) - 1"
+expression: "Mean($low, 60) / ((Max($high, 3) + Mean(($high + $low) / 2, 10)) / 2) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against a blend of the very recent high ceiling and 10 day accepted open-close midpoint; stocks still close to the longer-run low anchor without broad open/close repair rank higher."
-expected_behavior: "Extends the reviewed low-anchor plus high-ceiling reversal family while avoiding the discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, and disallowed-window ideas. Mean($low, 60) supplies the stable downside anchor, Max($high, 3) penalizes fresh rebound spikes, and Mean(($open + $close) / 2, 10) uses a short accepted-price midpoint instead of close alone so one-sided closing noise has less influence. Higher values should favor compressed stocks with limited follow-through from their 60 day low anchor. The expression uses only allowed low/high/open/close fields, 3/10/60 windows, and three rolling operators."
+description: "60 day low-anchor reversion measured against a blend of the very recent high ceiling and 10 day high-low midpoint; stocks still compressed near the longer-run low anchor without broad range repair rank higher."
+expected_behavior: "Extends the reviewed low-anchor plus high-ceiling reversal family while avoiding the discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, and disallowed-window ideas. Mean($low, 60) supplies the stable downside anchor, Max($high, 3) penalizes fresh rebound spikes, and Mean(($high + $low) / 2, 10) uses a recent trading-range midpoint rather than the prior open-close midpoint so intraday range recovery is required before the signal fades. Higher values should favor compressed stocks with limited follow-through from their 60 day low anchor. The expression uses only allowed low/high fields, 3/10/60 windows, and three rolling operators."
