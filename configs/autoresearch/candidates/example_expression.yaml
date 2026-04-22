@@ -1,6 +1,6 @@
-name: close_mean_range_discount_reversal_20_v1
-family: price_position
-expression: "(Mean($high,20)-$close)/(Mean($high,20)-Mean($low,20))"
+name: open_high_mid_price_volume_divergence_20_v1
+family: divergence
+expression: "0-Corr((($open+$high)/2)/Mean(($open+$high)/2,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day close discount versus the rolling mean high-low channel."
-expected_behavior: "A higher value means today's close sits further below the 20 day average high, scaled by the 20 day average high-low spread. This is a low complexity price-position reversal test: names with plain close reversal and range position have produced reviewable rows, while recent discarded ideas were mainly volatility-only, open range position, or turnover-divergence variants. The expression uses only allowed high, low, and close fields; the allowed 20 day window; and three Mean operators."
+description: "20 day divergence between the normalized open-high midpoint and normalized traded volume."
+expected_behavior: "A higher value means the rolling correlation between the open-high midpoint, (($open+$high)/2) relative to its 20 day mean, and volume relative to its 20 day mean is lower or negative. This keeps the candidate in the reviewed price-volume divergence family while testing an untried upper intraday anchor distinct from close, open, high, low, high-low midpoint, open-close midpoint, typical price, and high-close upper midpoint variants. It avoids turnover-based paths that have crashed and recent discarded pure volatility or range-position ideas, using only allowed open, high, and volume fields; the allowed 20 day window; and one Corr plus two Mean operators."
