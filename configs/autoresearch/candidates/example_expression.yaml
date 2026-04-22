@@ -1,6 +1,6 @@
-name: vol_damped_persistent_low_norm_pressure_reversal_20_60_v1
+name: open_low_mid_discount_pressure_reversal_20_60_v1
 family: reversal
-expression: "(Mean(($open-$close)/$low,20)*(1-Std($close,20)/Mean($close,20)))+Mean(($open-$close)/$low,60)"
+expression: "Mean((($open+$low)/2-$close)/$low,20)+Mean(($open-$close)/$low,60)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal with a simple 20 day price-volatility dampener on the recent leg."
-expected_behavior: "Mean(($open-$close)/$low,20) captures recent close-below-open pressure relative to the session low, while Mean(($open-$close)/$low,60) keeps the persistent pressure anchor that has repeatedly survived review. The 20 day leg is scaled by 1-Std($close,20)/Mean($close,20), so crowded high-volatility selloffs contribute less than steadier selling pressure with the same low-normalized body. This avoids the crashed turnover confirmation/divergence paths, avoids pure volatility or near-low filters that were discarded, and uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and allowed Mean and Std operators."
+description: "20 day open-low midpoint discount reversal plus a 60 day low-normalized selling-pressure anchor."
+expected_behavior: "Mean((($open+$low)/2-$close)/$low,20) rewards names whose closes persistently finish below the lower intraday open-low midpoint, capturing clear end-of-day selling pressure without adding volume, turnover, or volatility filters. Mean(($open-$close)/$low,60) keeps the simple persistent low-normalized pressure anchor that has repeatedly survived review. This is distinct from the prior high-low midpoint discount, open-low midpoint normalization, near-low, low-rebound, pure volatility, and turnover confirmation/divergence variants, while using only allowed open, low, and close fields; allowed 20 and 60 day windows; and allowed Mean operators."
