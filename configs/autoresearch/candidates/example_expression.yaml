@@ -1,6 +1,6 @@
-name: upper_wick_volume_divergence_high_discount_reversal_20_60_v1
+name: slow_volume_baseline_high_discount_divergence_reversal_20_60_120_v1
 family: divergence
-expression: "0-Corr(($high-$close)/$close,$volume/Mean($volume,20),20)+(Mean($high,60)-$close)/$close"
+expression: "0-Corr($high/Mean($high,60),$volume/Mean($volume,120),20)+(Mean($high,60)-$close)/$close"
 direction: 1
-description: "20 day upper-wick pressure versus volume divergence with a 60 day mean-high discount reversal term."
-expected_behavior: "Ranks stocks higher when intraday upper-wick pressure is weakly confirmed by normalized volume over 20 days, and when the close remains below the stock's 60 day average high. This keeps the reviewed high-discount reversal anchor but changes the divergence leg from normalized high levels to close-relative upper wick pressure, avoiding the repeated volume/amount high-level variants and the crashed turnover-divergence pattern. The expression uses only allowed high, close, and volume fields with 20 and 60 day windows, two Mean calls, and one Corr call."
+description: "20 day high versus slow normalized-volume divergence with a 60 day mean-high discount reversal term."
+expected_behavior: "Ranks stocks higher when normalized highs are weakly confirmed by volume relative to a slower 120 day baseline, while the close remains below the stock's 60 day average high. This keeps the simple high-discount reversal anchor that has reviewed well, but changes the liquidity confirmation from a short 20 day volume baseline to a slower 120 day baseline to test whether less transient volume crowding improves persistence. The expression uses only allowed high, close, and volume fields with 20, 60, and 120 day windows, three Mean calls, and one Corr call."
