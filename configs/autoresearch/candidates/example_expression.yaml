@@ -1,6 +1,6 @@
-name: low_price_volume_divergence_20_v1
-family: divergence
-expression: "0-Corr($low/Mean($low,20),$volume/Mean($volume,20),20)"
+name: open_gap_reversal_3_20_v1
+family: reversal
+expression: "0-Mean($open/Ref($close,3)-1,20)"
 direction: 1
-description: "20 day negative correlation between normalized low price and normalized volume; stocks where volume expands while intraday lows weaken rank higher."
-expected_behavior: "Tests a compact low-price volume divergence idea distinct from the heavily explored selling-pressure denominator variants. A high value means the 20 day correlation between low relative to its own 20 day mean and volume relative to its own 20 day mean is low or negative, which may capture capitulation-like low prints on rising participation before reversal. This avoids the discarded intraday range-position divergence, pressure-volume divergence, slow close-volume divergence, pure turnover-volatility, downside-only, and crash-prone turnover-confirmation ideas. The expression uses only allowed low and volume fields, the allowed 20 day window, and allowed Mean and Corr operators."
+description: "20 day average reversal of the open price relative to the close from three trading days earlier."
+expected_behavior: "Tests a compact gap-style reversal signal that is distinct from the heavily explored selling-pressure denominator variants, volume/amount divergence variants, discarded direct range-position ideas, and crash-prone turnover-confirmation idea. A high value means recent opens have been weak versus the close three sessions earlier, which may capture short-horizon opening-price pessimism before mean reversion. The expression uses only allowed open and close fields, allowed 3 and 20 day windows, and allowed Ref and Mean operators."
