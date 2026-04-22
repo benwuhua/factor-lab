@@ -1,6 +1,6 @@
-name: normalized_price_amount_divergence_20_v1
-family: divergence
-expression: "0-Corr($close/Mean($close,20),$amount/Mean($amount,20),20)"
+name: close_range_position_reversal_20_60_v1
+family: price_position
+expression: "Mean(($high-$close)/($high-$low+0.000001),20)+Mean(($high-$close)/($high-$low+0.000001),60)"
 direction: 1
-description: "20 day negative correlation between normalized close and normalized amount; stocks where traded value expands while relative price is weak rank higher."
-expected_behavior: "Tests a simple price-amount divergence idea distinct from the repeated selling-pressure and low-anchor variants. Higher values indicate lower or negative 20 day correlation between close relative to its 20 day mean and traded amount relative to its 20 day mean, which may capture value-backed capitulation during price weakness without thresholds, turnover fields, or multi-anchor composites. The expression uses only allowed close and amount fields; the allowed 20 day window; and allowed Mean and Corr operators."
+description: "20 and 60 day blend of close location within each day's high-low range; stocks repeatedly closing nearer the session low rank higher."
+expected_behavior: "Tests a low-complexity price-position reversal signal related to the reviewed close-below-midpoint idea, but normalizes by the full daily range instead of the price midpoint. Mean(($high-$close)/($high-$low+0.000001),20) captures recent weak closing location, while the 60 day term captures persistent lower-range closes. Higher values should favor names with sustained close-near-low pressure that may mean revert, without using turnover confirmation, volume divergence, threshold clipping, disallowed windows, or high-complexity OHLC composites. The expression uses only allowed high, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
