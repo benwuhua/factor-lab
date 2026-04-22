@@ -1,6 +1,6 @@
-name: hybrid_open_close_norm_selling_pressure_reversal_20_60_v1
+name: hybrid_low_oc_mid_norm_selling_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open-$close)/$open,20)+Mean(($open-$close)/$close,60)"
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/(($open+$close)/2),60)"
 direction: 1
-description: "20 day open-normalized plus 60 day close-normalized intraday selling-pressure reversal; stocks with repeated closes below open rank higher."
-expected_behavior: "Tests a low-complexity blend of two reviewed selling-pressure normalizations without adding volume, turnover, thresholds, or composite OHLC anchors. The 20 day open-normalized leg emphasizes recent open-to-close weakness relative to the entry anchor, while the 60 day close-normalized leg captures persistent pressure relative to the final traded price. Higher values should favor names with sustained intraday selling pressure that may mean revert over the evaluation horizon. The expression uses only allowed open and close fields, allowed 20 and 60 day windows, and two allowed Mean operators."
+description: "20 day low-normalized plus 60 day open-close-mid normalized intraday selling-pressure reversal; stocks with repeated weak closes rank higher."
+expected_behavior: "Tests a low-complexity hybrid of reviewed selling-pressure anchors without adding volume, turnover, thresholds, correlations, or high-complexity OHLC composites. The 20 day low-normalized leg keeps the stronger recent exhaustion signal by scaling close-below-open pressure against the session low, while the 60 day open-close midpoint leg measures persistent pressure against a stable traded-price anchor less extreme than the low and less single-price dependent than close alone. Higher values should favor names with sustained intraday selling pressure that may mean revert over the evaluation horizon. The expression uses only allowed open, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
