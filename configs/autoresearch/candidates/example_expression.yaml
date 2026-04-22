@@ -1,6 +1,6 @@
-name: gap5_amount_divergence_20_v1
+name: gap5_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr(($open/Ref($close,5)-1),$amount/Mean($amount,20),20)"
+expression: "0-Corr(($open/Ref($close,5)-1),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day divergence between the 5 day open gap anchor and normalized traded amount."
-expected_behavior: "A higher value means the rolling correlation between the 5 day open gap anchor, $open/Ref($close,5)-1, and amount relative to its 20 day mean is lower or negative. The idea extends the recently reviewed gap and price-volume divergence family with capital-flow confirmation through amount instead of another intraday price anchor. It avoids turnover expressions that recently crashed and discarded pure volatility, range-position, and intraday-rebound divergence paths, using only allowed open, close, and amount fields; the allowed 5 and 20 day windows; and one Corr, one Ref, and one Mean operator."
+description: "20 day divergence between the 5 day open gap anchor and normalized volume."
+expected_behavior: "A higher value means the rolling correlation between the 5 day open gap anchor, $open/Ref($close,5)-1, and volume relative to its 20 day mean is lower or negative. The idea extends the reviewed gap divergence path with volume rather than amount, preserving the same low-complexity structure while avoiding turnover expressions that recently crashed and discarded pure volatility, range-position, and intraday-rebound divergence paths. It uses only allowed open, close, and volume fields; the allowed 5 and 20 day windows; and one Corr, one Ref, and one Mean operator."
