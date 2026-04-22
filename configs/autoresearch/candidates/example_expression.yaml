@@ -1,6 +1,6 @@
-name: open_pressure_volume_divergence_20_v1
-family: divergence
-expression: "Mean(($open - $close) / $open, 20) - Corr($close, $volume, 20)"
+name: low_rebound_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open - $close) / $open, 60) + Mean(($close - $low) / $open, 20)"
 direction: 1
-description: "20 day intraday selling-pressure reversal adjusted by close-volume divergence; stocks with closes below open and weaker close-volume correlation rank higher."
-expected_behavior: "Tests whether recent open-normalized down-body pressure is cleaner when paired with negative or weak close-volume correlation. Mean(($open - $close) / $open, 20) captures persistent intraday selling pressure, while subtracting Corr($close, $volume, 20) favors names where volume has not confirmed rising closes, a simple divergence pattern that may indicate exhaustion rather than trend continuation. This avoids previously discarded turnover compression, price-turnover spread, downside clipping, and high-complexity turnover-weighted variants. The expression uses allowed open, close, and volume fields, the allowed 20 day window, and two allowed operators."
+description: "Persistent 60 day intraday selling pressure combined with 20 day recovery from intraday lows; stocks with repeated close-below-open pressure but better low-to-close rebound rank higher."
+expected_behavior: "Tests a simple capitulation-and-absorption reversal pattern. Mean(($open - $close) / $open, 60) captures persistent intraday selling pressure, while Mean(($close - $low) / $open, 20) favors names where recent closes have recovered from the day's lows instead of finishing near the bottom of the range. The idea is distinct from prior low-anchor and selling-pressure variants because it does not use rolling price anchors, high ceilings, turnover weighting, volume divergence, clipping, or disallowed windows. The expression uses allowed open, low, and close fields with allowed 20 and 60 day windows and two Mean operators."
