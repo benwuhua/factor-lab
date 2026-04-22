@@ -1,6 +1,6 @@
-name: typical_norm_selling_pressure_reversal_20_60_v1
+name: short_low_norm_selling_pressure_reversal_5_60_v1
 family: reversal
-expression: "Mean(($open-$close)/(($high+$low+$close)/3),20)+Mean(($open-$close)/(($high+$low+$close)/3),60)"
+expression: "Mean(($open-$close)/$low,5)+Mean(($open-$close)/$low,60)"
 direction: 1
-description: "20 and 60 day close-below-open selling-pressure reversal normalized by the daily typical price."
-expected_behavior: "Extends the reviewed 20/60 selling-pressure reversal family with a typical-price denominator that blends high, low, and close without the higher-complexity OHLC composite that was discarded. Mean(($open-$close)/(($high+$low+$close)/3),20) captures recent intraday selling pressure scaled by the day's representative traded level, while the 60 day term captures persistence. Higher values should favor names with repeated weak closes versus opens that may be prone to reversal. The expression uses only allowed open, high, low, and close fields, the allowed 20 and 60 day windows, and two Mean operators, avoiding previously discarded or crashed turnover-confirmation, downside-clipping, range-body, low-rebound, and low-volatility compression ideas."
+description: "5 and 60 day close-below-open selling-pressure reversal normalized by the daily low price."
+expected_behavior: "Tests whether very recent low-normalized intraday selling pressure adds useful timing to the persistent 60 day selling-pressure reversal signal. Mean(($open-$close)/$low,5) captures short-horizon weak closes versus opens scaled by the session low, while Mean(($open-$close)/$low,60) preserves the slower pressure component that has been robust in reviewed variants. Higher values should favor names with fresh and persistent selling pressure that may be prone to reversal. The expression uses only allowed open, close, and low fields, the allowed 5 and 60 day windows, and two Mean operators, avoiding previously discarded or crashed turnover-confirmation, downside-clipping, range-compression, range-body, low-rebound, and open-to-low pullback ideas."
