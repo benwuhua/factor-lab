@@ -1,6 +1,6 @@
-name: fast_normalized_price_volume_divergence_10_v1
-family: divergence
-expression: "0-Corr($close/Mean($close,10),$volume/Mean($volume,10),10)"
+name: close_20d_high_drawdown_reversal_v1
+family: reversal
+expression: "Max($close,20)/$close-1"
 direction: 1
-description: "10 day negative correlation between normalized close and normalized volume; stocks where recent volume does not confirm relative price strength rank higher."
-expected_behavior: "Tests a faster version of the reviewed normalized price-volume divergence idea while moving away from the recent 20/60 quiet drawdown and low-normalized selling-pressure variants. Higher values mean the 10 day correlation between close relative to its 10 day mean and volume relative to its 10 day mean is lower or negative, which may capture short-term capitulation or weak volume confirmation before reversal. The candidate avoids turnover fields that have crashed, avoids discarded pure low-volatility, intraday-position divergence, downside-only, and near-low variants, and stays low complexity with only allowed close and volume fields; the 10 day window; and allowed Corr and Mean operators."
+description: "20 day close-to-high drawdown reversal; stocks trading farther below their recent highest close rank higher."
+expected_behavior: "Tests a very low-complexity price-position reversal anchor that is distinct from the discarded turnover, pure low-volatility, intraday shortfall, and near-low pressure variants. Higher values mean the latest close is farther below the 20 day maximum close, which may capture short-term overreaction while avoiding the crowded low-normalized selling-pressure family. The expression uses only the allowed close field, the 20 day window, and the allowed Max operator."
