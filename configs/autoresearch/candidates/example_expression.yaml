@@ -1,6 +1,6 @@
-name: low_position_weighted_selling_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean((($open-$close)/$low)*(($high-$close)/($high-$low+0.000001)),20)+Mean(($open-$close)/$low,60)"
+name: low_norm_fast_volume_divergence_reversal_20_60_10_v1
+family: divergence
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($close,$volume,10)"
 direction: 1
-description: "20 day low-normalized intraday selling pressure weighted by same-day close-near-low position, plus a 60 day low-normalized pressure baseline."
-expected_behavior: "Tests whether the reviewed low-normalized selling-pressure reversal is cleaner when recent down bodies only score strongly if the close also finishes near the session low. Mean((($open-$close)/$low)*(($high-$close)/($high-$low+0.000001)),20) captures recent close-below-open pressure gated by daily range position, while Mean(($open-$close)/$low,60) preserves the persistent pressure backbone that has reviewed well. This avoids the discarded standalone range-body normalization, turnover confirmation, downside clipping, disallowed windows, and high-complexity OHLC composites. The expression uses only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 and 60 day low-normalized intraday selling-pressure reversal adjusted by fast close-volume divergence."
+expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal with a 10 day close-volume divergence penalty. The two Mean terms preserve the simple recent and persistent close-below-open pressure backbone, while subtracting Corr($close,$volume,10) favors names where very recent volume has not confirmed price strength. This is distinct from the prior 20 day divergence version and avoids discarded turnover confirmation, downside clipping, low-rebound, range-body, and high-complexity OHLC composites. The expression uses only allowed open, close, low, and volume fields; allowed 10, 20, and 60 day windows; two Mean operators; and one Corr operator."
