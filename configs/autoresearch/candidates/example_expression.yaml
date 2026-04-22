@@ -1,6 +1,6 @@
-name: hl_mid_price_volume_divergence_20_v1
-family: divergence
-expression: "0-Corr((($high+$low)/2)/Mean(($high+$low)/2,20),$volume/Mean($volume,20),20)"
+name: recent_weighted_low_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "2 * Mean(($open - $close) / $low, 20) + Mean(($open - $close) / $low, 60)"
 direction: 1
-description: "20 day divergence between normalized high-low midpoint price and normalized volume."
-expected_behavior: "Tests a low-complexity price-volume divergence variant using the daily high-low midpoint instead of close level or intraday close position. Higher values indicate weaker 20 day correlation between midpoint price relative to its own 20 day mean and volume relative to its 20 day mean, favoring names where volume does not confirm accepted price strength. This avoids the discarded intraday-position divergence, turnover-confirmation crash, low-rebound, downside-clipping, and range-compression ideas while staying close to the reviewed normalized price-volume divergence family. The expression uses only allowed high, low, and volume fields; the allowed 20 day window; and allowed Mean and Corr operators."
+description: "Recent-weighted low-normalized intraday selling pressure reversal over 20 and 60 day horizons."
+expected_behavior: "Tests a low-complexity reversal variant of the reviewed low-normalized selling-pressure family by giving the recent 20 day down-body pressure twice the weight of the slower 60 day persistence term. Higher values indicate repeated closes below opens relative to the daily low anchor, with a tilt toward more recent pressure that may mean revert over the evaluation horizon. This avoids discarded or crash-prone turnover-confirmation, low-rebound, downside-clipping, range-compression, and high-complexity OHLC-average ideas. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and two allowed Mean operators."
