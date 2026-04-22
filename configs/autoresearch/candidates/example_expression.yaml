@@ -1,6 +1,6 @@
-name: close_60d_range_position_reversal_v1
-family: price_position
-expression: "0-($close-Min($low,60))/(Max($high,60)-Min($low,60))"
+name: typical_price_amount_divergence_20_v1
+family: divergence
+expression: "0-Corr((($high+$low+$close)/3)/Mean(($high+$low+$close)/3,20),$amount/Mean($amount,20),20)"
 direction: 1
-description: "60 day close position reversal within the rolling high-low range."
-expected_behavior: "A higher value means today's close sits nearer the 60 day rolling low than the 60 day rolling high, expressing a simple medium horizon price-position reversal signal. This keeps complexity low with only Min and Max over the allowed 60 day window, avoids turnover expressions that recently crashed, and differs from discarded open/intraday position ideas by anchoring on close within the broader 60 day high-low range."
+description: "20 day divergence between normalized typical price strength and normalized traded amount."
+expected_behavior: "A higher value means the rolling correlation between normalized typical price and normalized traded amount is more negative, favoring stocks whose broad intraday price level is not being confirmed by capital flow. This extends the reviewed typical-price volume divergence and high-norm amount divergence ideas without repeating a discarded range-position or turnover-divergence candidate. The expression uses only allowed high, low, close, and amount fields, the allowed 20 day window, and one Corr plus two Mean operators."
