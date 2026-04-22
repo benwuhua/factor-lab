@@ -1,6 +1,6 @@
-name: typical_price_amount_divergence_20_v1
+name: fast_high_norm_price_amount_divergence_10_v1
 family: divergence
-expression: "0-Corr((($high+$low+$close)/3)/Mean(($high+$low+$close)/3,20),$amount/Mean($amount,20),20)"
+expression: "0-Corr($high/Mean($high,10),$amount/Mean($amount,10),10)"
 direction: 1
-description: "20 day divergence between normalized typical price strength and normalized traded amount."
-expected_behavior: "A higher value means the rolling correlation between normalized typical price and normalized traded amount is more negative, favoring stocks whose broad intraday price level is not being confirmed by capital flow. This extends the reviewed typical-price volume divergence and high-norm amount divergence ideas without repeating a discarded range-position or turnover-divergence candidate. The expression uses only allowed high, low, close, and amount fields, the allowed 20 day window, and one Corr plus two Mean operators."
+description: "10 day divergence between normalized high-price strength and normalized traded amount."
+expected_behavior: "A higher value means the short-window correlation between normalized highs and normalized traded amount is more negative, favoring stocks whose recent upside price prints are not being confirmed by capital flow. This keeps the reviewed high-norm price amount divergence idea but tests a faster 10 day horizon, while avoiding the crashed turnover-divergence path and discarded range-position ideas. The expression uses only allowed high and amount fields, the allowed 10 day window, and one Corr plus two Mean operators."
