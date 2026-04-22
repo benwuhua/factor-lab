@@ -1,6 +1,6 @@
-name: normalized_low_norm_volume_divergence_reversal_20_60_v1
+name: low_norm_turnover_divergence_reversal_20_v1
 family: divergence
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($close/Mean($close,20),$volume/Mean($volume,20),20)"
+expression: "Mean(($open-$close)/$low,20)-Corr($close/Mean($close,20),$turnover/Mean($turnover,20),20)"
 direction: 1
-description: "Low-normalized 20 and 60 day selling pressure with a normalized price-volume divergence adjustment."
-expected_behavior: "Tests whether the strong low-normalized selling-pressure reversal backbone improves when it favors names whose normalized close path is not positively confirmed by normalized volume. The two Mean(($open-$close)/$low, window) terms reward persistent close-below-open pressure on a low-price scale, while subtracting Corr($close/Mean($close,20),$volume/Mean($volume,20),20) favors weak or negative price-volume co-movement without using the previously crashing turnover-confirmation pattern. This avoids the discarded pure volatility, downside-only, near-60-day-low, direct range-position, and pressure-volume self-correlation ideas while staying inside the allowed fields, windows, and operators."
+description: "Low-normalized 20 day selling pressure adjusted by price-turnover divergence."
+expected_behavior: "Tests whether the reliable low-normalized selling-pressure reversal signal improves when recent price movement is not strongly confirmed by turnover. The Mean(($open-$close)/$low,20) term rewards persistent close-below-open pressure on a low-price scale, while subtracting Corr($close/Mean($close,20),$turnover/Mean($turnover,20),20) favors weak or negative price-turnover co-movement. This keeps the expression lower complexity than the discarded normalized volume-divergence variant and avoids the previously crashing turnover-confirmation condition structure."
