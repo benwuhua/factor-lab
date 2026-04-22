@@ -1,6 +1,6 @@
-name: turnover_weighted_open_pressure_reversal_20_60_v1
-family: divergence
-expression: "Mean((($open - $close) / $open) * $turnover, 20) / Mean($turnover, 20) + Mean((($open - $close) / $open) * $turnover, 60) / Mean($turnover, 60)"
+name: downside_open_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean((($open - $close) / $open) + Abs(($open - $close) / $open), 20) + Mean((($open - $close) / $open) + Abs(($open - $close) / $open), 60)"
 direction: 1
-description: "20 and 60 day turnover-weighted open-to-close selling pressure; names whose weak closes occur on heavier turnover rank higher."
-expected_behavior: "Tests whether open-to-close selling pressure is more informative when the down closes are concentrated on higher-turnover days. Each horizon averages (($open - $close) / $open) weighted by turnover and divides by the same horizon's average turnover, keeping the signal focused on turnover-conditioned pressure rather than raw liquidity. Higher values should favor names with persistent, high-participation intraday selling that may be prone to reversal. The expression uses only allowed open, close, and turnover fields, the allowed 20 and 60 day windows, and four rolling Mean operators."
+description: "20 and 60 day downside-only open-to-close pressure; up-day relief is clipped out algebraically so only weak closes accumulate."
+expected_behavior: "Tests whether persistent intraday selling pressure is cleaner when positive open-to-close days are not allowed to offset down days. Let x = ($open - $close) / $open; x + Abs(x) is positive when the close is below the open and zero when the close is above the open, up to a constant scale that does not change ranks. Averaging this downside pressure over 20 and 60 day horizons should identify names with repeated weak closes that may be prone to reversal. The expression uses only allowed open and close fields, the allowed 20 and 60 day windows, and the allowed Abs and Mean operators."
