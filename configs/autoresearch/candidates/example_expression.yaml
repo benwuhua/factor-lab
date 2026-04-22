@@ -1,6 +1,6 @@
-name: intraday_reversal_5_v1
-family: reversal
-expression: "Mean(1 - $close / $open, 5)"
+name: price_turnover_divergence_20_5_v1
+family: divergence
+expression: "($close / Ref($close, 20) - 1) - (Mean($turnover, 5) / Mean($turnover, 20) - 1)"
 direction: 1
-description: "5 day average intraday reversal pressure, with stocks closing below their opens ranked higher."
-expected_behavior: "Recent weak intraday closes may reflect short-horizon selling pressure that mean reverts over the 20 day evaluation horizon."
+description: "20 day price momentum net of short-term turnover expansion; quiet price advances rank higher than turnover-driven moves."
+expected_behavior: "A stock that rises without a 5 day turnover surge versus its 20 day baseline may reflect steadier accumulation and lower crowding over the 20 day evaluation horizon."
