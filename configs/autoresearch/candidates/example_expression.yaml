@@ -1,6 +1,6 @@
-name: distance_from_low_reversal_60_v1
-family: price_position
-expression: "$close / Min($close, 60) - 1"
+name: range_normalized_mean_reversion_60_v1
+family: reversal
+expression: "($close - Mean($close, 60)) / (Max($high, 60) - Min($low, 60) + 0.000001)"
 direction: -1
-description: "60 day distance-from-low reversal; stocks trading closer to their recent low rank higher."
-expected_behavior: "Tests whether a simple recent-low anchor captures medium-term reversal without adding turnover or volatility scaling complexity."
+description: "60 day mean reversion scaled by the recent high-low range; lower normalized price gaps rank higher."
+expected_behavior: "Tests whether the successful medium-term close reversion idea is more stable when the price gap is scaled by its own 60 day trading range."
