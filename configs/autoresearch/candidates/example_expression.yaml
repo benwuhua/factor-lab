@@ -1,6 +1,6 @@
-name: slow_volume_high_norm_divergence_20_60_v1
+name: fast_high_medium_volume_divergence_10_20_v1
 family: divergence
-expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,60),20)"
+expression: "0-Corr($high/Mean($high,10),$volume/Mean($volume,20),10)"
 direction: 1
-description: "20 day divergence between high-price strength and volume normalized by a slower 60 day participation baseline."
-expected_behavior: "A higher value means the 20 day rolling correlation between $high/Mean($high,20) and volume relative to its 60 day mean is lower or negative. The candidate keeps the reviewed high-anchor price-volume divergence interpretation, but tests whether a slower participation baseline better separates price strength that is not confirmed by medium-term volume. It is distinct from the latest 10 day high-volume divergence, the same-window 20 day high-volume divergence, and the close-based 20/60 normalized divergence. It avoids turnover expressions that recently crashed and discarded intraday rebound, range-position, and pure volatility paths while using only allowed high and volume fields, allowed 20 and 60 day windows, and one Corr plus two Mean operators."
+description: "10 day divergence between fast high-price strength and volume normalized by a 20 day participation baseline."
+expected_behavior: "A higher value means the 10 day rolling correlation between $high/Mean($high,10) and volume relative to its 20 day mean is lower or negative. The candidate keeps the reviewed high-anchor price-volume divergence interpretation, but tests whether a faster price-strength leg against a medium participation baseline improves on the same-window 10 day and slower 20/60 high-volume divergence variants. It avoids turnover expressions that recently crashed and discarded intraday rebound, range-position, and pure volatility paths while using only allowed high and volume fields, allowed 10 and 20 day windows, and one Corr plus two Mean operators."
