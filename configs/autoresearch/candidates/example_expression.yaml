@@ -1,6 +1,6 @@
-name: hl_mid_price_amount_divergence_20_v1
+name: oc_mid_price_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr((($high+$low)/2)/Mean(($high+$low)/2,20),$amount/Mean($amount,20),20)"
+expression: "0-Corr((($open+$close)/2)/Mean(($open+$close)/2,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day divergence between high-low midpoint price strength and normalized traded amount."
-expected_behavior: "A higher value means the rolling correlation between the normalized high-low midpoint and normalized traded amount is more negative, favoring stocks whose midpoint price strength is not being confirmed by amount. This extends the reviewed hl-mid price-volume divergence idea with amount as the confirmation channel, while avoiding turnover-based divergence paths that have crashed and avoiding discarded volatility-only or near-low variants. The expression uses only allowed high, low, and amount fields, the allowed 20 day window, and one Corr plus two Mean operators."
+description: "20 day divergence between open-close midpoint price strength and normalized traded volume."
+expected_behavior: "A higher value means the rolling correlation between the normalized open-close midpoint and normalized volume is more negative, favoring stocks whose traded-session midpoint price strength is not being confirmed by participation. This extends the reviewed price-volume divergence family with a different low-complexity price anchor, while avoiding turnover-based divergence paths that have crashed and avoiding discarded volatility-only or near-low variants. The expression uses only allowed open, close, and volume fields, the allowed 20 day window, and one Corr plus two Mean operators."
