@@ -1,6 +1,6 @@
-name: open_low_mid_discount_pressure_reversal_20_60_v1
+name: close_20d_plain_reversal_v1
 family: reversal
-expression: "Mean((($open+$low)/2-$close)/$low,20)+Mean(($open-$close)/$low,60)"
+expression: "Ref($close,20)/$close-1"
 direction: 1
-description: "20 day open-low midpoint discount reversal plus a 60 day low-normalized selling-pressure anchor."
-expected_behavior: "Mean((($open+$low)/2-$close)/$low,20) rewards names whose closes persistently finish below the lower intraday open-low midpoint, capturing clear end-of-day selling pressure without adding volume, turnover, or volatility filters. Mean(($open-$close)/$low,60) keeps the simple persistent low-normalized pressure anchor that has repeatedly survived review. This is distinct from the prior high-low midpoint discount, open-low midpoint normalization, near-low, low-rebound, pure volatility, and turnover confirmation/divergence variants, while using only allowed open, low, and close fields; allowed 20 and 60 day windows; and allowed Mean operators."
+description: "Plain 20 day close-to-close reversal; stocks whose current close is below the close 20 sessions ago rank higher."
+expected_behavior: "This deliberately resets to a low-complexity baseline after many reviewed variants around low-normalized intraday selling pressure, turnover damping, volume divergence, and midpoint discounts. Ref($close,20)/$close-1 is a transparent medium-horizon reversal signal: higher values mean larger 20 day price drawdowns, which may mean revert over the evaluation horizon. It avoids the discarded turnover confirmation/divergence crash paths, discarded pure volatility/near-low/close-from-high/downside-open variants, and high-complexity normalized divergence expressions. It uses only the allowed close field, the allowed 20 day window, and one allowed Ref operator."
