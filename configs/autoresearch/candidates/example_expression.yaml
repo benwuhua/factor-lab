@@ -1,6 +1,6 @@
-name: hybrid_low_oc_mid_norm_selling_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/(($open+$close)/2),60)"
-direction: 1
-description: "20 day low-normalized plus 60 day open-close-mid normalized intraday selling-pressure reversal; stocks with repeated weak closes rank higher."
-expected_behavior: "Tests a low-complexity hybrid of reviewed selling-pressure anchors without adding volume, turnover, thresholds, correlations, or high-complexity OHLC composites. The 20 day low-normalized leg keeps the stronger recent exhaustion signal by scaling close-below-open pressure against the session low, while the 60 day open-close midpoint leg measures persistent pressure against a stable traded-price anchor less extreme than the low and less single-price dependent than close alone. Higher values should favor names with sustained intraday selling pressure that may mean revert over the evaluation horizon. The expression uses only allowed open, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+name: slow_close_volume_divergence_60_v1
+family: divergence
+expression: "Corr($close,$volume,60)"
+direction: -1
+description: "60 day close-volume correlation used as an inverse divergence signal; stocks with weaker price-volume confirmation rank higher."
+expected_behavior: "Isolates the simple divergence component that recent reviewed candidates used only as an add-on to selling-pressure terms. A lower 60 day correlation between close and volume suggests price moves are less confirmed by participation, which may indicate exhaustion rather than trend continuation. Using direction -1 ranks weaker close-volume confirmation higher while keeping the expression very low complexity. This avoids the discarded turnover, pure low-volatility, upper-shadow, low-rebound, and disallowed overnight-gap ideas. The expression uses only allowed close and volume fields, the allowed 60 day window, and one Corr operator."
