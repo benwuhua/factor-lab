@@ -1,6 +1,6 @@
-name: low_norm_fast_volume_divergence_reversal_20_60_10_v1
-family: divergence
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($close,$volume,10)"
+name: low_norm_short_persistent_selling_pressure_reversal_10_60_v1
+family: reversal
+expression: "Mean(($open-$close)/$low,10)+Mean(($open-$close)/$low,60)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal adjusted by fast close-volume divergence."
-expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal with a 10 day close-volume divergence penalty. The two Mean terms preserve the simple recent and persistent close-below-open pressure backbone, while subtracting Corr($close,$volume,10) favors names where very recent volume has not confirmed price strength. This is distinct from the prior 20 day divergence version and avoids discarded turnover confirmation, downside clipping, low-rebound, range-body, and high-complexity OHLC composites. The expression uses only allowed open, close, low, and volume fields; allowed 10, 20, and 60 day windows; two Mean operators; and one Corr operator."
+description: "10 and 60 day low-normalized intraday selling-pressure reversal."
+expected_behavior: "Tests whether a faster 10 day low-normalized close-below-open pressure leg can improve the reviewed 20/60 low_norm_selling_pressure_reversal backbone while keeping the persistent 60 day component. The factor stays low complexity with only open, close, and low fields; allowed 10 and 60 day windows; and two Mean operators. It avoids previously discarded or crashed ideas based on turnover confirmation, downside clipping, range-body normalization, low rebound terms, and higher-complexity OHLC composites."
