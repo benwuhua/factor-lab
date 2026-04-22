@@ -1,6 +1,6 @@
-name: upper_mid_price_volume_divergence_20_v1
-family: divergence
-expression: "0-Corr((($high+$close)/2)/Mean(($high+$close)/2,20),$volume/Mean($volume,20),20)"
+name: open_range_position_reversal_20_v1
+family: price_position
+expression: "0-(($open-Min($low,20))/(Max($high,20)-Min($low,20)))"
 direction: 1
-description: "20 day divergence between the normalized high-close upper midpoint and normalized traded volume."
-expected_behavior: "A higher value means the rolling correlation between the upper intraday price midpoint, (($high+$close)/2) relative to its 20 day mean, and volume relative to its 20 day mean is lower or negative. This favors stocks whose upper-price strength or weakness is less confirmed by trading participation, a compact divergence interpretation that is distinct from the reviewed close, open, high, low, high-low midpoint, open-close midpoint, typical-price, and range-volume anchors. The candidate avoids turnover-based divergence paths that have crashed and discarded pure volatility or intraday-position ideas while using only allowed high, close, and volume fields; the allowed 20 day window; and one Corr plus two Mean operators."
+description: "Negative open position within the trailing 20 day high-low range."
+expected_behavior: "A higher value means today's open is lower within its recent 20 day high-low range, favoring simple short-term reversal from depressed opening levels. This is a low-complexity price-position candidate distinct from the prior close range position, selling-pressure, turnover-damped, and volume-divergence families. It avoids turnover-based expressions that recently crashed and uses only allowed open, low, high fields; the allowed 20 day window; and one Min plus one Max range anchor."
