@@ -1,6 +1,6 @@
-name: short_open_norm_selling_pressure_reversal_10_60_v1
-family: reversal
-expression: "Mean(($open - $close) / $open, 10) + Mean(($open - $close) / $open, 60)"
+name: open_pressure_volume_divergence_20_v1
+family: divergence
+expression: "Mean(($open - $close) / $open, 20) - Corr($close, $volume, 20)"
 direction: 1
-description: "10 and 60 day open-normalized intraday selling-pressure reversal blend; stocks with short-term and persistent closes below open rank higher."
-expected_behavior: "Tests a faster recent leg of the reviewed open-normalized selling-pressure family without repeating discarded acceleration, downside clipping, turnover-weighted, or high-complexity OHLC variants. Mean(($open - $close) / $open, 10) captures fresher down-body pressure, while the 60 day leg keeps the persistent exhaustion anchor. Higher values should favor names with renewed short-term selling pressure layered on medium-term intraday weakness. The expression uses only allowed open and close fields, allowed 10 and 60 windows, and two Mean operators."
+description: "20 day intraday selling-pressure reversal adjusted by close-volume divergence; stocks with closes below open and weaker close-volume correlation rank higher."
+expected_behavior: "Tests whether recent open-normalized down-body pressure is cleaner when paired with negative or weak close-volume correlation. Mean(($open - $close) / $open, 20) captures persistent intraday selling pressure, while subtracting Corr($close, $volume, 20) favors names where volume has not confirmed rising closes, a simple divergence pattern that may indicate exhaustion rather than trend continuation. This avoids previously discarded turnover compression, price-turnover spread, downside clipping, and high-complexity turnover-weighted variants. The expression uses allowed open, close, and volume fields, the allowed 20 day window, and two allowed operators."
