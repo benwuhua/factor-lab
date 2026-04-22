@@ -1,6 +1,6 @@
-name: typical_price_mean_reversion_60_v1
+name: vwap_anchor_reversion_60_v1
 family: reversal
-expression: "(Mean($high, 60) + Mean($low, 60) + Mean($close, 60)) / ($close + $close + $close) - 1"
+expression: "Mean($amount / $volume, 60) / $close - 1"
 direction: 1
-description: "60 day typical-price mean reversion; stocks with current closes below their medium-term high-low-close anchor rank higher."
-expected_behavior: "Extends the reviewed 60 day close and high-low midpoint reversion ideas with one simple typical-price anchor, aiming to keep the neutralized medium-horizon reversal signal while avoiding range normalization and turnover filters that were discarded."
+description: "60 day traded-price anchor reversal; stocks with current closes below their medium-term amount-per-volume price anchor rank higher."
+expected_behavior: "Uses a simple VWAP-like anchor to test whether the reviewed 60 day mean-reversion effect is stronger when the reference price is weighted by traded value rather than the daily close or high-low midpoint, while avoiding discarded turnover filters, range normalization, and disallowed short windows."
