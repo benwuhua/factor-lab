@@ -1,6 +1,6 @@
-name: hybrid_low_open_norm_selling_pressure_reversal_20_60_v1
+name: low_norm_selling_pressure_reversal_20_120_v1
 family: reversal
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$open,60)"
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,120)"
 direction: 1
-description: "20 day low-normalized intraday selling pressure plus 60 day open-normalized pressure; stocks with recent weak closes near the low and persistent open-to-close pressure rank higher."
-expected_behavior: "Combines two reviewed but not identical selling-pressure anchors without adding turnover confirmation, volume filters, or high-complexity OHLC composites. The 20 day term keeps the stronger low-normalized exhaustion signal by scaling close-below-open pressure against the session low. The 60 day term uses the open as a more stable medium-horizon denominator, reducing dependence on persistent low-price anchoring while preserving the reversal interpretation. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 day low-normalized intraday selling pressure plus 120 day low-normalized pressure; stocks with recent weak closes near the low and a longer history of close-below-open pressure rank higher."
+expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal idea to test whether the strong 20 day exhaustion signal benefits from a slower 120 day confirmation rather than another price anchor. Positive values indicate repeated close-below-open pressure scaled by the session low, which should favor reversal candidates where selling pressure has persisted without adding turnover filters, volume confirmation, or high-complexity OHLC composites. The expression uses only allowed open, close, and low fields; allowed 20 and 120 day windows; and two allowed Mean operators."
