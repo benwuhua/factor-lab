@@ -1,6 +1,6 @@
-name: quiet_close_drawdown_reversal_20_60_v1
+name: quiet_amount_close_drawdown_reversal_20_60_v1
 family: divergence
-expression: "Ref($close,20)/$close-1+Mean($volume,60)/Mean($volume,20)-1"
+expression: "Ref($close,20)/$close-1+Mean($amount,60)/Mean($amount,20)-1"
 direction: 1
-description: "20 day close-to-close drawdown reversal confirmed by relatively quiet recent volume versus the 60 day baseline."
-expected_behavior: "Ref($close,20)/$close-1 rewards stocks that have sold off over the medium horizon, while Mean($volume,60)/Mean($volume,20)-1 favors cases where recent 20 day volume is below the 60 day baseline. The economic intuition is an uncrowded reversal: price weakness without elevated trading pressure may mean less forced selling and more room for mean reversion. The candidate avoids turnover fields that have crashed, avoids discarded pure low-volatility and near-60-day-low variants, and keeps complexity low with only allowed close and volume fields; 20 and 60 day windows; and Ref and Mean operators."
+description: "20 day close-to-close drawdown reversal confirmed by relatively quiet recent traded amount versus the 60 day baseline."
+expected_behavior: "Ref($close,20)/$close-1 rewards stocks that have sold off over the medium horizon, while Mean($amount,60)/Mean($amount,20)-1 favors cases where recent 20 day traded amount is below the 60 day baseline. The economic intuition is an uncrowded reversal in value traded terms: price weakness without elevated capital participation may mean less forced selling and more room for mean reversion. This keeps the reviewed quiet-drawdown structure but tests amount rather than volume, avoids turnover fields that have crashed, avoids discarded pure low-volatility and near-low variants, and stays low complexity with only allowed close and amount fields; 20 and 60 day windows; and Ref and Mean operators."
