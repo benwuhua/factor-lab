@@ -1,6 +1,6 @@
-name: low_norm_volume_divergence_reversal_20_60_v1
-family: divergence
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($close,$volume,20)"
+name: open_low_mid_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open-$close)/(($open+$low)/2),20)+Mean(($open-$close)/(($open+$low)/2),60)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal adjusted by recent close-volume divergence; stocks with persistent weak closes and less volume-confirmed price strength rank higher."
-expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal with one simple divergence term, without repeating the crashed turnover confirmation, discarded low-rebound/downside-clipping, or high-complexity OHLC-average ideas. The two Mean terms capture recent and persistent close-below-open pressure as a share of the session low. Subtracting Corr($close,$volume,20) favors names where price strength is not strongly confirmed by volume, preserving an interpretable exhaustion/reversal premise. The expression uses only allowed open, close, low, and volume fields; allowed 20 and 60 day windows; two Mean operators; and one Corr operator."
+description: "20 and 60 day intraday selling-pressure reversal normalized by the open-low midpoint; stocks with repeated closes below open relative to the lower intraday anchor rank higher."
+expected_behavior: "Tests a low-complexity denominator blend between the reviewed open-normalized and low-normalized selling-pressure reversals, without repeating the current volume-divergence extension, crashed turnover confirmation, discarded downside-clipping, or high-complexity OHLC-average ideas. Mean(($open-$close)/(($open+$low)/2),20) captures recent close-below-open pressure scaled by the open-low midpoint, while the 60 day term captures persistent pressure. The midpoint denominator should reduce noise from extreme lows while preserving the stronger lower-anchor interpretation observed in the low-normalized family. The expression uses only allowed open, low, and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
