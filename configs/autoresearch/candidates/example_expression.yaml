@@ -1,6 +1,6 @@
-name: high_drawdown_volume_divergence_reversal_20_60_v1
+name: close_120d_discount_volume_divergence_reversal_20_120_v1
 family: divergence
-expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)+(Max($high,60)-$close)/Max($high,60)"
+expression: "0-Corr($close/Mean($close,20),$volume/Mean($volume,20),20)+(Max($high,120)-$close)/Max($high,120)"
 direction: 1
-description: "20 day high-price versus volume divergence with a 60 day high-drawdown reversal term."
-expected_behavior: "Ranks stocks higher when normalized highs are weakly confirmed by normalized volume over 20 days, and when the close remains below the recent 60 day high. This keeps the interpretable high-volume divergence family that has survived review, but changes the discount anchor from prior mean-high variants to a simple 60 day high drawdown term. It avoids the discarded pure range-position, pure volatility, average-trade-price discount, and turnover-divergence crash patterns. The expression uses only allowed high, close, and volume fields with 20 and 60 day windows, two Mean calls, two Max calls, and one Corr call."
+description: "20 day close-price versus volume divergence with a 120 day high-discount reversal term."
+expected_behavior: "Ranks stocks higher when normalized close prices are weakly confirmed by normalized volume over 20 days, and when the close remains discounted from the recent 120 day high. This extends the reviewed high-discount volume-divergence family with a simpler close-price divergence leg instead of another high or upper-mid anchor. It avoids the discarded pure range-position, pure volatility, average-trade-price discount, and turnover-divergence crash patterns. The expression uses only allowed close, high, and volume fields with 20 and 120 day windows, two Mean calls, two Max calls, and one Corr call."
