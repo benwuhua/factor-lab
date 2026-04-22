@@ -1,6 +1,6 @@
-name: open_pressure_amount_divergence_20_60_v1
-family: divergence
-expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60) - Corr($close, $amount, 20)"
+name: volume_confirmed_open_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open-$close)/$open,20)+Mean(($open-$close)/$open,60)+Corr(($open-$close)/$open,$volume,20)"
 direction: 1
-description: "20 and 60 day open-normalized intraday selling pressure adjusted by recent close-amount divergence; stocks with repeated weak closes and weaker traded-value confirmation rank higher."
-expected_behavior: "Extends the reviewed open-normalized selling-pressure reversal with a single simple traded-value divergence term. The two Mean terms capture recent and persistent close-below-open pressure as a share of open, while subtracting Corr($close, $amount, 20) favors names where amount has not strongly confirmed price strength. This avoids discarded low-rebound, downside clipping, turnover-weighted, and high-complexity OHLC mean variants. The expression uses allowed open, close, and amount fields, allowed 20 and 60 day windows, two Mean operators, and one Corr operator."
+description: "20 and 60 day open-normalized intraday selling pressure with a 20 day volume confirmation term; stocks with persistent weak closes and volume concentrated on pressure days rank higher."
+expected_behavior: "Keeps the reviewed open-normalized selling-pressure reversal backbone while testing whether sell-pressure days confirmed by volume improve reversal strength. The two Mean terms capture recent and persistent close-below-open pressure as a share of open, and Corr(($open-$close)/$open,$volume,20) favors names where volume rises on weak intraday closes, a simple capitulation-style signal. This avoids discarded downside clipping, low-rebound, turnover-weighted, and high-complexity OHLC mean variants. The expression uses allowed open, close, and volume fields, allowed 20 and 60 day windows, two Mean operators, and one Corr operator."
