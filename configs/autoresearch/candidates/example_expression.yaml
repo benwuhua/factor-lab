@@ -1,6 +1,6 @@
-name: overnight_gap_reversal_10_v1
+name: mean_close_reversion_60_v1
 family: reversal
-expression: "Mean(Ref($close, 1) / $open - 1, 10)"
+expression: "Mean($close, 60) / $close - 1"
 direction: 1
-description: "10 day overnight gap reversal; stocks opening below the prior close rank higher, using only open and previous close information."
-expected_behavior: "Averaging recent overnight gaps should capture short-horizon overreaction from gap-down opens while avoiding the already tested intraday close/open reversal and keeping turnover moderate."
+description: "60 day mean close reversion; stocks trading below their medium-term average close rank higher."
+expected_behavior: "Extends the reviewed 20 day mean-close reversion idea to a slower horizon, aiming to preserve the neutralized reversal signal while reducing top-quantile turnover."
