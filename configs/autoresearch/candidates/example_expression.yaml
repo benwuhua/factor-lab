@@ -1,6 +1,6 @@
-name: lower_mid_discount_low_norm_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)+Mean((($open+$low)/2-$close)/$low,20)"
+name: high_norm_price_volume_divergence_20_v1
+family: divergence
+expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 and 60 day low-normalized selling-pressure reversal plus a 20 day open-low midpoint discount term."
-expected_behavior: "Mean(($open-$close)/$low,20) and Mean(($open-$close)/$low,60) keep the reviewed low-normalized selling-pressure backbone: higher values mean repeated closes below the open on a low-price scale over both recent and medium horizons. Mean((($open+$low)/2-$close)/$low,20) adds a compact lower-intraday-position term that rewards closes below the open-low midpoint, focusing on end-of-day weakness without adding turnover, volume correlation, volatility gates, or threshold branches. This is distinct from the prior high-low midpoint discount, standalone open-low midpoint, pure close reversal, near-low, intraday-shortfall, and crashed turnover-divergence ideas while using only allowed open, low, and close fields; allowed 20 and 60 day windows; and three allowed Mean operators."
+description: "20 day divergence between high-normalized price strength and normalized volume."
+expected_behavior: "A higher value means the rolling correlation between $high/Mean($high,20) and $volume/Mean($volume,20) is more negative, favoring stocks whose recent high-price strength is not being confirmed by volume. This extends the reviewed price-volume divergence family with a high-price anchor rather than close, open, low, or high-low midpoint anchors, while avoiding turnover-based divergence paths that have crashed and avoiding discarded volatility-only or near-low variants. The expression uses only allowed high and volume fields, the allowed 20 day window, and one Corr plus two Mean operators."
