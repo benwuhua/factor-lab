@@ -1,6 +1,6 @@
-name: low_hl_mid_anchor_reversion_60_v1
+name: low_ohlc_anchor_reversion_60_v1
 family: reversal
-expression: "Mean($low, 60) / (($high + $low) / 2) - 1"
+expression: "Mean($low, 60) / (($open + $high + $low + $close) / 4) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against the current high/low midpoint; stocks whose intraday range midpoint sits below their longer-run low anchor rank higher."
-expected_behavior: "Extends the reviewed low-anchor reversal family with a high/low midpoint denominator rather than close, open, or open/close midpoint. This keeps the expression low complexity, uses only the allowed 60 day window, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
+description: "60 day low-anchor reversion measured against the current OHLC average; stocks whose full-session average price sits below their longer-run low anchor rank higher."
+expected_behavior: "Extends the reviewed low-anchor reversal family with a current OHLC denominator instead of single-price or two-price anchors. This stays low complexity, uses only the allowed 60 day window, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
