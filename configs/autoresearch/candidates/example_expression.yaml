@@ -1,6 +1,6 @@
-name: turnover_damped_hybrid_low_open_pressure_reversal_20_60_v1
+name: turnover_damped_hybrid_low_high_pressure_reversal_20_60_v1
 family: turnover
-expression: "Mean(($open-$close)/($low*(1+$turnover)),20)+Mean(($open-$close)/$open,60)"
+expression: "Mean(($open-$close)/($low*(1+$turnover)),20)+Mean(($open-$close)/$high,60)"
 direction: 1
-description: "20 day turnover-damped low-normalized selling pressure plus a 60 day open-normalized persistent pressure anchor."
-expected_behavior: "Tests whether the reviewed low-normalized selling-pressure reversal remains strong when recent high-turnover sessions are mildly damped, while the medium-horizon leg uses the more stable open denominator. A high value means recent closes have tended to finish below opens relative to the session low after turnover damping, and the same pressure persists over 60 days relative to the open. This avoids the discarded 60 day low-distance penalty, volatility damping, downside-only and range-compression variants, and the crash-prone turnover confirmation gate. The expression uses only allowed open, close, low, and turnover fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 day turnover-damped low-normalized selling pressure plus a 60 day high-normalized persistent pressure anchor."
+expected_behavior: "Tests whether the reviewed turnover-damped low-normalized recent selling-pressure signal remains strong when the medium-horizon anchor is normalized by the session high rather than open or low. A high value means recent closes have tended to finish below opens relative to the session low after mild turnover damping, with persistent 60 day pressure scaled by the upper price anchor. This avoids the discarded volatility damping, range compression, downside-only, near-low penalty, low-rebound, high-pullback, and turnover-confirmation gate ideas while keeping the expression low complexity. The expression uses only allowed open, close, low, high, and turnover fields; allowed 20 and 60 day windows; and two allowed Mean operators."
