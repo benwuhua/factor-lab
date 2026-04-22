@@ -1,6 +1,6 @@
-name: upper_wick_high_volume_divergence_reversal_20_v1
+name: low_close_rebound_high_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)+($high-$close)/Mean($high,20)"
+expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)+($close-$low)/Mean($high,20)"
 direction: 1
-description: "20 day high-price versus volume divergence with a small upper-wick reversal tilt."
-expected_behavior: "Ranks stocks higher when normalized high prices are weakly confirmed by normalized volume, and adds a modest boost when the close finishes below the intraday high. This keeps the successful high-price volume divergence intuition while adding a low-complexity reversal signal from upper-wick pressure. It avoids the discarded range-position, average-trade-price discount, volatility-damped, and crashed turnover-divergence paths. The expression uses only allowed high, close, and volume fields with one 20 day window, two Mean operators, and one Corr operator."
+description: "20 day high-price versus volume divergence with a low-to-close intraday rebound tilt."
+expected_behavior: "Ranks stocks higher when normalized high prices are weakly confirmed by normalized volume, and adds a modest boost when the close recovers above the intraday low. This keeps the productive high-price volume divergence intuition while testing a simple rebound-style reversal term instead of the prior upper-wick pressure variant. It avoids the discarded range-position, average-trade-price discount, volatility-damped, and crashed turnover-divergence paths. The expression uses only allowed high, low, close, and volume fields with one 20 day window, three Mean operators, and one Corr operator."
