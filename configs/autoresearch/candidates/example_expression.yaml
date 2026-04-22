@@ -1,6 +1,6 @@
-name: open_to_low_downside_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open - $low) / $open, 20) + Mean(($open - $low) / $open, 60)"
+name: close_from_high_reversal_20_60_v1
+family: price_position
+expression: "Mean(($high - $close) / $high, 20) + Mean(($high - $close) / $high, 60)"
 direction: 1
-description: "20 and 60 day downside-excursion reversal from open to intraday low; stocks with repeated open-to-low drawdowns rank higher."
-expected_behavior: "Tests whether repeated intraday downside excursions mean revert without reusing close-below-open selling-pressure denominators or the discarded turnover, downside-clipping, low-rebound, and complexity-heavy OHLC-average ideas. Mean(($open - $low) / $open, 20) captures recent downside pressure from the opening anchor to the session low, while the 60 day term captures persistent downside excursion. Higher values should favor names that repeatedly trade materially below their open and may rebound over the evaluation horizon. The expression uses only allowed open and low fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 and 60 day close discount from intraday high; stocks that repeatedly close well below their session highs rank higher."
+expected_behavior: "Tests a simple price-position reversal signal distinct from the discarded open-to-low downside excursion and pure upper-shadow relief ideas. Mean(($high - $close) / $high, 20) captures recent inability to hold intraday highs, while the 60 day term captures persistent close-from-high pressure. Higher values should favor names with repeated close weakness relative to the session high that may mean revert over the evaluation horizon. The expression uses only allowed high and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
