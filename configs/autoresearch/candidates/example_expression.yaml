@@ -1,6 +1,6 @@
-name: open_norm_price_volume_divergence_20_v1
+name: low_norm_pressure_volume_divergence_20_60_v1
 family: divergence
-expression: "0-Corr($open/Mean($open,20),$volume/Mean($volume,20),20)"
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr(($open-$close)/$low,$volume,20)"
 direction: 1
-description: "20 day negative correlation between normalized open price and normalized volume; stocks where volume does not confirm accepted opening price strength rank higher."
-expected_behavior: "Tests a low-complexity divergence variant adjacent to the reviewed normalized close-volume and high-low-midpoint volume divergence ideas, but uses the opening auction/early accepted price anchor instead of the close. Higher values indicate weaker 20 day correlation between open relative to its own 20 day mean and volume relative to its own 20 day mean, which may capture participation that is not confirming price strength. This avoids repeating the discarded 60 day close-volume divergence, turnover-confirmation crash, downside clipping, low-rebound, and pure low-volatility ideas. The expression uses only allowed open and volume fields, the allowed 20 day window, two Mean operators, and one Corr operator."
+description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day pressure-volume divergence adjustment."
+expected_behavior: "Keeps the reviewed low-normalized selling-pressure reversal backbone while testing whether the signal is cleaner when weak intraday closes are not strongly volume-confirmed. The two Mean terms capture recent and persistent close-below-open pressure relative to the session low. Subtracting Corr(($open-$close)/$low,$volume,20) favors names where that pressure is less synchronized with volume, suggesting lower-conviction selling rather than confirmed distribution. This avoids the crashed turnover-confirmation path and the discarded downside clipping, low-rebound, pure range-compression, and high-complexity OHLC composite ideas. The expression uses only allowed open, close, low, and volume fields; allowed 20 and 60 day windows; two Mean operators; and one Corr operator."
