@@ -1,6 +1,6 @@
-name: low_turnover_low_norm_pressure_reversal_20_v1
+name: open_gap_hybrid_low_open_pressure_reversal_3_20_60_v1
 family: reversal
-expression: "Mean(($open-$close)/$low,20)/(1+Mean($turnover,20))"
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$open,60)-Mean($open/Ref($close,3)-1,20)"
 direction: 1
-description: "20 day close-below-open pressure scaled by low price and softly penalized by average turnover level."
-expected_behavior: "Tests whether the reviewed low-normalized selling-pressure reversal is cleaner when high-turnover names are damped by their 20 day average turnover level rather than by relative turnover instability. The numerator reuses Mean(($open-$close)/$low,20), rewarding repeated closes below the open on a low-price scale. The denominator 1+Mean($turnover,20) is a low-complexity liquidity penalty, distinct from discarded pure low-turnover, turnover-volatility, turnover-confirmation, and relative turnover-stability variants. It uses only allowed open, close, low, and turnover fields; the allowed 20 day window; and the allowed Mean operator."
+description: "20 day low-normalized selling pressure plus a 60 day open-normalized pressure anchor, adjusted for weak recent opens versus the close three sessions earlier."
+expected_behavior: "Tests whether the reviewed open-gap pessimism signal is stronger when paired with the best low/open selling-pressure backbone instead of used as a standalone 20 day add-on. Mean(($open-$close)/$low,20) captures recent close-below-open pressure on a low-price scale, Mean(($open-$close)/$open,60) adds persistent weak closes on a stable open-price scale, and subtracting Mean($open/Ref($close,3)-1,20) rewards names whose recent opens remain weak versus the close three sessions earlier. This avoids the discarded pure volatility, direct range-position, near-60-day-low penalty, downside-only, and crash-prone turnover-confirmation ideas while using only allowed open, close, low fields; allowed 3, 20, and 60 day windows; and allowed Mean and Ref operators."
