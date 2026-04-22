@@ -1,6 +1,6 @@
-name: close_below_hl_mid_reversal_20_60_v1
+name: close_below_ohlc_mean_reversal_20_60_v1
 family: price_position
-expression: "Mean((($high + $low) / 2 - $close) / (($high + $low) / 2), 20) + Mean((($high + $low) / 2 - $close) / (($high + $low) / 2), 60)"
+expression: "Mean((($open + $high + $low + $close) / 4 - $close) / (($open + $high + $low + $close) / 4), 20) + Mean((($open + $high + $low + $close) / 4 - $close) / (($open + $high + $low + $close) / 4), 60)"
 direction: 1
-description: "20 and 60 day blend of how far the close sits below the daily high/low midpoint; stocks repeatedly finishing in the lower half of the intraday range rank higher."
-expected_behavior: "Tests a low-complexity price-position reversal signal related to, but distinct from, the reviewed open-to-close selling-pressure variants. Mean((($high + $low) / 2 - $close) / (($high + $low) / 2), 20) captures recent closes below the intraday midpoint, while the 60 day term captures persistent lower-half closes. Higher values should favor names with sustained weak closing location that may be prone to reversal. The expression uses only allowed high, low, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
+description: "20 and 60 day blend of how far the close sits below the daily OHLC average; stocks repeatedly finishing weak versus the full-session average price rank higher."
+expected_behavior: "Tests a low-complexity price-position reversal signal adjacent to, but distinct from, the reviewed high-low midpoint and open-to-close selling-pressure variants. Mean((($open + $high + $low + $close) / 4 - $close) / (($open + $high + $low + $close) / 4), 20) captures recent weak closing location versus the daily OHLC average, while the 60 day term captures persistent full-session closing weakness. Higher values should favor names with sustained poor closing location that may be prone to reversal. The expression uses only allowed open, high, low, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
