@@ -1,6 +1,6 @@
-name: short_low_norm_selling_pressure_reversal_5_60_v1
+name: open_norm_selling_pressure_reversal_20_120_v1
 family: reversal
-expression: "Mean(($open-$close)/$low,5)+Mean(($open-$close)/$low,60)"
+expression: "Mean(($open-$close)/$open,20)+Mean(($open-$close)/$open,120)"
 direction: 1
-description: "5 and 60 day close-below-open selling-pressure reversal normalized by the daily low price."
-expected_behavior: "Tests whether very recent low-normalized intraday selling pressure adds useful timing to the persistent 60 day selling-pressure reversal signal. Mean(($open-$close)/$low,5) captures short-horizon weak closes versus opens scaled by the session low, while Mean(($open-$close)/$low,60) preserves the slower pressure component that has been robust in reviewed variants. Higher values should favor names with fresh and persistent selling pressure that may be prone to reversal. The expression uses only allowed open, close, and low fields, the allowed 5 and 60 day windows, and two Mean operators, avoiding previously discarded or crashed turnover-confirmation, downside-clipping, range-compression, range-body, low-rebound, and open-to-low pullback ideas."
+description: "20 and 120 day close-below-open selling-pressure reversal normalized by the daily open price."
+expected_behavior: "Tests whether the strong open-normalized 20/60 day selling-pressure reversal family benefits from a slower 120 day persistence anchor without adding complexity. Mean(($open-$close)/$open,20) captures recent weak closes versus opens scaled by the opening price, while Mean(($open-$close)/$open,120) emphasizes longer-lived selling pressure that may be prone to reversal. Higher values should favor names with both recent and persistent intraday selling pressure. The expression uses only allowed open and close fields, the allowed 20 and 120 day windows, and two Mean operators, avoiding previously discarded or crashed turnover-confirmation, downside-clipping, range-compression, range-body, low-rebound, and open-to-low pullback ideas."
