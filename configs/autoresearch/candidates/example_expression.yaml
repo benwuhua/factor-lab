@@ -1,6 +1,6 @@
-name: smooth_mean_close_reversion_60_20_v1
-family: reversal
-expression: "Mean($close, 60) / Mean($close, 20) - 1"
-direction: 1
-description: "Smoothed 60 day mean close reversion; stocks whose recent 20 day average sits below their 60 day average rank higher."
-expected_behavior: "Keeps the reviewed 60 day mean-reversion anchor but uses a 20 day recent average to further suppress short-term noise and turnover while preserving a simple medium-term reversal signal."
+name: drawdown_from_high_reversal_60_v1
+family: price_position
+expression: "$close / Max($close, 60) - 1"
+direction: -1
+description: "60 day drawdown-from-high reversal; stocks trading farther below their recent high rank higher."
+expected_behavior: "Tests whether the reviewed medium-term reversal effect is stronger when measured as distance from the 60 day high rather than distance from a moving average, while keeping the expression very simple."
