@@ -1,6 +1,6 @@
-name: smooth_hl_mid_reversion_60_20_v1
+name: typical_price_mean_reversion_60_v1
 family: reversal
-expression: "(Mean($high, 60) + Mean($low, 60)) / (Mean($close, 20) + Mean($close, 20)) - 1"
+expression: "(Mean($high, 60) + Mean($low, 60) + Mean($close, 60)) / ($close + $close + $close) - 1"
 direction: 1
-description: "60 day high-low midpoint reversion against a 20 day average close; stocks with recent prices below the medium-term range center rank higher."
-expected_behavior: "Combines two reviewed low-complexity ideas: the 60 day high-low midpoint anchor and 20 day close smoothing, aiming to preserve neutralized medium-horizon reversal while reducing single-day noise and turnover."
+description: "60 day typical-price mean reversion; stocks with current closes below their medium-term high-low-close anchor rank higher."
+expected_behavior: "Extends the reviewed 60 day close and high-low midpoint reversion ideas with one simple typical-price anchor, aiming to keep the neutralized medium-horizon reversal signal while avoiding range normalization and turnover filters that were discarded."
