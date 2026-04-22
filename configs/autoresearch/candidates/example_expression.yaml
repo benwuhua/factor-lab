@@ -1,6 +1,6 @@
-name: hl_mid_norm_selling_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open - $close) / (($high + $low) / 2), 20) + Mean(($open - $close) / (($high + $low) / 2), 60)"
+name: close_below_hl_mid_reversal_20_60_v1
+family: price_position
+expression: "Mean((($high + $low) / 2 - $close) / (($high + $low) / 2), 20) + Mean((($high + $low) / 2 - $close) / (($high + $low) / 2), 60)"
 direction: 1
-description: "20 and 60 day intraday selling-pressure reversal blend normalized by the daily high/low midpoint; stocks with repeated closes below open as a share of the intraday midpoint rank higher."
-expected_behavior: "Tests a low-complexity continuation of the reviewed selling-pressure reversal family by scaling the open-to-close body with the same day's high/low midpoint instead of open or close. Mean(($open - $close) / (($high + $low) / 2), 20) captures recent intraday selling pressure, while the 60 day term captures persistent medium-term pressure. Higher values should favor names with sustained weak intraday closes that may be prone to reversal. The expression uses only allowed open, high, low, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
+description: "20 and 60 day blend of how far the close sits below the daily high/low midpoint; stocks repeatedly finishing in the lower half of the intraday range rank higher."
+expected_behavior: "Tests a low-complexity price-position reversal signal related to, but distinct from, the reviewed open-to-close selling-pressure variants. Mean((($high + $low) / 2 - $close) / (($high + $low) / 2), 20) captures recent closes below the intraday midpoint, while the 60 day term captures persistent lower-half closes. Higher values should favor names with sustained weak closing location that may be prone to reversal. The expression uses only allowed high, low, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
