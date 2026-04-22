@@ -1,6 +1,6 @@
-name: low_turnover_high_mean_discount_reversal_20_60_v1
-family: turnover
-expression: "(Mean($high,60)-$close)/$close+(Mean($turnover,20)-$turnover)/Mean($turnover,20)"
+name: slow_corr_high_mean60_discount_volume_divergence_reversal_60_v1
+family: divergence
+expression: "0-Corr($high/Mean($high,60),$volume/Mean($volume,60),60)+(Mean($high,60)-$close)/$close"
 direction: 1
-description: "60 day mean-high discount reversal reinforced by below-normal 20 day turnover."
-expected_behavior: "Ranks stocks higher when the close is below the stock's 60 day average high and current turnover is below its 20 day average. The first term keeps the interpretable high-discount reversal anchor that has recently reviewed well, while the second term favors uncrowded rebounds without using turnover correlation, avoiding the recent turnover-divergence crash pattern. The expression uses only allowed high, close, and turnover fields with 20 and 60 day windows and simple Mean operations."
+description: "60 day high-volume divergence with a 60 day mean-high discount reversal anchor."
+expected_behavior: "Ranks stocks higher when medium-term normalized highs are weakly confirmed by medium-term normalized volume, and when the close remains below the stock's 60 day average high. This keeps the reviewed high-volume divergence plus mean-high discount interpretation, but slows the correlation horizon to test whether the signal is more persistent without adding turnover, range-position, intraday rebound, or pure volatility terms that recently discarded or crashed. The expression uses only allowed high, close, and volume fields with a single 60 day window, three Mean calls, and one Corr call."
