@@ -1,6 +1,6 @@
-name: low_anchor_weighted_high_ceiling_reversion_60_3_10_v1
+name: low_anchor_short_high_medium_mean_reversion_60_3_20_v1
 family: reversal
-expression: "Mean($low, 60) / ((Max($high, 3) + Max($high, 3) + Max($high, 10)) / 3) - 1"
+expression: "Mean($low, 60) / ((Max($high, 3) + Mean($high, 20)) / 2) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against a recent-weighted high ceiling; stocks whose 3 and 10 day rebound highs remain close to their longer-run low anchor rank higher."
-expected_behavior: "Extends the reviewed low-anchor dual-high-ceiling reversal family without repeating discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, or disallowed-window ideas. The 60 day average low provides a stable downside anchor, while the denominator weights the 3 day maximum high twice and the 10 day maximum high once, emphasizing very recent rebound pressure without ignoring a broader recent ceiling. Higher values should favor names still compressed near their longer-run low after limited upside follow-through, using only allowed low/high fields, 3/10/60 windows, and simple rolling operators."
+description: "60 day low-anchor reversion measured against a short-term high ceiling and medium-term average high; stocks whose recent and one-month upper prices remain close to the longer-run low anchor rank higher."
+expected_behavior: "Extends the reviewed low-anchor reversal family with a hybrid denominator rather than another weighted 3/10 high-ceiling tweak. The 60 day average low supplies the stable downside anchor, Max($high, 3) penalizes very recent rebound spikes, and Mean($high, 20) captures sustained one-month upper-price pressure without relying on the more extreme 20 day maximum high. Higher values should favor names still compressed near their longer-run low with limited upside follow-through. The expression uses only allowed low/high fields, 3/20/60 windows, and three simple rolling operators, while avoiding discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, and disallowed-window ideas."
