@@ -1,6 +1,6 @@
-name: close_20d_plain_reversal_v1
+name: mean_close_20d_reversal_v1
 family: reversal
-expression: "Ref($close,20)/$close-1"
+expression: "Mean($close,20)/$close-1"
 direction: 1
-description: "Plain 20 day close-to-close reversal; stocks whose current close is below the close 20 sessions ago rank higher."
-expected_behavior: "This deliberately resets to a low-complexity baseline after many reviewed variants around low-normalized intraday selling pressure, turnover damping, volume divergence, and midpoint discounts. Ref($close,20)/$close-1 is a transparent medium-horizon reversal signal: higher values mean larger 20 day price drawdowns, which may mean revert over the evaluation horizon. It avoids the discarded turnover confirmation/divergence crash paths, discarded pure volatility/near-low/close-from-high/downside-open variants, and high-complexity normalized divergence expressions. It uses only the allowed close field, the allowed 20 day window, and one allowed Ref operator."
+description: "Smoothed 20 day close mean reversal; stocks trading below their recent average close rank higher."
+expected_behavior: "This keeps the prior reviewed plain close reversal idea low-complexity while replacing the single 20 day Ref anchor with a 20 day Mean anchor. Mean($close,20)/$close-1 is positive when the current close is below its recent average, expressing a simple medium-horizon mean reversion hypothesis with less dependence on one lagged close. It avoids the discarded turnover confirmation and turnover divergence crash paths, discarded pure volatility and near-low variants, and high-complexity normalized divergence expressions. It uses only the allowed close field, the allowed 20 day window, and one allowed Mean operator."
