@@ -1,6 +1,6 @@
-name: fast_high_medium_volume_divergence_10_20_v1
-family: divergence
-expression: "0-Corr($high/Mean($high,10),$volume/Mean($volume,20),10)"
+name: close_60d_range_position_reversal_v1
+family: price_position
+expression: "0-($close-Min($low,60))/(Max($high,60)-Min($low,60))"
 direction: 1
-description: "10 day divergence between fast high-price strength and volume normalized by a 20 day participation baseline."
-expected_behavior: "A higher value means the 10 day rolling correlation between $high/Mean($high,10) and volume relative to its 20 day mean is lower or negative. The candidate keeps the reviewed high-anchor price-volume divergence interpretation, but tests whether a faster price-strength leg against a medium participation baseline improves on the same-window 10 day and slower 20/60 high-volume divergence variants. It avoids turnover expressions that recently crashed and discarded intraday rebound, range-position, and pure volatility paths while using only allowed high and volume fields, allowed 10 and 20 day windows, and one Corr plus two Mean operators."
+description: "60 day close position reversal within the rolling high-low range."
+expected_behavior: "A higher value means today's close sits nearer the 60 day rolling low than the 60 day rolling high, expressing a simple medium horizon price-position reversal signal. This keeps complexity low with only Min and Max over the allowed 60 day window, avoids turnover expressions that recently crashed, and differs from discarded open/intraday position ideas by anchoring on close within the broader 60 day high-low range."
