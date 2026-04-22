@@ -1,6 +1,6 @@
-name: open_norm_selling_pressure_reversal_20_60_v1
+name: hl_mid_norm_selling_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60)"
+expression: "Mean(($open - $close) / (($high + $low) / 2), 20) + Mean(($open - $close) / (($high + $low) / 2), 60)"
 direction: 1
-description: "20 and 60 day open-normalized intraday selling-pressure reversal blend; stocks with repeated closes below open as a share of open rank higher."
-expected_behavior: "Tests a low-complexity variant of the reviewed selling-pressure reversal family by normalizing the open-to-close body by open instead of close. Mean(($open - $close) / $open, 20) captures recent intraday selling pressure, while Mean(($open - $close) / $open, 60) captures persistent medium-term selling pressure. Higher values should favor names with repeated weak intraday closes that may be prone to reversal. The expression uses only allowed open and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
+description: "20 and 60 day intraday selling-pressure reversal blend normalized by the daily high/low midpoint; stocks with repeated closes below open as a share of the intraday midpoint rank higher."
+expected_behavior: "Tests a low-complexity continuation of the reviewed selling-pressure reversal family by scaling the open-to-close body with the same day's high/low midpoint instead of open or close. Mean(($open - $close) / (($high + $low) / 2), 20) captures recent intraday selling pressure, while the 60 day term captures persistent medium-term pressure. Higher values should favor names with sustained weak intraday closes that may be prone to reversal. The expression uses only allowed open, high, low, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
