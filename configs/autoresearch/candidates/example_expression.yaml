@@ -1,6 +1,6 @@
-name: low_norm_pressure_volume_divergence_20_60_v1
-family: divergence
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr(($open-$close)/$low,$volume,20)"
+name: range_damped_low_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-0.5*Mean(($high-$low)/$close,20)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day pressure-volume divergence adjustment."
-expected_behavior: "Keeps the reviewed low-normalized selling-pressure reversal backbone while testing whether the signal is cleaner when weak intraday closes are not strongly volume-confirmed. The two Mean terms capture recent and persistent close-below-open pressure relative to the session low. Subtracting Corr(($open-$close)/$low,$volume,20) favors names where that pressure is less synchronized with volume, suggesting lower-conviction selling rather than confirmed distribution. This avoids the crashed turnover-confirmation path and the discarded downside clipping, low-rebound, pure range-compression, and high-complexity OHLC composite ideas. The expression uses only allowed open, close, low, and volume fields; allowed 20 and 60 day windows; two Mean operators; and one Corr operator."
+description: "20 and 60 day low-normalized intraday selling-pressure reversal damped by recent intraday range."
+expected_behavior: "Keeps the reviewed low-normalized selling-pressure reversal backbone while testing whether noisy wide-range selloffs should be penalized. The two selling-pressure terms reward stocks that have repeatedly closed below the open relative to the session low, a simple mean-reversion setup. The 0.5 weighted Mean(($high-$low)/$close,20) term lightly reduces exposure to names whose recent pressure came with unusually large intraday ranges, avoiding a pure range-compression factor while adding a volatility sanity check. This avoids repeating the crashed turnover-confirmation path, the discarded pressure-volume divergence candidate, the pure low-volatility/range-compression idea, and high-complexity OHLC composites. The expression uses only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and three Mean operators."
