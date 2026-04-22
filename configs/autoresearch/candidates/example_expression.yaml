@@ -1,6 +1,6 @@
-name: compact_high_volume_divergence_pressure_reversal_20_v1
+name: compact_high_amount_divergence_pressure_reversal_20_v1
 family: divergence
-expression: "Mean(($open-$close)/$low,20)+(0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20))"
+expression: "Mean(($open-$close)/$low,20)+(0-Corr($high/Mean($high,20),$amount/Mean($amount,20),20))"
 direction: 1
-description: "Compact 20 day blend of low-normalized intraday selling-pressure reversal and high-price volume non-confirmation."
-expected_behavior: "Mean(($open-$close)/$low,20) ranks names with recent close-below-open pressure on a low-price scale, while 0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20) favors cases where high-price strength is not confirmed by volume. This keeps the reviewed high-normalized price-volume divergence idea but adds only one simple selling-pressure leg, avoiding the discarded average-trade-price discount, pure range-position, volatility-only, pressure-volume over-complexity, and crashed turnover-divergence paths. The expression uses allowed open, close, low, high, and volume fields; only the allowed 20 day window; one outer Mean, two normalization Means, and one Corr operator."
+description: "Compact 20 day blend of low-normalized intraday selling-pressure reversal and high-price amount non-confirmation."
+expected_behavior: "Mean(($open-$close)/$low,20) ranks names with recent close-below-open pressure on a low-price scale, while 0-Corr($high/Mean($high,20),$amount/Mean($amount,20),20) favors cases where high-price strength is not confirmed by traded amount. This is the amount-confirmation counterpart to the reviewed compact high-volume divergence pressure idea, avoiding the discarded average-trade-price discount, pure range-position, volatility-only, over-complex pressure-volume, and crashed turnover-divergence paths. The expression uses allowed open, close, low, high, and amount fields; only the allowed 20 day window; one outer Mean, two normalization Means, and one Corr operator."
