@@ -1,6 +1,6 @@
-name: persistent_selling_pressure_reversal_120_v1
+name: range_normalized_selling_pressure_reversal_60_v1
 family: reversal
-expression: "Mean($open - $close, 120) / Mean($close, 120)"
+expression: "Mean($open - $close, 60) / Mean($high - $low, 60)"
 direction: 1
-description: "120 day persistent intraday selling-pressure reversal normalized by the 120 day average close; stocks repeatedly closing below their opens over a longer horizon rank higher."
-expected_behavior: "Extends the reviewed simple selling-pressure branch from 60 to 120 trading days without adding anchor, ceiling, range, or turnover components. Mean($open - $close, 120) measures sustained down-body pressure over a longer horizon, and division by Mean($close, 120) keeps the signal comparable across price levels. Higher values should favor names with persistent long-horizon intraday selling pressure that may be prone to reversal. The expression uses only allowed open/close fields, the allowed 120 day window, and two rolling Mean operators."
+description: "60 day persistent intraday selling-pressure reversal normalized by the average daily high-low range; stocks with larger down bodies relative to their normal range rank higher."
+expected_behavior: "Builds on the reviewed selling-pressure reversal branch while avoiding another low-anchor or ceiling variation. Mean($open - $close, 60) measures sustained tendency to close below the open, and Mean($high - $low, 60) scales that pressure by each stock's typical trading range rather than by price level. Higher values should favor names with persistent range-adjusted selling pressure that may be prone to reversal. The expression uses only allowed open, close, high, and low fields, the allowed 60 day window, and two rolling Mean operators."
