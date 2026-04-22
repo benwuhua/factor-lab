@@ -1,6 +1,6 @@
-name: close_reversal_10_v1
+name: mean_close_reversion_20_v1
 family: reversal
-expression: "Ref($close, 10) / $close - 1"
+expression: "Mean($close, 20) / $close - 1"
 direction: 1
-description: "10 day close-to-close reversal; recent decliners rank higher without adding liquidity or volatility filters."
-expected_behavior: "Stocks that have sold off over the last 10 sessions may mean-revert over the 20 day evaluation horizon, while the simple close-only construction should keep turnover and complexity low."
+description: "20 day moving-average close reversion; stocks trading below their recent average rank higher without adding liquidity or volatility filters."
+expected_behavior: "Using the 20 day mean as a smooth anchor should capture medium-horizon price dislocation with lower noise than endpoint close reversal, while keeping turnover and complexity low."
