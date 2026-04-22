@@ -1,6 +1,6 @@
-name: typical_price_volume_divergence_20_v1
+name: range_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr((($high+$low+$close)/3)/Mean(($high+$low+$close)/3,20),$volume/Mean($volume,20),20)"
+expression: "0-Corr(($high-$low)/Mean($high-$low,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day divergence between normalized typical price strength and normalized traded volume."
-expected_behavior: "A higher value means the rolling correlation between normalized typical price and normalized volume is more negative, favoring stocks whose broad intraday price level is not being confirmed by participation. This extends the reviewed low-complexity price-volume divergence family with a high-low-close typical-price anchor rather than repeating the close, open, high, low, high-low midpoint, or open-close midpoint variants, while avoiding turnover-based divergence paths that have crashed and avoiding discarded volatility-only or high-complexity normalized low-norm blends. The expression uses only allowed high, low, close, and volume fields, the allowed 20 day window, and one Corr plus two Mean operators."
+description: "20 day divergence between normalized intraday range and normalized traded volume."
+expected_behavior: "A higher value means the rolling correlation between normalized high-low range and normalized volume is more negative, favoring stocks where recent range expansion or contraction is less confirmed by trading participation. This keeps to a low-complexity divergence idea without repeating the already reviewed price-level anchors such as close, open, high, low, high-low midpoint, open-close midpoint, or typical price, and avoids turnover-based divergence paths that have crashed. The expression uses only allowed high, low, and volume fields, the allowed 20 day window, and one Corr plus two Mean operators."
