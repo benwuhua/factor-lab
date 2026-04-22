@@ -1,6 +1,6 @@
-name: close_20d_high_drawdown_reversal_v1
-family: reversal
-expression: "Max($close,20)/$close-1"
+name: gap3_intraday_rebound_divergence_20_v1
+family: divergence
+expression: "Mean($close/$open-1,20)-Mean($open/Ref($close,3)-1,20)"
 direction: 1
-description: "20 day close-to-high drawdown reversal; stocks trading farther below their recent highest close rank higher."
-expected_behavior: "Tests a very low-complexity price-position reversal anchor that is distinct from the discarded turnover, pure low-volatility, intraday shortfall, and near-low pressure variants. Higher values mean the latest close is farther below the 20 day maximum close, which may capture short-term overreaction while avoiding the crowded low-normalized selling-pressure family. The expression uses only the allowed close field, the 20 day window, and the allowed Max operator."
+description: "20 day divergence between intraday rebound and 3 day opening gap pressure; stocks with stronger open-to-close recovery versus weak opens rank higher."
+expected_behavior: "Mean($close/$open-1,20) captures persistent intraday buying from open to close, while Mean($open/Ref($close,3)-1,20) captures opening weakness versus the close three sessions earlier. Higher values favor names that are marked down at the open but bought back during the session, a low-complexity reversal/divergence pattern that is distinct from discarded pure intraday shortfall, low-volatility, near-low, turnover-crash, and crowded low-normalized selling-pressure variants. The expression uses only allowed open and close fields, allowed 3 and 20 day windows, and allowed Ref and Mean operators."
