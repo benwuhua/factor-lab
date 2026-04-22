@@ -1,6 +1,6 @@
-name: vwap_anchor_reversion_60_v1
-family: reversal
-expression: "Mean($amount / $volume, 60) / $close - 1"
-direction: 1
-description: "60 day traded-price anchor reversal; stocks with current closes below their medium-term amount-per-volume price anchor rank higher."
-expected_behavior: "Uses a simple VWAP-like anchor to test whether the reviewed 60 day mean-reversion effect is stronger when the reference price is weighted by traded value rather than the daily close or high-low midpoint, while avoiding discarded turnover filters, range normalization, and disallowed short windows."
+name: turnover_mean_60_low_v1
+family: turnover
+expression: "Mean($turnover, 60)"
+direction: -1
+description: "60 day average turnover level; stocks with persistently lower trading turnover rank higher."
+expected_behavior: "Tests a simple low-turnover effect as a standalone signal, avoiding the previously discarded 5 versus 60 turnover compression ratio, price-turnover divergence, and any disallowed 0 or 1 day windows."
