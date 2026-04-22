@@ -1,6 +1,6 @@
-name: drawdown_from_high_reversal_60_v1
+name: distance_from_low_reversal_60_v1
 family: price_position
-expression: "$close / Max($close, 60) - 1"
+expression: "$close / Min($close, 60) - 1"
 direction: -1
-description: "60 day drawdown-from-high reversal; stocks trading farther below their recent high rank higher."
-expected_behavior: "Tests whether the reviewed medium-term reversal effect is stronger when measured as distance from the 60 day high rather than distance from a moving average, while keeping the expression very simple."
+description: "60 day distance-from-low reversal; stocks trading closer to their recent low rank higher."
+expected_behavior: "Tests whether a simple recent-low anchor captures medium-term reversal without adding turnover or volatility scaling complexity."
