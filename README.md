@@ -197,6 +197,16 @@ make autoresearch-ledger
 
 The ledger report groups `review`, `discard_candidate`, and `crash` rows, then shows the top review candidates and common discard/crash reasons.
 
+Run overnight Codex CLI autoresearch without an OpenAI API key:
+
+```bash
+git switch -c autoresearch/nightly-$(date +%Y%m%d)
+tmux new -s factor-night
+make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30
+```
+
+The Codex loop uses the local `codex` ChatGPT login. Each iteration asks Codex to update only `configs/autoresearch/candidates/example_expression.yaml`; the runner then commits the candidate, runs the locked oracle, runs the ledger summary, and writes logs under `reports/autoresearch/codex_loop/`. The runner refuses to run on `main` or `master` unless `--allow-protected-branch` is passed directly to the script.
+
 ## Event Backtests
 
 Use event backtests when a factor is closer to an absolute trigger or pattern score than a pure IC feature:
