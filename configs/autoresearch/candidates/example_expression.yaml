@@ -1,6 +1,6 @@
-name: price_position_20_reversal_v1
-family: price_position
-expression: "($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 0.000001)"
+name: turnover_compression_5_60_v1
+family: turnover
+expression: "Mean($turnover, 5) / (Mean($turnover, 60) + 0.000001)"
 direction: -1
-description: "20 day close location within the recent high-low range, ranked as a reversal signal."
-expected_behavior: "Lower range position should indicate more rebound room, while closes near the 20 day high should be less attractive."
+description: "5 day average turnover scaled by the 60 day turnover baseline, ranked as a low-crowding signal."
+expected_behavior: "Stocks with subdued recent turnover relative to their own medium-term baseline should be less crowded and may have better 20 day forward returns."
