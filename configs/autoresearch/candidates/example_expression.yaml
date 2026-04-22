@@ -1,6 +1,6 @@
-name: turnover_volatility_low_20_v1
-family: turnover
-expression: "Std($turnover, 20)"
-direction: -1
-description: "Twenty day turnover volatility; lower unstable trading activity is ranked higher."
-expected_behavior: "Tests whether stocks with steadier recent trading participation carry a cleaner forward return signal than high-churn names. This is distinct from the discarded turnover_mean_60_low_v1 level signal and avoids the crash-prone turnover confirmation pattern by using turnover alone with one allowed Std operator and one allowed 20 day window."
+name: hybrid_open_close_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open-$close)/$open,20)+Mean(($open-$close)/$close,60)"
+direction: 1
+description: "20 day open-normalized plus 60 day close-normalized intraday selling-pressure reversal; stocks with repeated closes below open rank higher."
+expected_behavior: "Tests a low-complexity blend of two reviewed selling-pressure normalizations without adding volume, turnover, thresholds, or composite OHLC anchors. The 20 day open-normalized leg emphasizes recent open-to-close weakness relative to the entry anchor, while the 60 day close-normalized leg captures persistent pressure relative to the final traded price. Higher values should favor names with sustained intraday selling pressure that may mean revert over the evaluation horizon. The expression uses only allowed open and close fields, allowed 20 and 60 day windows, and two allowed Mean operators."
