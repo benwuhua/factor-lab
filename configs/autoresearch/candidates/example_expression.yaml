@@ -1,6 +1,6 @@
-name: hl_mid_mean_reversion_60_v1
-family: reversal
-expression: "(Mean($high, 60) + Mean($low, 60)) / $close - 2"
+name: drawdown_from_high_reversal_120_v1
+family: price_position
+expression: "Max($high, 120) / $close - 1"
 direction: 1
-description: "60 day high-low midpoint mean reversion; stocks trading below their average daily range midpoint rank higher."
-expected_behavior: "Tests whether the reviewed medium-term reversion effect is stronger when the anchor uses the 60 day average high-low midpoint instead of close-only averages, while keeping complexity low."
+description: "120 day drawdown-from-high reversal; stocks trading farther below their recent high rank higher."
+expected_behavior: "Tests whether extending the reviewed drawdown-from-high reversal horizon from 60 to 120 sessions lowers turnover while preserving a simple price-position signal."
