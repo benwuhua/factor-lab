@@ -1,6 +1,6 @@
-name: open_gap_reversal_3_20_v1
+name: open_gap_low_norm_pressure_reversal_3_20_v1
 family: reversal
-expression: "0-Mean($open/Ref($close,3)-1,20)"
+expression: "Mean(($open-$close)/$low,20)-Mean($open/Ref($close,3)-1,20)"
 direction: 1
-description: "20 day average reversal of the open price relative to the close from three trading days earlier."
-expected_behavior: "Tests a compact gap-style reversal signal that is distinct from the heavily explored selling-pressure denominator variants, volume/amount divergence variants, discarded direct range-position ideas, and crash-prone turnover-confirmation idea. A high value means recent opens have been weak versus the close three sessions earlier, which may capture short-horizon opening-price pessimism before mean reversion. The expression uses only allowed open and close fields, allowed 3 and 20 day windows, and allowed Ref and Mean operators."
+description: "20 day low-normalized selling pressure adjusted by weak opens versus the close three sessions earlier."
+expected_behavior: "Tests whether the reviewed low-normalized intraday selling-pressure signal is stronger when paired with compact open-gap pessimism. A high value means closes have tended to finish below opens relative to the low-price scale, while opens have also been weak versus the close three sessions earlier. This keeps complexity low and avoids discarded direct range-position, downside-only, range-compression, turnover-volatility, and crash-prone turnover-confirmation ideas. The expression uses only allowed open, close, and low fields; allowed 3 and 20 day windows; and allowed Mean and Ref operators."
