@@ -1,6 +1,6 @@
-name: lagged_close_reversal_60_5_v1
+name: smooth_mean_close_reversion_60_5_v1
 family: reversal
-expression: "Ref($close, 60) / Ref($close, 5) - 1"
+expression: "Mean($close, 60) / Mean($close, 5) - 1"
 direction: 1
-description: "Lagged 60-to-5 day close reversal; stocks that fell over the older medium-term window rank higher while the most recent week is skipped."
-expected_behavior: "Keeps the reviewed medium-term reversal theme but avoids reacting to the latest 5 sessions, aiming to reduce noisy short-term rebounds and keep turnover low with a two-Ref expression."
+description: "Smoothed 60 day mean close reversion; stocks whose recent 5 day average sits below their 60 day average rank higher."
+expected_behavior: "Keeps the reviewed 60 day mean-reversion anchor but replaces the single close with a 5 day recent average, aiming to reduce one-day noise while preserving a simple medium-term reversal signal."
