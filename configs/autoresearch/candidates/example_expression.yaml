@@ -1,6 +1,6 @@
-name: close_norm_selling_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open-$close)/$close,20)+Mean(($open-$close)/$close,60)"
+name: normalized_price_volume_divergence_20_v1
+family: divergence
+expression: "0-Corr($close/Mean($close,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day plus 60 day close-normalized intraday selling pressure; stocks that repeatedly close below the open relative to their close rank higher."
-expected_behavior: "Tests the same persistent close-below-open selling-pressure reversal family as the reviewed open-, low-, high-, and HL-mid-normalized variants, but uses close as the price scale. Higher values indicate sustained intraday selling pressure normalized by the terminal traded price, which may capture short-term exhaustion without adding volume, turnover, thresholds, or composite anchors. The expression uses only allowed open and close fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 day negative correlation between normalized close and normalized volume; stocks where volume expands while relative price is weak rank higher."
+expected_behavior: "Tests a simple price-volume divergence idea distinct from the repeated selling-pressure and low-anchor variants. Higher values indicate lower or negative 20 day correlation between close relative to its 20 day mean and volume relative to its 20 day mean, which may capture capitulation-like volume during price weakness without thresholds, turnover fields, or multi-anchor composites. The expression uses only allowed close and volume fields; the allowed 20 day window; and allowed Mean and Corr operators."
