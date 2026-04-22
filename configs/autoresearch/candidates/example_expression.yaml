@@ -1,6 +1,6 @@
-name: low_open_mid_anchor_reversion_60_v1
+name: low_close_mid_anchor_reversion_60_v1
 family: reversal
-expression: "(Mean($low, 60) + Mean($open, 60)) / ($close + $close) - 1"
+expression: "(Mean($low, 60) + Mean($close, 60)) / ($close + $close) - 1"
 direction: 1
-description: "60 day low-open midpoint anchor reversion; stocks whose current close sits below the average of recent lows and opens rank higher."
-expected_behavior: "Extends the reviewed 60 day anchor-reversion family by blending the stronger low anchor with the open anchor instead of adding turnover, volatility, range scaling, or disallowed 0/1 day windows. The signal stays low-complexity and interpretable: depressed closes relative to a conservative low/open historical price anchor should retain medium-horizon reversal information while avoiding previously discarded turnover-only, VWAP-anchor, range-normalized, volatility-scaled, and Min/Max price-position ideas."
+description: "60 day low-close midpoint anchor reversion; stocks whose current close sits below the average of recent lows and closes rank higher."
+expected_behavior: "Combines two reviewed medium-horizon reversal anchors: the strong 60 day low anchor and the stable 60 day mean-close reversion signal. The low/close midpoint keeps the expression simple and interpretable while testing whether a conservative price anchor can preserve the low-anchor edge without adding smoothing, turnover, volatility scaling, VWAP, range normalization, Min/Max price-position logic, or disallowed 0/1 day windows."
