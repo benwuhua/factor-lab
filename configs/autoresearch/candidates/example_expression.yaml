@@ -1,6 +1,6 @@
-name: low_norm_low_volume_divergence_reversal_20_60_v1
-family: divergence
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($low,$volume,20)"
+name: smoothed_open_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean($open-$close,20)/Mean($open,20)+Mean($open-$close,60)/Mean($open,60)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day low-volume divergence adjustment; stocks with persistent close-below-open pressure and weaker low-price volume confirmation rank higher."
-expected_behavior: "Builds on the reviewed low-normalized selling-pressure reversal family while testing a distinct divergence anchor from the prior close-volume variants. The two Mean terms capture recent and persistent close-below-open pressure as a share of the session low. Subtracting Corr($low,$volume,20) favors cases where the low-price path is less positively confirmed by volume, suggesting selling pressure may be more exhausted than institutionally reinforced. This avoids the previously crashing turnover-confirmation structure and stays simple: allowed open, close, low, and volume fields; allowed 20 and 60 day windows; two Mean operators; and one Corr operator."
+description: "20 and 60 day smoothed open-normalized intraday selling-pressure reversal; stocks with persistent close-below-open bodies relative to their average open price rank higher."
+expected_behavior: "Tests a low-complexity ratio-of-means variant of the reviewed open-normalized selling-pressure reversal family. Using Mean($open-$close,N)/Mean($open,N) keeps the same interpretation as close-below-open pressure but smooths the denominator before normalization, which may reduce daily price-scale noise compared with averaging per-day ratios. Direction is positive because persistent selling pressure is treated as a reversal setup. The expression uses only allowed open and close fields, 20 and 60 day windows, and four Mean operators, with no turnover confirmation branch or disallowed short window."
