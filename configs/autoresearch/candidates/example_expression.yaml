@@ -1,6 +1,6 @@
-name: volatility_scaled_close_reversal_20_v1
+name: lower_mid_discount_low_norm_pressure_reversal_20_60_v1
 family: reversal
-expression: "(Ref($close,20)/$close-1)/(Std($close/Ref($close,3)-1,20)+0.000001)"
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)+Mean((($open+$low)/2-$close)/$low,20)"
 direction: 1
-description: "20 day close-to-close reversal scaled by recent 3 day return volatility."
-expected_behavior: "Ref($close,20)/$close-1 captures a transparent medium-horizon drawdown reversal signal: higher values mean the current close is depressed versus the close 20 sessions earlier. Dividing by Std($close/Ref($close,3)-1,20)+0.000001 favors cleaner drawdowns where the reversal opportunity is not simply compensation for high recent price turbulence. This is distinct from discarded pure low-volatility, near-low, intraday-shortfall, and turnover-divergence ideas, avoids turnover fields that have crashed, and keeps the candidate low complexity with only the allowed close field, allowed 3 and 20 day windows, and allowed Ref and Std operators."
+description: "20 and 60 day low-normalized selling-pressure reversal plus a 20 day open-low midpoint discount term."
+expected_behavior: "Mean(($open-$close)/$low,20) and Mean(($open-$close)/$low,60) keep the reviewed low-normalized selling-pressure backbone: higher values mean repeated closes below the open on a low-price scale over both recent and medium horizons. Mean((($open+$low)/2-$close)/$low,20) adds a compact lower-intraday-position term that rewards closes below the open-low midpoint, focusing on end-of-day weakness without adding turnover, volume correlation, volatility gates, or threshold branches. This is distinct from the prior high-low midpoint discount, standalone open-low midpoint, pure close reversal, near-low, intraday-shortfall, and crashed turnover-divergence ideas while using only allowed open, low, and close fields; allowed 20 and 60 day windows; and three allowed Mean operators."
