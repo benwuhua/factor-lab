@@ -1,6 +1,6 @@
-name: mean_close_reversion_60_v1
+name: mean_close_reversion_120_v1
 family: reversal
-expression: "Mean($close, 60) / $close - 1"
+expression: "Mean($close, 120) / $close - 1"
 direction: 1
-description: "60 day mean close reversion; stocks trading below their medium-term average close rank higher."
-expected_behavior: "Extends the reviewed 20 day mean-close reversion idea to a slower horizon, aiming to preserve the neutralized reversal signal while reducing top-quantile turnover."
+description: "120 day mean close reversion; stocks trading below their long-term average close rank higher."
+expected_behavior: "Extends the reviewed mean-close reversion family to the slowest allowed horizon, testing whether a lower-turnover long-term anchor preserves the neutralized reversal signal."
