@@ -1,6 +1,6 @@
-name: turnover_mean_60_low_v1
-family: turnover
-expression: "Mean($turnover, 60)"
-direction: -1
-description: "60 day average turnover level; stocks with persistently lower trading turnover rank higher."
-expected_behavior: "Tests a simple low-turnover effect as a standalone signal, avoiding the previously discarded 5 versus 60 turnover compression ratio, price-turnover divergence, and any disallowed 0 or 1 day windows."
+name: smooth_mean_close_reversion_120_20_v1
+family: reversal
+expression: "Mean($close, 120) / Mean($close, 20) - 1"
+direction: 1
+description: "Long-horizon mean reversion using a 120 day close average against a 20 day smoothed recent price anchor."
+expected_behavior: "Ranks stocks higher when their 20 day smoothed price is depressed versus the 120 day average, extending reviewed mean-reversion variants while avoiding discarded turnover, range-volatility, price-position, and disallowed 0 or 1 day window ideas."
