@@ -1,6 +1,6 @@
-name: downside_open_pressure_reversal_20_60_v1
+name: selling_pressure_acceleration_20_60_v1
 family: reversal
-expression: "Mean((($open - $close) / $open) + Abs(($open - $close) / $open), 20) + Mean((($open - $close) / $open) + Abs(($open - $close) / $open), 60)"
+expression: "Mean(($open - $close) / $open, 20) - Mean(($open - $close) / $open, 60)"
 direction: 1
-description: "20 and 60 day downside-only open-to-close pressure; up-day relief is clipped out algebraically so only weak closes accumulate."
-expected_behavior: "Tests whether persistent intraday selling pressure is cleaner when positive open-to-close days are not allowed to offset down days. Let x = ($open - $close) / $open; x + Abs(x) is positive when the close is below the open and zero when the close is above the open, up to a constant scale that does not change ranks. Averaging this downside pressure over 20 and 60 day horizons should identify names with repeated weak closes that may be prone to reversal. The expression uses only allowed open and close fields, the allowed 20 and 60 day windows, and the allowed Abs and Mean operators."
+description: "Recent open-to-close selling pressure relative to its 60 day baseline, targeting short-term pressure acceleration and reversal."
+expected_behavior: "Tests whether names with 20 day open-to-close weakness that is elevated versus their own 60 day baseline are more likely to mean revert. The signal is positive when recent closes are weak versus opens faster than the longer baseline, while persistent stale pressure is subtracted out. This keeps the successful open-normalized selling pressure family but removes the downside clipping that crashed or discarded recent variants, using only allowed open and close fields, allowed 20 and 60 windows, and two Mean operators."
