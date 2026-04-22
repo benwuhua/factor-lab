@@ -1,6 +1,6 @@
-name: low_anchor_selling_pressure_adjusted_reversion_60_20_v1
+name: low_anchor_high_ceiling_selling_pressure_reversion_60_3_20_v1
 family: reversal
-expression: "Mean($low, 60) / ($close - Mean($open - $close, 20)) - 1"
+expression: "Mean($low, 60) / (Max($high, 3) - Mean($open - $close, 20)) - 1"
 direction: 1
-description: "60 day low-anchor reversal with a 20 day intraday selling-pressure adjustment; stocks near their longer-run low anchor after repeated closes below opens rank higher."
-expected_behavior: "Combines two reviewed low-complexity reversal ideas without repeating the discarded range-normalized selling-pressure, turnover, volatility-scaled, VWAP, distance-from-low, upper-shadow, or disallowed-window variants. Mean($low, 60) supplies a stable downside anchor, while subtracting Mean($open - $close, 20) from the current close lifts the score when recent intraday bodies show persistent selling pressure and lowers it when closes have been firm. Higher values should favor compressed names that remain close to their 60 day low anchor and still show short-term sell-pressure exhaustion. The expression uses only allowed open/close/low fields, 20/60 windows, and two rolling Mean operators."
+description: "60 day low-anchor reversal against a 3 day high ceiling, adjusted upward when recent open-to-close bodies show persistent selling pressure."
+expected_behavior: "Extends the reviewed low-anchor high-ceiling cluster with the separately reviewed selling-pressure signal, rather than repeating discarded turnover, volatility-scaled, range-normalized, VWAP, distance-from-low, or upper-shadow variants. Mean($low, 60) keeps the stable downside anchor, Max($high, 3) penalizes names that already rebounded to a fresh short-term high, and subtracting Mean($open - $close, 20) raises the score when recent closes have persistently finished below opens. Higher values should favor compressed stocks still near their long-run low anchor with unresolved sell-pressure exhaustion. The expression uses only allowed open/high/low/close fields, 3/20/60 windows, and three rolling operators."
