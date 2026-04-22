@@ -1,6 +1,6 @@
-name: gap3_intraday_rebound_divergence_20_v1
-family: divergence
-expression: "Mean($close/$open-1,20)-Mean($open/Ref($close,3)-1,20)"
+name: volatility_scaled_close_reversal_20_v1
+family: reversal
+expression: "(Ref($close,20)/$close-1)/(Std($close/Ref($close,3)-1,20)+0.000001)"
 direction: 1
-description: "20 day divergence between intraday rebound and 3 day opening gap pressure; stocks with stronger open-to-close recovery versus weak opens rank higher."
-expected_behavior: "Mean($close/$open-1,20) captures persistent intraday buying from open to close, while Mean($open/Ref($close,3)-1,20) captures opening weakness versus the close three sessions earlier. Higher values favor names that are marked down at the open but bought back during the session, a low-complexity reversal/divergence pattern that is distinct from discarded pure intraday shortfall, low-volatility, near-low, turnover-crash, and crowded low-normalized selling-pressure variants. The expression uses only allowed open and close fields, allowed 3 and 20 day windows, and allowed Ref and Mean operators."
+description: "20 day close-to-close reversal scaled by recent 3 day return volatility."
+expected_behavior: "Ref($close,20)/$close-1 captures a transparent medium-horizon drawdown reversal signal: higher values mean the current close is depressed versus the close 20 sessions earlier. Dividing by Std($close/Ref($close,3)-1,20)+0.000001 favors cleaner drawdowns where the reversal opportunity is not simply compensation for high recent price turbulence. This is distinct from discarded pure low-volatility, near-low, intraday-shortfall, and turnover-divergence ideas, avoids turnover fields that have crashed, and keeps the candidate low complexity with only the allowed close field, allowed 3 and 20 day windows, and allowed Ref and Std operators."
