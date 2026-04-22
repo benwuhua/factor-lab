@@ -1,6 +1,6 @@
-name: upper_mid_discount_high_volume_divergence_reversal_20_v1
+name: upper_mid_liquidity_divergence_20_v1
 family: divergence
-expression: "Mean(($open+$high-$close-$close)/$low,20)+(0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20))"
+expression: "0-Corr(($high+$close)/Mean($high+$close,20),($volume/Mean($volume,20)+$amount/Mean($amount,20)),20)"
 direction: 1
-description: "Compact 20 day blend of upper-midpoint close discount reversal and high-price volume non-confirmation."
-expected_behavior: "Mean(($open+$high-$close-$close)/$low,20) ranks names whose closes sit below the open/high upper midpoint on a low-price scale, capturing persistent intraday selling pressure without using a discarded pure range-position form. The 0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20) leg favors high-price strength that is not confirmed by traded volume, extending the reviewed high-volume divergence path while avoiding the crashed turnover-divergence and weak average-trade-price discount ideas. The expression uses only allowed open, high, low, close, and volume fields; one 20 day window; one outer Mean, two normalization Means, and one Corr operator."
+description: "20 day divergence between upper-mid price strength and normalized combined share/dollar liquidity."
+expected_behavior: "Ranks stocks higher when the high/close upper-mid price level is not confirmed by the combined normalized volume and amount series. This keeps the successful high/upper-mid price-volume divergence intuition, adds amount as a low-complexity liquidity confirmation check, and avoids the discarded average-trade-price discount and crashed turnover-divergence paths. The expression uses only allowed high, close, volume, and amount fields with one 20 day window, three Mean operators, and one Corr operator."
