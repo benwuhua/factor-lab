@@ -1,6 +1,6 @@
-name: steady_low_norm_selling_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Std(($open-$close)/$low,20)"
+name: low_norm_low_volume_divergence_reversal_20_60_v1
+family: divergence
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($low,$volume,20)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day steadiness penalty; stocks with repeated close-below-open pressure and fewer one-off spikes rank higher."
-expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal with one simple volatility penalty rather than adding discarded turnover confirmation or high-complexity OHLC averaging. The two Mean terms capture recent and persistent close-below-open pressure as a share of the session low, while subtracting Std(($open-$close)/$low,20) favors steadier exhaustion over noisy single-day pressure. This keeps the economic premise interpretable: persistent weak closes near the lower price anchor may revert, but unstable pressure is penalized. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; two Mean operators; and one Std operator."
+description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day low-volume divergence adjustment; stocks with persistent close-below-open pressure and weaker low-price volume confirmation rank higher."
+expected_behavior: "Builds on the reviewed low-normalized selling-pressure reversal family while testing a distinct divergence anchor from the prior close-volume variants. The two Mean terms capture recent and persistent close-below-open pressure as a share of the session low. Subtracting Corr($low,$volume,20) favors cases where the low-price path is less positively confirmed by volume, suggesting selling pressure may be more exhausted than institutionally reinforced. This avoids the previously crashing turnover-confirmation structure and stays simple: allowed open, close, low, and volume fields; allowed 20 and 60 day windows; two Mean operators; and one Corr operator."
