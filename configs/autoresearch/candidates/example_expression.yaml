@@ -1,6 +1,6 @@
-name: mom_skip_60_5_v1
-family: momentum
-expression: "Ref($close, 5) / Ref($close, 60) - 1"
-direction: 1
-description: "60 day momentum skipping the most recent 5 sessions."
-expected_behavior: "Higher values should indicate persistent medium-term strength."
+name: price_position_20_reversal_v1
+family: price_position
+expression: "($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 0.000001)"
+direction: -1
+description: "20 day close location within the recent high-low range, ranked as a reversal signal."
+expected_behavior: "Lower range position should indicate more rebound room, while closes near the 20 day high should be less attractive."
