@@ -1,6 +1,6 @@
-name: range_adjusted_selling_pressure_20_v1
+name: low_anchor_selling_pressure_adjusted_reversion_60_20_v1
 family: reversal
-expression: "Mean(($open - $close) / ($high - $low + 0.000001), 20)"
+expression: "Mean($low, 60) / ($close - Mean($open - $close, 20)) - 1"
 direction: 1
-description: "Persistent 20 day intraday selling pressure scaled by the same day's high-low range; stocks that repeatedly close below their opens within the daily range rank higher for a simple reversal test."
-expected_behavior: "Tests whether sustained intraday down-body pressure is more informative when adjusted by daily range rather than by price level. The signal is distinct from the discarded 5 day intraday reversal and from the prior unscaled selling-pressure review candidate because it measures where the open-to-close move sits inside each day's tradable range before smoothing over 20 days. Higher values should favor names with repeated range-adjusted selling pressure that may be overextended and prone to short-horizon reversal. The expression uses only allowed open/high/low/close fields, the allowed 20 day window, and one rolling Mean operator."
+description: "60 day low-anchor reversal with a 20 day intraday selling-pressure adjustment; stocks near their longer-run low anchor after repeated closes below opens rank higher."
+expected_behavior: "Combines two reviewed low-complexity reversal ideas without repeating the discarded range-normalized selling-pressure, turnover, volatility-scaled, VWAP, distance-from-low, upper-shadow, or disallowed-window variants. Mean($low, 60) supplies a stable downside anchor, while subtracting Mean($open - $close, 20) from the current close lifts the score when recent intraday bodies show persistent selling pressure and lowers it when closes have been firm. Higher values should favor compressed names that remain close to their 60 day low anchor and still show short-term sell-pressure exhaustion. The expression uses only allowed open/close/low fields, 20/60 windows, and two rolling Mean operators."
