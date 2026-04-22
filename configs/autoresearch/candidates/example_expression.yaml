@@ -1,6 +1,6 @@
-name: low_anchor_recent_high_ceiling_reversion_60_10_v1
+name: low_anchor_high_mean_ceiling_reversion_60_5_v1
 family: reversal
-expression: "Mean($low, 60) / Max($high, 10) - 1"
+expression: "Mean($low, 60) / ((Mean($high, 5) + Max($high, 5)) / 2) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against the recent 10 day high ceiling; stocks whose two-week highest traded prices remain close to their longer-run low anchor rank higher."
-expected_behavior: "Extends the reviewed low-anchor recent-high ceiling idea from a 5 day to a 10 day ceiling to reduce dependence on a very short rebound window while keeping the same economic interpretation. The factor should favor stocks still compressed near their longer-run low after any recent high-price attempts, using only allowed low/high fields, 60 and 10 day windows, and two simple operators. It avoids discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, and disallowed-window ideas."
+description: "60 day low-anchor reversion measured against a recent 5 day high mean/ceiling blend; stocks whose recent upper prices remain close to their longer-run low anchor rank higher."
+expected_behavior: "Blends two reviewed low-anchor reversal variants: the recent 5 day average high, which is smoother, and the 5 day maximum high ceiling, which is stricter about rebound attempts. The factor should preserve the same compressed-near-low interpretation while testing whether the midpoint denominator balances signal strength and turnover better than either high reference alone. It uses only allowed low/high fields, 60 and 5 day windows, and three simple operators, while avoiding discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, and disallowed-window ideas."
