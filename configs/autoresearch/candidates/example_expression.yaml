@@ -1,6 +1,6 @@
-name: avg_trade_price_discount_reversal_20_v1
-family: reversal
-expression: "(Mean($amount,20)/Mean($volume,20))/$close-1"
+name: compact_high_volume_divergence_pressure_reversal_20_v1
+family: divergence
+expression: "Mean(($open-$close)/$low,20)+(0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20))"
 direction: 1
-description: "20 day average traded price discount reversal using amount divided by volume as a simple VWAP-like anchor."
-expected_behavior: "A higher value means the current close is below the 20 day average traded price proxy, Mean(amount,20)/Mean(volume,20). This tests a low-complexity reversal idea anchored on where recent capital transacted rather than another low-norm selling-pressure variant. It avoids the discarded pure range-position and volatility ideas, and avoids the crashed turnover-divergence path. The expression uses only allowed amount, volume, and close fields, the allowed 20 day window, and two Mean operators."
+description: "Compact 20 day blend of low-normalized intraday selling-pressure reversal and high-price volume non-confirmation."
+expected_behavior: "Mean(($open-$close)/$low,20) ranks names with recent close-below-open pressure on a low-price scale, while 0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20) favors cases where high-price strength is not confirmed by volume. This keeps the reviewed high-normalized price-volume divergence idea but adds only one simple selling-pressure leg, avoiding the discarded average-trade-price discount, pure range-position, volatility-only, pressure-volume over-complexity, and crashed turnover-divergence paths. The expression uses allowed open, close, low, high, and volume fields; only the allowed 20 day window; one outer Mean, two normalization Means, and one Corr operator."
