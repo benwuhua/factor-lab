@@ -1,6 +1,6 @@
-name: short_open_low_mid_discount_pressure_reversal_10_60_v1
+name: medium_close_drawdown_midpoint_discount_reversal_20_v1
 family: reversal
-expression: "Mean((($open+$low)/2-$close)/$low,10)+Mean(($open-$close)/$low,60)"
+expression: "Ref($close,20)/$close-1+Mean((($open+$low)/2-$close)/$low,20)"
 direction: 1
-description: "10 day open-low midpoint discount reversal plus a 60 day low-normalized selling-pressure anchor."
-expected_behavior: "Mean((($open+$low)/2-$close)/$low,10) rewards names whose closes have recently finished below the lower open-low midpoint, capturing short-term end-of-day selling pressure without volume, turnover, or volatility gates. Mean(($open-$close)/$low,60) keeps the reviewed medium-horizon low-normalized pressure anchor as a stabilizer. This tests a shorter discount memory than the reviewed 20/60 open-low midpoint candidate while avoiding the discarded intraday-shortfall, near-low, pure volatility, short-drawdown, and crash-prone turnover confirmation or turnover divergence paths. It uses only allowed open, low, and close fields; allowed 10 and 60 day windows; and two allowed Mean operators."
+description: "20 day close-to-close drawdown reversal plus a 20 day open-low midpoint discount pressure term."
+expected_behavior: "Ref($close,20)/$close-1 rewards medium-horizon price drawdowns with clear reversal interpretation, while Mean((($open+$low)/2-$close)/$low,20) adds a low-normalized measure of repeated closes below the open-low midpoint. The candidate avoids turnover and turnover-divergence paths that have crashed, avoids pure volatility and near-60-day-low ideas that were discarded, and keeps complexity below prior multi-anchor pressure variants. It uses only allowed open, low, and close fields; the allowed 20 day window; and allowed Ref and Mean operators."
