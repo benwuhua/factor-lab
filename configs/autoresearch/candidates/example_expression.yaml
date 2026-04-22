@@ -1,6 +1,6 @@
-name: low_norm_amount_divergence_reversal_20_60_v1
-family: divergence
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($close,$amount,20)"
+name: hybrid_low_open_norm_selling_pressure_reversal_20_60_v1
+family: reversal
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$open,60)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal adjusted by recent close-amount divergence; stocks with persistent weak closes and weaker traded-value confirmation rank higher."
-expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal family with one simple amount-based divergence term rather than repeating turnover confirmation or another mean-denominator tweak. The two Mean terms capture recent and persistent close-below-open pressure as a share of the session low. Subtracting Corr($close,$amount,20) favors names where traded value has not strongly confirmed price strength, preserving an exhaustion/reversal interpretation. The expression uses only allowed open, close, low, and amount fields; allowed 20 and 60 day windows; two Mean operators; and one Corr operator."
+description: "20 day low-normalized intraday selling pressure plus 60 day open-normalized pressure; stocks with recent weak closes near the low and persistent open-to-close pressure rank higher."
+expected_behavior: "Combines two reviewed but not identical selling-pressure anchors without adding turnover confirmation, volume filters, or high-complexity OHLC composites. The 20 day term keeps the stronger low-normalized exhaustion signal by scaling close-below-open pressure against the session low. The 60 day term uses the open as a more stable medium-horizon denominator, reducing dependence on persistent low-price anchoring while preserving the reversal interpretation. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and two allowed Mean operators."
