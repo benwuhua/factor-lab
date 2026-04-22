@@ -1,6 +1,6 @@
-name: midpoint_discount_low_norm_pressure_reversal_20_60_v1
+name: prior_low_break_reversal_3_20_v1
 family: reversal
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)+Mean((($high+$low)/2-$close)/$close,20)"
+expression: "0-Mean($close/Ref($low,3)-1,20)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal with a 20 day close-below-midpoint price-position leg."
-expected_behavior: "Keeps the reviewed low-normalized selling-pressure backbone while adding a compact weak-close position term instead of turnover correlation, volatility damping, or threshold gates. The two Mean(($open-$close)/$low, window) terms reward repeated closes below open relative to the session low, while Mean((($high+$low)/2-$close)/$close,20) favors stocks whose closes sit below the daily high-low midpoint on a return-like scale. This avoids the crashed turnover-divergence and turnover-confirmation paths, the discarded pure volatility/range-compression ideas, and the discarded standalone downside or low-rebound variants while using only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and three Mean operators."
+description: "20 day reversal signal for closes that trade weak relative to the low from three sessions earlier."
+expected_behavior: "Tests a compact price-position reversal idea away from the heavily explored low-normalized intraday selling-pressure denominator variants. A high value means the current close has been persistently weak versus the low from three trading sessions earlier, capturing short-horizon prior-low breaks that may mean revert. This avoids the crashed turnover-confirmation and turnover-divergence paths, the discarded 60 day low-anchor proximity idea, the discarded open-to-low downside variant, and the discarded close-from-high standalone variant. The expression uses only allowed close and low fields, allowed 3 and 20 day windows, and allowed Ref and Mean operators."
