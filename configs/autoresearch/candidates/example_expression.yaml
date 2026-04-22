@@ -1,6 +1,6 @@
-name: low_anchor_high_mean_ceiling_reversion_60_3_v1
+name: low_anchor_high_mean_ceiling_reversion_60_10_v1
 family: reversal
-expression: "Mean($low, 60) / ((Mean($high, 3) + Max($high, 3)) / 2) - 1"
+expression: "Mean($low, 60) / ((Mean($high, 10) + Max($high, 10)) / 2) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against a recent 3 day high mean/ceiling blend; stocks whose recent upper prices remain close to their longer-run low anchor rank higher."
-expected_behavior: "Blends two reviewed low-anchor reversal references on a shorter recent window: the 3 day average high, which captures recent rebound level, and the 3 day maximum high ceiling, which penalizes sharper near-term bounces. The factor should retain the compressed-near-low interpretation while testing whether a shorter high reference improves responsiveness without materially increasing turnover. It uses only allowed low/high fields, 60 and 3 day windows, and three simple rolling operators, while avoiding discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, and disallowed-window ideas."
+description: "60 day low-anchor reversion measured against a recent 10 day high mean/ceiling blend; stocks whose recent upper prices remain close to their longer-run low anchor rank higher."
+expected_behavior: "Extends the reviewed low-anchor high-ceiling family with a moderate 10 day recent high reference. The 10 day average high captures sustained rebound pressure, while the 10 day maximum high ceiling penalizes sharper bounces; dividing the 60 day average low by their blend keeps the signal focused on names still compressed near a longer-run downside anchor. This tests a middle horizon between the more reactive 3 and 5 day variants and the slower 20 day recent-high ceiling variant, without using discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, or disallowed-window ideas. It uses only allowed low/high fields, 60 and 10 day windows, and simple rolling operators."
