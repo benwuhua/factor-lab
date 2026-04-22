@@ -1,6 +1,6 @@
-name: price_turnover_divergence_20_5_v1
-family: divergence
-expression: "($close / Ref($close, 20) - 1) - (Mean($turnover, 5) / Mean($turnover, 20) - 1)"
+name: close_reversal_10_v1
+family: reversal
+expression: "Ref($close, 10) / $close - 1"
 direction: 1
-description: "20 day price momentum net of short-term turnover expansion; quiet price advances rank higher than turnover-driven moves."
-expected_behavior: "A stock that rises without a 5 day turnover surge versus its 20 day baseline may reflect steadier accumulation and lower crowding over the 20 day evaluation horizon."
+description: "10 day close-to-close reversal; recent decliners rank higher without adding liquidity or volatility filters."
+expected_behavior: "Stocks that have sold off over the last 10 sessions may mean-revert over the 20 day evaluation horizon, while the simple close-only construction should keep turnover and complexity low."
