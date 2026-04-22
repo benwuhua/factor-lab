@@ -1,6 +1,6 @@
-name: smooth_open_anchor_reversion_60_5_v1
+name: high_anchor_reversion_60_v1
 family: reversal
-expression: "Mean($open, 60) / Mean($close, 5) - 1"
+expression: "Mean($high, 60) / $close - 1"
 direction: 1
-description: "Smoothed 60 day open-anchor reversion; stocks whose recent 5 day average close sits below their 60 day average open rank higher."
-expected_behavior: "Blends the reviewed open-anchor reversion and smooth 60-to-5 mean reversion ideas, aiming to preserve the medium-horizon reversal signal while reducing one-day close noise and avoiding discarded turnover, range-normalized, VWAP-anchor, and disallowed 0 or 1 day window ideas."
+description: "60 day high-anchor reversion; stocks whose current close sits below their recent average high rank higher."
+expected_behavior: "Tests a simple upper-price anchor distinct from discarded turnover, range-normalized, VWAP-anchor, and illegal-window ideas. The signal should retain the medium-horizon reversal interpretation of mean reversion while using the average high as a conservative reference for prior trading range pressure."
