@@ -60,6 +60,16 @@ Summarize the local ledger:
 make autoresearch-ledger
 ```
 
+For an overnight Codex CLI loop, create an experiment branch first because the runner commits one candidate per iteration:
+
+```bash
+git switch -c autoresearch/nightly-$(date +%Y%m%d)
+tmux new -s factor-night
+make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30
+```
+
+This uses the local `codex` ChatGPT login, not an API key. Logs are written under `reports/autoresearch/codex_loop/`.
+
 ## 5. Run An Event Backtest
 
 ```bash

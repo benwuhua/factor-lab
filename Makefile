@@ -13,8 +13,11 @@ AUTORESEARCH_SPACE ?= configs/autoresearch/expression_space.yaml
 AUTORESEARCH_CANDIDATE ?= configs/autoresearch/candidates/example_expression.yaml
 AUTORESEARCH_LEDGER ?= reports/autoresearch/expression_results.tsv
 AUTORESEARCH_LEDGER_MD ?= reports/autoresearch/expression_results_summary.md
+AUTORESEARCH_CODEX_MODEL ?= gpt-5.4
+AUTORESEARCH_CODEX_UNTIL ?= 08:30
+AUTORESEARCH_CODEX_ITERATIONS ?= 30
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -30,6 +33,7 @@ help:
 	@printf "  make summarize-event  Render Markdown from an event summary CSV\n"
 	@printf "  make autoresearch-expression  Run one controlled expression-factor loop\n"
 	@printf "  make autoresearch-ledger  Summarize expression autoresearch ledger\n"
+	@printf "  make autoresearch-codex-loop  Run overnight Codex CLI expression autoresearch\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
@@ -38,6 +42,7 @@ help:
 	@printf "  make summarize-event FACTOR=arbr_26 SUMMARY=reports/factor_arbr_26_event_backtest_summary_csi300.csv\n"
 	@printf "  make autoresearch-expression AUTORESEARCH_CANDIDATE=configs/autoresearch/candidates/example_expression.yaml\n"
 	@printf "  make autoresearch-ledger AUTORESEARCH_LEDGER=reports/autoresearch/expression_results.tsv\n"
+	@printf "  make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -114,6 +119,14 @@ autoresearch-ledger:
 	$(PYTHON) scripts/autoresearch/summarize_expression_ledger.py \
 		--ledger $(AUTORESEARCH_LEDGER) \
 		--output $(AUTORESEARCH_LEDGER_MD)
+
+autoresearch-codex-loop:
+	$(PYTHON) scripts/autoresearch/run_expression_codex_loop.py \
+		--until $(AUTORESEARCH_CODEX_UNTIL) \
+		--max-iterations $(AUTORESEARCH_CODEX_ITERATIONS) \
+		--model $(AUTORESEARCH_CODEX_MODEL) \
+		--candidate-file $(AUTORESEARCH_CANDIDATE) \
+		--ledger $(AUTORESEARCH_LEDGER)
 
 lgb-dry-run:
 	$(PYTHON) scripts/run_lgb_workflow.py \
