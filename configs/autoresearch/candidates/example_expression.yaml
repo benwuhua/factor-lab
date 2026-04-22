@@ -1,6 +1,6 @@
-name: selling_pressure_reversal_20_60_v1
+name: range_adjusted_selling_pressure_20_v1
 family: reversal
-expression: "Mean($open - $close, 20) / Mean($close, 60)"
+expression: "Mean(($open - $close) / ($high - $low + 0.000001), 20)"
 direction: 1
-description: "Persistent 20 day intraday selling pressure normalized by the 60 day average close; stocks repeatedly closing below their opens rank higher for a simple mean-reversion test."
-expected_behavior: "Tests a low-complexity reversal signal outside the heavily explored low-anchor high-ceiling variants and away from discarded turnover, range-volatility, VWAP, distance-from-low, upper-shadow, and disallowed-window ideas. Mean($open - $close, 20) captures sustained negative intraday body pressure, while Mean($close, 60) scales the signal by the stock price level. Higher values should favor names with repeated intraday weakness that may be overextended and prone to reversal. The expression uses only allowed open/close fields, 20/60 windows, and two rolling Mean operators."
+description: "Persistent 20 day intraday selling pressure scaled by the same day's high-low range; stocks that repeatedly close below their opens within the daily range rank higher for a simple reversal test."
+expected_behavior: "Tests whether sustained intraday down-body pressure is more informative when adjusted by daily range rather than by price level. The signal is distinct from the discarded 5 day intraday reversal and from the prior unscaled selling-pressure review candidate because it measures where the open-to-close move sits inside each day's tradable range before smoothing over 20 days. Higher values should favor names with repeated range-adjusted selling pressure that may be overextended and prone to short-horizon reversal. The expression uses only allowed open/high/low/close fields, the allowed 20 day window, and one rolling Mean operator."
