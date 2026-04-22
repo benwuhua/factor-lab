@@ -1,6 +1,6 @@
-name: smooth_low_anchor_reversion_60_20_v1
+name: low_open_anchor_reversion_60_v1
 family: reversal
-expression: "Mean($low, 60) / Mean($close, 20) - 1"
+expression: "Mean($low, 60) / $open - 1"
 direction: 1
-description: "60 day low-anchor reversion with a 20 day smoothed close denominator; stocks whose recent average price sits below the recent low anchor rank higher."
-expected_behavior: "Extends the reviewed low-anchor reversal family by smoothing the price denominator over 20 days instead of adding another price field or turnover condition. The construction stays interpretable and low complexity, uses only allowed 20 and 60 day windows, and avoids discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
+description: "60 day low-anchor reversion measured against the current open; stocks opening below their longer-run low anchor rank higher."
+expected_behavior: "Extends the reviewed low-anchor reversal family by using the current open as the price denominator rather than the close or a smoothed close. The factor stays low complexity, uses only the allowed 60 day window, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, Min/Max price-position, and disallowed 0/1 day window ideas."
