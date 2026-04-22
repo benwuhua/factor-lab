@@ -1,6 +1,6 @@
-name: hybrid_low_close_norm_selling_pressure_reversal_20_60_v1
+name: hybrid_open_low_norm_selling_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open - $close) / $low, 20) + Mean(($open - $close) / $close, 60)"
+expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $low, 60)"
 direction: 1
-description: "Hybrid low and close normalized intraday selling pressure reversal over 20 and 60 day horizons."
-expected_behavior: "Tests a low-complexity hybrid of the reviewed low-normalized and close-normalized selling-pressure reversal families. The 20 day term keeps the stronger recent capitulation signal by scaling close-below-open bodies against the daily low anchor, while the 60 day term uses the close as a stable persistence scale instead of another low anchor. Higher values indicate repeated intraday selling pressure that may mean revert over the evaluation horizon. This avoids discarded or crash-prone turnover-confirmation, downside-clipping, low-rebound, range-compression, high-pullback, and high-complexity OHLC-average ideas. The expression uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "Reverse hybrid open and low normalized intraday selling pressure reversal over 20 and 60 day horizons."
+expected_behavior: "Tests whether recent close-below-open pressure is cleaner when scaled by the stable open anchor, while persistent 60 day pressure keeps the more stress-sensitive low anchor. Higher values indicate sustained intraday selling pressure that may mean revert over the evaluation horizon. This is distinct from the prior low-then-open hybrid, avoids discarded or crash-prone turnover-confirmation, downside-clipping, low-rebound, range-compression, high-pullback, and high-complexity OHLC-average ideas, and uses only allowed open, close, and low fields; allowed 20 and 60 day windows; and two allowed Mean operators."
