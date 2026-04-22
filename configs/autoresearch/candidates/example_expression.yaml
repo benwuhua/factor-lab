@@ -1,6 +1,6 @@
-name: mean_close_reversion_120_v1
+name: volatility_scaled_mean_reversion_60_v1
 family: reversal
-expression: "Mean($close, 120) / $close - 1"
+expression: "(Mean($close, 60) - $close) / (Std($close, 60) + 0.000001)"
 direction: 1
-description: "120 day mean close reversion; stocks trading below their long-term average close rank higher."
-expected_behavior: "Extends the reviewed mean-close reversion family to the slowest allowed horizon, testing whether a lower-turnover long-term anchor preserves the neutralized reversal signal."
+description: "60 day volatility-scaled close mean reversion; stocks trading far below their own medium-term average after close-volatility scaling rank higher."
+expected_behavior: "Keeps the reviewed 60 day mean-reversion anchor but scales by each stock's own 60 day close variability, aiming to favor cleaner dislocations rather than simply volatile losers."
