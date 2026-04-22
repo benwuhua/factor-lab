@@ -1,6 +1,6 @@
-name: smooth_mean_close_reversion_60_5_v1
+name: smooth_mean_close_reversion_60_20_v1
 family: reversal
-expression: "Mean($close, 60) / Mean($close, 5) - 1"
+expression: "Mean($close, 60) / Mean($close, 20) - 1"
 direction: 1
-description: "Smoothed 60 day mean close reversion; stocks whose recent 5 day average sits below their 60 day average rank higher."
-expected_behavior: "Keeps the reviewed 60 day mean-reversion anchor but replaces the single close with a 5 day recent average, aiming to reduce one-day noise while preserving a simple medium-term reversal signal."
+description: "Smoothed 60 day mean close reversion; stocks whose recent 20 day average sits below their 60 day average rank higher."
+expected_behavior: "Keeps the reviewed 60 day mean-reversion anchor but uses a 20 day recent average to further suppress short-term noise and turnover while preserving a simple medium-term reversal signal."
