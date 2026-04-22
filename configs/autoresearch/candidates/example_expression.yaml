@@ -1,6 +1,6 @@
-name: upper_mid_price_amount_divergence_20_v1
+name: lower_mid_price_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr((($high+$close)/2)/Mean(($high+$close)/2,20),$amount/Mean($amount,20),20)"
+expression: "0-Corr((($low+$close)/2)/Mean(($low+$close)/2,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day divergence between normalized high-close upper midpoint and normalized traded amount."
-expected_behavior: "A higher value means the rolling correlation between the upper intraday price midpoint, (($high+$close)/2) relative to its 20 day mean, and traded amount relative to its 20 day mean is lower or negative. This mirrors the reviewed upper-mid price-volume divergence structure while testing amount as a value-weighted participation channel, avoiding turnover-based divergence paths that recently crashed and avoiding discarded pure range-position, volatility-only, and near-low variants. The expression uses only allowed high, close, and amount fields; the allowed 20 day window; and one Corr plus two Mean operators."
+description: "20 day divergence between normalized low-close lower midpoint and normalized traded volume."
+expected_behavior: "A higher value means the rolling correlation between the lower intraday price midpoint, (($low+$close)/2) relative to its 20 day mean, and traded volume relative to its 20 day mean is lower or negative. This tests whether participation that is not confirmed by the lower half of the daily price range contains a simple reversal/divergence signal. It stays close to the reviewed price-volume divergence family while avoiding turnover-based divergence paths that recently crashed and avoiding discarded pure range-position and volatility-only variants. The expression uses allowed low, close, and volume fields; the allowed 20 day window; and one Corr plus two Mean operators."
