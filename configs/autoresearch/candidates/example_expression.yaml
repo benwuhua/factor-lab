@@ -1,6 +1,6 @@
-name: smooth_mean_close_reversion_120_20_v1
+name: open_anchor_reversion_60_v1
 family: reversal
-expression: "Mean($close, 120) / Mean($close, 20) - 1"
+expression: "Mean($open, 60) / $close - 1"
 direction: 1
-description: "Long-horizon mean reversion using a 120 day close average against a 20 day smoothed recent price anchor."
-expected_behavior: "Ranks stocks higher when their 20 day smoothed price is depressed versus the 120 day average, extending reviewed mean-reversion variants while avoiding discarded turnover, range-volatility, price-position, and disallowed 0 or 1 day window ideas."
+description: "60 day mean-reversion signal using the average open as a stable historical price anchor against the latest close."
+expected_behavior: "Ranks stocks higher when the latest close is depressed versus the 60 day average opening price, extending reviewed 60 day mean-reversion variants while avoiding discarded turnover, range-normalized, VWAP-anchor, and disallowed 0 or 1 day window ideas."
