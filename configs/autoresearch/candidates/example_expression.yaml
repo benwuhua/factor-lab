@@ -1,6 +1,6 @@
-name: low_anchor_dual_high_ceiling_reversion_60_3_5_v1
+name: low_anchor_high_open_ceiling_reversion_60_5_v1
 family: reversal
-expression: "Mean($low, 60) / ((Max($high, 3) + Max($high, 5)) / 2) - 1"
+expression: "Mean($low, 60) / ((Max($high, 5) + Max($open, 5)) / 2) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against blended 3 and 5 day high ceilings; stocks whose nearest rebound ceilings remain close to their longer-run low anchor rank higher."
-expected_behavior: "Extends the reviewed low-anchor high-ceiling reversal family with a shorter dual-ceiling denominator rather than repeating discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, or disallowed-window ideas. The 60 day average low provides a stable downside anchor, while the 3 and 5 day maximum highs require recent rebound attempts to stay compressed before the factor ranks a stock strongly. Higher values should favor names still near their longer-run low after very recent high-price attempts, using only allowed low/high fields, 3/5/60 windows, and simple rolling operators."
+description: "60 day low-anchor reversion measured against a blended 5 day high/open ceiling; stocks whose recent rebound ceiling remains close to the longer-run low anchor rank higher."
+expected_behavior: "Extends the reviewed low-anchor high-ceiling reversal family with an opening-price ceiling check rather than repeating discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, or disallowed-window ideas. The 60 day average low provides a stable downside anchor, while the average of 5 day maximum high and 5 day maximum open dampens single intraday high spikes but still requires recent rebound attempts to stay compressed. Higher values should favor names still near their longer-run low with limited recent upside follow-through, using only allowed low/high/open fields, 5/60 windows, and simple rolling operators."
