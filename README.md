@@ -24,6 +24,24 @@ src/qlib_factor_lab/     Reusable Python package
 tests/                   Unit tests that do not require downloaded data
 ```
 
+## Research Flow
+
+```mermaid
+flowchart TD
+    A["Build or download local data"] --> B["Check provider config"]
+    B --> C["Generate candidate factors"]
+    C --> D["Mine IC / Rank IC"]
+    D --> E{"Factor type?"}
+    E -->|Cross-sectional feature| F["Batch compare and model workflow"]
+    E -->|Absolute or pattern trigger| G["Event backtest by percentile bucket"]
+    F --> H["Review stability by horizon, year, and market regime"]
+    G --> H
+    H --> I["Promote robust factors into model or live-trading design"]
+    I --> J["Keep generated reports local; commit source and small references"]
+```
+
+The loop is intentionally conservative: use IC/Rank IC for broad triage, event backtests for trigger-like signals, then require horizon, yearly, and market-regime checks before a factor graduates.
+
 ## Quick Start
 
 Create a local environment:
@@ -39,13 +57,13 @@ python -m pip install -e .
 Run the unit tests:
 
 ```bash
-python -m unittest discover -s tests
+make test
 ```
 
 Check the local Qlib environment after data has been downloaded or built:
 
 ```bash
-python scripts/check_env.py
+make check-env
 ```
 
 ## Data Setup
@@ -140,23 +158,13 @@ The current pool includes momentum, reversal, volatility, volume-price, liquidit
 Generate the candidate table only:
 
 ```bash
-python scripts/mine_factors.py \
-  --config configs/factor_mining.yaml \
-  --provider-config configs/provider_current.yaml \
-  --generate-only \
-  --candidates-output reports/factor_mining_candidates_current.csv
+make candidates
 ```
 
 Run a 5-day and 20-day CSI500 screen:
 
 ```bash
-python scripts/mine_factors.py \
-  --config configs/factor_mining.yaml \
-  --provider-config configs/provider_current.yaml \
-  --output reports/factor_mining_current_h5_h20.csv \
-  --candidates-output reports/factor_mining_candidates_current.csv \
-  --horizon 5 \
-  --horizon 20
+make mine-csi500
 ```
 
 The result table includes IC, Rank IC, quintile mean returns, long-short return, turnover, and observation counts.
@@ -166,12 +174,7 @@ The result table includes IC, Rank IC, quintile mean returns, long-short return,
 Use event backtests when a factor is closer to an absolute trigger or pattern score than a pure IC feature:
 
 ```bash
-python scripts/backtest_factor_events.py \
-  --factor arbr_26 \
-  --config configs/factor_mining.yaml \
-  --provider-config configs/provider_csi300_current.yaml \
-  --horizon 5 \
-  --horizon 20
+make event-csi300 FACTOR=arbr_26
 ```
 
 Event backtests apply the factor's configured `direction` before percentile bucketing. For example, a `direction: -1` factor treats lower raw values as higher scores, so `p95_p100` means the best configured score bucket.

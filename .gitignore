@@ -15,6 +15,7 @@ reports/*.parquet
 reports/*.png
 reports/*
 !reports/
+!reports/README.md
 !reports/joinquant_factorlib/
 !reports/joinquant_factorlib/*.csv
 !reports/joinquant_factorlib/*.json
