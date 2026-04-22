@@ -11,6 +11,8 @@ The current project focuses on:
 
 Generated market data, Qlib binaries, MLflow records, and backtest reports are intentionally ignored by Git. See [docs/data-and-artifacts.md](docs/data-and-artifacts.md).
 
+For a compact command-by-command example, see [docs/factor-research-path.md](docs/factor-research-path.md).
+
 ## Project Layout
 
 ```text
@@ -188,6 +190,15 @@ python scripts/backtest_factor_events.py \
   --horizon 20 \
   --confirm-window 3 \
   --confirm-volume-ratio 1.2
+```
+
+Generate a Markdown summary from an event backtest summary CSV:
+
+```bash
+make summarize-event \
+  FACTOR=arbr_26 \
+  SUMMARY=reports/factor_arbr_26_event_backtest_summary_csi300.csv \
+  SUMMARY_MD=reports/factor_arbr_26_event_backtest_summary_csi300.md
 ```
 
 ## Model Workflow

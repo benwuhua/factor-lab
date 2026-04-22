@@ -6,8 +6,10 @@ CSI500_PROVIDER ?= configs/provider_current.yaml
 CSI300_PROVIDER ?= configs/provider_csi300_current.yaml
 FACTOR ?= arbr_26
 HORIZONS ?= --horizon 5 --horizon 20
+SUMMARY ?= reports/factor_$(FACTOR)_event_backtest_summary_csi300.csv
+SUMMARY_MD ?= reports/factor_$(FACTOR)_event_backtest_summary_csi300.md
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -20,11 +22,13 @@ help:
 	@printf "  make mine-csi300      Run 5/20 day candidate mining on CSI300 config\n"
 	@printf "  make event-csi500     Event backtest FACTOR on CSI500 config\n"
 	@printf "  make event-csi300     Event backtest FACTOR on CSI300 config\n"
+	@printf "  make summarize-event  Render Markdown from an event summary CSV\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
 	@printf "Examples:\n"
 	@printf "  make event-csi300 FACTOR=arbr_26\n"
+	@printf "  make summarize-event FACTOR=arbr_26 SUMMARY=reports/factor_arbr_26_event_backtest_summary_csi300.csv\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -67,6 +71,9 @@ event-csi500:
 		--factor $(FACTOR) \
 		--config $(FACTOR_CONFIG) \
 		--provider-config $(CSI500_PROVIDER) \
+		--trades-output reports/factor_$(FACTOR)_event_backtest_trades_csi500.csv \
+		--summary-output reports/factor_$(FACTOR)_event_backtest_summary_csi500.csv \
+		--yearly-output reports/factor_$(FACTOR)_event_backtest_yearly_csi500.csv \
 		$(HORIZONS)
 
 event-csi300:
@@ -74,7 +81,19 @@ event-csi300:
 		--factor $(FACTOR) \
 		--config $(FACTOR_CONFIG) \
 		--provider-config $(CSI300_PROVIDER) \
+		--trades-output reports/factor_$(FACTOR)_event_backtest_trades_csi300.csv \
+		--summary-output reports/factor_$(FACTOR)_event_backtest_summary_csi300.csv \
+		--yearly-output reports/factor_$(FACTOR)_event_backtest_yearly_csi300.csv \
 		$(HORIZONS)
+
+summarize-event:
+	$(PYTHON) scripts/summarize_event_report.py \
+		--summary $(SUMMARY) \
+		--output $(SUMMARY_MD) \
+		--name "$(FACTOR) event backtest" \
+		--factor $(FACTOR) \
+		--provider-config $(CSI300_PROVIDER) \
+		--command "make event-csi300 FACTOR=$(FACTOR)"
 
 lgb-dry-run:
 	$(PYTHON) scripts/run_lgb_workflow.py \
