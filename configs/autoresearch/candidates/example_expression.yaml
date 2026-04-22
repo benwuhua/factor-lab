@@ -1,6 +1,6 @@
-name: steady_open_pressure_reversal_20_60_v1
+name: open_pressure_high_pullback_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60) - Std(($open - $close) / $open, 20)"
+expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60) + (Max($high, 60) - $close) / Max($high, 60)"
 direction: 1
-description: "20 and 60 day open-normalized intraday selling pressure with a 20 day consistency penalty; stocks with persistent, less erratic weak closes rank higher."
-expected_behavior: "Keeps the reviewed open-normalized selling-pressure reversal backbone while avoiding the crashed turnover confirmation variant. The two Mean terms capture recent and persistent close-below-open pressure as a share of open, while subtracting Std(($open - $close) / $open, 20) penalizes one-off noisy pressure spikes and favors steadier exhaustion. This avoids discarded downside clipping, low-rebound, direct turnover weighting, and high-complexity OHLC mean variants. The expression uses only allowed open and close fields, allowed 20 and 60 day windows, two Mean operators, and one Std operator."
+description: "20 and 60 day open-normalized intraday selling pressure plus distance below the 60 day high; stocks with persistent weak closes and a clear pullback from recent highs rank higher."
+expected_behavior: "Keeps the reviewed open-normalized selling-pressure reversal backbone, but replaces the 20 day volatility penalty with a simple price-position term. The two Mean terms capture recent and persistent close-below-open pressure as a share of open, while (Max($high, 60) - $close) / Max($high, 60) favors names that have pulled back from their 60 day high without using low-rebound, turnover-confirmation, downside clipping, or high-complexity OHLC averaging ideas that previously failed or became too complex. The expression uses only allowed open, close, and high fields; allowed 20 and 60 day windows; two Mean operators; and Max over an allowed 60 day window."
