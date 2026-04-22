@@ -1,6 +1,6 @@
-name: high_norm_selling_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open - $close) / $high, 20) + Mean(($open - $close) / $high, 60)"
+name: low_norm_volume_divergence_reversal_20_60_v1
+family: divergence
+expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-Corr($close,$volume,20)"
 direction: 1
-description: "20 and 60 day intraday selling-pressure reversal normalized by the session high; stocks with repeated closes below open as a share of high rank higher."
-expected_behavior: "Tests a low-complexity denominator variant of the reviewed open-, close-, low-, and HL-mid-normalized selling-pressure reversal family without repeating the discarded close-from-high, low-rebound, downside-clipping, turnover-confirmation, or high-complexity OHLC-average ideas. Mean(($open - $close) / $high, 20) captures recent close-below-open pressure scaled by the day's upper trading anchor, while the 60 day term captures persistent pressure. Normalizing by high should damp denominator noise from weak closes or deep lows while preserving the same interpretable intraday reversal premise. The expression uses only allowed open, close, and high fields; allowed 20 and 60 day windows; and two allowed Mean operators."
+description: "20 and 60 day low-normalized intraday selling-pressure reversal adjusted by recent close-volume divergence; stocks with persistent weak closes and less volume-confirmed price strength rank higher."
+expected_behavior: "Extends the reviewed low-normalized selling-pressure reversal with one simple divergence term, without repeating the crashed turnover confirmation, discarded low-rebound/downside-clipping, or high-complexity OHLC-average ideas. The two Mean terms capture recent and persistent close-below-open pressure as a share of the session low. Subtracting Corr($close,$volume,20) favors names where price strength is not strongly confirmed by volume, preserving an interpretable exhaustion/reversal premise. The expression uses only allowed open, close, low, and volume fields; allowed 20 and 60 day windows; two Mean operators; and one Corr operator."
