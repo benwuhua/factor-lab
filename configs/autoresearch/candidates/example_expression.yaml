@@ -1,6 +1,6 @@
-name: turnover_compression_5_60_v1
-family: turnover
-expression: "Mean($turnover, 5) / (Mean($turnover, 60) + 0.000001)"
+name: range_volatility_10_v1
+family: volatility
+expression: "Mean(($high - $low) / $close, 10)"
 direction: -1
-description: "5 day average turnover scaled by the 60 day turnover baseline, ranked as a low-crowding signal."
-expected_behavior: "Stocks with subdued recent turnover relative to their own medium-term baseline should be less crowded and may have better 20 day forward returns."
+description: "10 day average intraday high-low range scaled by close, ranked as a low-volatility signal."
+expected_behavior: "Stocks with tighter recent intraday ranges should have lower realized uncertainty and may deliver steadier 20 day forward returns."
