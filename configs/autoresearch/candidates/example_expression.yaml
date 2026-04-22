@@ -1,6 +1,6 @@
-name: range_normalized_mean_reversion_60_v1
+name: hl_mid_mean_reversion_60_v1
 family: reversal
-expression: "($close - Mean($close, 60)) / (Max($high, 60) - Min($low, 60) + 0.000001)"
-direction: -1
-description: "60 day mean reversion scaled by the recent high-low range; lower normalized price gaps rank higher."
-expected_behavior: "Tests whether the successful medium-term close reversion idea is more stable when the price gap is scaled by its own 60 day trading range."
+expression: "(Mean($high, 60) + Mean($low, 60)) / $close - 2"
+direction: 1
+description: "60 day high-low midpoint mean reversion; stocks trading below their average daily range midpoint rank higher."
+expected_behavior: "Tests whether the reviewed medium-term reversion effect is stronger when the anchor uses the 60 day average high-low midpoint instead of close-only averages, while keeping complexity low."
