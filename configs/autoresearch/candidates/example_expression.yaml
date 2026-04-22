@@ -1,6 +1,6 @@
-name: mean_close_selling_pressure_reversion_60_20_v1
+name: persistent_selling_pressure_reversal_60_v1
 family: reversal
-expression: "Mean($close, 60) / $close - 1 + Mean($open - $close, 20) / Mean($close, 60)"
+expression: "Mean($open - $close, 60) / Mean($close, 60)"
 direction: 1
-description: "60 day mean-close reversal reinforced by persistent 20 day intraday selling pressure; stocks below their medium-term close average and repeatedly closing below their opens rank higher."
-expected_behavior: "Combines two reviewed low-complexity reversal signals without continuing the heavily explored low-anchor high-ceiling branch or repeating discarded turnover, volatility-scaled, range-normalized, VWAP, distance-from-low, upper-shadow, or disallowed-window ideas. Mean($close, 60) / $close - 1 captures medium-term mean reversion, while Mean($open - $close, 20) / Mean($close, 60) adds a price-scaled measure of recent intraday selling pressure. Higher values should favor names that are both below their 60 day close anchor and still show persistent down-body pressure that may be prone to reversal. The expression uses only allowed open/close fields, 20/60 windows, and three rolling Mean operators."
+description: "60 day persistent intraday selling-pressure reversal normalized by the 60 day average close; stocks repeatedly closing below their opens over a medium horizon rank higher."
+expected_behavior: "Extends the reviewed selling-pressure branch to a longer persistence horizon while staying simpler than the recent combinations with mean-close, low-anchor, high-ceiling, range-adjusted, or turnover components. Mean($open - $close, 60) measures sustained down-body pressure, and division by Mean($close, 60) makes the signal comparable across price levels. Higher values should favor names with persistent medium-term intraday selling pressure that may be prone to reversal. The expression uses only allowed open/close fields, the allowed 60 day window, and two rolling Mean operators."
