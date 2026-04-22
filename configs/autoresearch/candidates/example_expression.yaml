@@ -1,6 +1,6 @@
-name: oc_mid_anchor_reversion_60_v1
+name: smooth_open_anchor_reversion_60_5_v1
 family: reversal
-expression: "Mean(($open + $close) / 2, 60) / $close - 1"
+expression: "Mean($open, 60) / Mean($close, 5) - 1"
 direction: 1
-description: "60 day mean-reversion signal using the average open-close midpoint as a stable historical price anchor against the latest close."
-expected_behavior: "Ranks stocks higher when the latest close is depressed versus the 60 day average open-close midpoint, blending the reviewed close and open anchor reversion ideas while avoiding discarded turnover, range-normalized, VWAP-anchor, and disallowed 0 or 1 day window ideas."
+description: "Smoothed 60 day open-anchor reversion; stocks whose recent 5 day average close sits below their 60 day average open rank higher."
+expected_behavior: "Blends the reviewed open-anchor reversion and smooth 60-to-5 mean reversion ideas, aiming to preserve the medium-horizon reversal signal while reducing one-day close noise and avoiding discarded turnover, range-normalized, VWAP-anchor, and disallowed 0 or 1 day window ideas."
