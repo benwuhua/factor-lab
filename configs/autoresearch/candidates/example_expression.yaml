@@ -1,6 +1,6 @@
-name: low_norm_selling_pressure_reversal_10_120_v1
-family: reversal
-expression: "Mean(($open-$close)/$low,10)+Mean(($open-$close)/$low,120)"
+name: turnover_damped_low_norm_pressure_reversal_20_60_v1
+family: turnover
+expression: "Mean(($open-$close)/($low*(1+$turnover)),20)+Mean(($open-$close)/$low,60)"
 direction: 1
-description: "10 and 120 day low-normalized intraday selling-pressure reversal."
-expected_behavior: "Tests whether a fast 10 day close-below-open pressure leg plus a slow 120 day persistence leg improves the reviewed low-normalized selling-pressure reversal family without adding gates or extra normalization. Higher values indicate recent and long-run intraday selling pressure relative to the session low, a simple capitulation and mean-reversion setup. This avoids the crashed turnover-confirmation path, discarded downside-only and range-compression variants, pressure-volume divergence discard, and high-complexity OHLC composites. The expression uses only allowed open, close, and low fields; allowed 10 and 120 day windows; and two Mean operators."
+description: "20 day turnover-damped low-normalized intraday selling pressure plus a 60 day persistent low-normalized selling-pressure reversal leg."
+expected_behavior: "Tests whether recent close-below-open pressure is cleaner when high-turnover sessions are mildly damped rather than used as a hard confirmation gate. Mean(($open-$close)/($low*(1+$turnover)),20) ranks stocks with recent intraday selling pressure that is not simply high-turnover capitulation, while Mean(($open-$close)/$low,60) keeps the reviewed persistent low-normalized reversal anchor. This avoids the crashed turnover-confirmation path, discarded turnover-volatility low signal, downside-only variants, range-compression variants, pressure-volume divergence discard, and high-complexity OHLC composites. The expression uses only allowed open, close, low, and turnover fields; allowed 20 and 60 day windows; and two allowed Mean operators."
