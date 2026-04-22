@@ -1,6 +1,6 @@
-name: intraday_position_volume_divergence_20_v1
+name: hl_mid_price_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr(($close-$low)/($high-$low),$volume/Mean($volume,20),20)"
+expression: "0-Corr((($high+$low)/2)/Mean(($high+$low)/2,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "20 day divergence between intraday close position and normalized volume."
-expected_behavior: "Tests whether high volume aligned with weaker intraday closes marks selling exhaustion and subsequent reversal. Higher values mean the close's position within the daily high-low range is less confirmed by volume over 20 days. This is distinct from prior normalized price-volume divergence because it uses intraday price position rather than close level, and it avoids discarded downside, low-rebound, turnover-confirmation, range-compression, and high-complexity OHLC composite ideas. The expression uses allowed high, low, close, and volume fields, the allowed 20 day window, one Corr operator, and one Mean operator."
+description: "20 day divergence between normalized high-low midpoint price and normalized volume."
+expected_behavior: "Tests a low-complexity price-volume divergence variant using the daily high-low midpoint instead of close level or intraday close position. Higher values indicate weaker 20 day correlation between midpoint price relative to its own 20 day mean and volume relative to its 20 day mean, favoring names where volume does not confirm accepted price strength. This avoids the discarded intraday-position divergence, turnover-confirmation crash, low-rebound, downside-clipping, and range-compression ideas while staying close to the reviewed normalized price-volume divergence family. The expression uses only allowed high, low, and volume fields; the allowed 20 day window; and allowed Mean and Corr operators."
