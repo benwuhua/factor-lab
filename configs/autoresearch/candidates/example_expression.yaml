@@ -1,6 +1,6 @@
-name: low_anchor_recent_high_ceiling_reversion_60_3_v1
+name: low_anchor_smooth_high_ceiling_reversion_60_5_10_v1
 family: reversal
-expression: "Mean($low, 60) / Max($high, 3) - 1"
+expression: "Mean($low, 60) / Max(Mean($high, 5), 10) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against the recent 3 day high ceiling; stocks whose latest rebound highs remain close to their longer-run low anchor rank higher."
-expected_behavior: "Tests a simpler short-ceiling member of the reviewed low-anchor reversal family. The 60 day average low supplies a stable downside anchor, while the 3 day maximum high makes the denominator sensitive to only the most recent rebound attempt. Higher values should favor names still compressed near their longer-run low with limited short-term upside follow-through. The expression uses only allowed low/high fields, 3 and 60 day windows, and simple rolling operators, avoiding discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, and disallowed-window ideas."
+description: "60 day low-anchor reversion measured against a smoothed recent high ceiling; stocks whose smoothed rebound highs remain close to their longer-run low anchor rank higher."
+expected_behavior: "Tests a low-complexity extension of the reviewed low-anchor reversal family by replacing a single-day high ceiling with the 10 day maximum of the 5 day average high. The 60 day average low supplies a stable downside anchor, while the smoothed high ceiling dampens one-day spikes but still captures recent rebound attempts. Higher values should favor names still compressed near their longer-run low with limited sustained upside follow-through. The expression uses only allowed low/high fields, 5, 10, and 60 day windows, and simple rolling operators, avoiding discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, upper-shadow, and disallowed-window ideas."
