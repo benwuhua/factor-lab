@@ -189,6 +189,14 @@ configs/autoresearch/candidates/example_expression.yaml
 
 The loop prints a compact summary block, writes raw and size-proxy-neutralized evaluation artifacts, and appends a local ledger under `reports/autoresearch/`. Generated run outputs are ignored by Git.
 
+Summarize the local expression ledger by status:
+
+```bash
+make autoresearch-ledger
+```
+
+The ledger report groups `review`, `discard_candidate`, and `crash` rows, then shows the top review candidates and common discard/crash reasons.
+
 ## Event Backtests
 
 Use event backtests when a factor is closer to an absolute trigger or pattern score than a pure IC feature:

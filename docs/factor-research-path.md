@@ -54,6 +54,12 @@ configs/autoresearch/candidates/example_expression.yaml
 
 The loop writes generated artifacts under `reports/autoresearch/` and appends `expression_results.tsv`. These outputs are local research memory and are ignored by Git.
 
+Summarize the local ledger:
+
+```bash
+make autoresearch-ledger
+```
+
 ## 5. Run An Event Backtest
 
 ```bash
