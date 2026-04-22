@@ -1,6 +1,6 @@
-name: high_60d_discount_amount_divergence_reversal_20_60_v1
+name: fast_high_60d_discount_volume_divergence_reversal_10_60_v1
 family: divergence
-expression: "0-Corr($high/Mean($high,20),$amount/Mean($amount,20),20)+(Mean($high,60)-$close)/Mean($high,60)"
+expression: "0-Corr($high/Mean($high,10),$volume/Mean($volume,10),10)+(Mean($high,60)-$close)/Mean($high,60)"
 direction: 1
-description: "20 day high-price versus amount divergence with a 60 day mean-high discount reversal term."
-expected_behavior: "Ranks stocks higher when normalized highs are weakly confirmed by normalized traded amount, while adding a medium-horizon reversal tilt for names whose close sits below the 60 day mean high. This keeps the productive high-discount divergence structure but tests traded amount as a liquidity confirmation channel instead of repeating the prior volume, turnover-divergence, range-position, or volatility-damped variants. The expression uses only allowed high, close, and amount fields with 20 and 60 day windows, four Mean calls, and one Corr call."
+description: "10 day high-price versus volume divergence with a 60 day mean-high discount reversal term."
+expected_behavior: "Ranks stocks higher when normalized highs are weakly confirmed by normalized volume over a faster 10 day window, while adding a medium-horizon reversal tilt for names whose close sits below the 60 day mean high. This keeps the productive high-discount volume-divergence structure but tests a shorter confirmation horizon instead of repeating the prior 20 day volume or amount variants, and avoids the discarded range-position, volatility-only, and turnover-divergence crash patterns. The expression uses only allowed high, close, and volume fields with 10 and 60 day windows, four Mean calls, and one Corr call."
