@@ -1,6 +1,6 @@
-name: mean_close_20d_reversal_v1
+name: intraday_return_shortfall_reversal_20_v1
 family: reversal
-expression: "Mean($close,20)/$close-1"
+expression: "Mean($close/$open-1,20)-($close/$open-1)"
 direction: 1
-description: "Smoothed 20 day close mean reversal; stocks trading below their recent average close rank higher."
-expected_behavior: "This keeps the prior reviewed plain close reversal idea low-complexity while replacing the single 20 day Ref anchor with a 20 day Mean anchor. Mean($close,20)/$close-1 is positive when the current close is below its recent average, expressing a simple medium-horizon mean reversion hypothesis with less dependence on one lagged close. It avoids the discarded turnover confirmation and turnover divergence crash paths, discarded pure volatility and near-low variants, and high-complexity normalized divergence expressions. It uses only the allowed close field, the allowed 20 day window, and one allowed Mean operator."
+description: "Intraday return shortfall reversal; stocks whose current close/open return is below their recent intraday average rank higher."
+expected_behavior: "This tests a simple intraday underperformance mean-reversion signal. Mean($close/$open-1,20)-($close/$open-1) is positive when today's close/open return is weaker than the stock's own 20 day intraday return baseline, favoring names with unusually poor same-day intraday action for a subsequent reversal. It stays low-complexity with only open and close, the allowed 20 day window, and one allowed Mean operator. It avoids the discarded pure volatility, near-low, and high-complexity normalized divergence paths, and it avoids the turnover confirmation/divergence expressions that previously crashed."
