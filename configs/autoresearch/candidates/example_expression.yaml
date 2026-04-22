@@ -1,6 +1,6 @@
-name: hl_mean_mid_discount_pressure_reversal_20_60_v1
+name: close_60d_plain_reversal_v1
 family: reversal
-expression: "Mean(((Mean($high,20)+Mean($low,20))/2-$close)/$low,20)+Mean(($open-$close)/$low,60)"
+expression: "Ref($close,60)/$close-1"
 direction: 1
-description: "20 day close discount versus the rolling high-low mean midpoint, combined with a 60 day low-normalized selling-pressure anchor."
-expected_behavior: "Mean(((Mean($high,20)+Mean($low,20))/2-$close)/$low,20) rewards stocks whose closes sit below the recent high-low midpoint rather than only below the recent low average, testing a balanced price-position pullback after the weaker low-mean discount result. Mean(($open-$close)/$low,60) keeps the reviewed medium-horizon low-normalized selling-pressure anchor as a stabilizer. The candidate avoids repeating discarded near-60d-low Min, pure volatility damping, short-drawdown, turnover-divergence, and close-from-high ideas. It uses only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and four allowed Mean operators."
+description: "Plain 60 day close-price reversal using the close from sixty sessions ago relative to the current close."
+expected_behavior: "Tests a deliberately low-complexity extension of the reviewed close_20d_plain_reversal idea at a medium horizon rather than adding another denominator, turnover, volatility, or divergence modifier. A higher value means the current close is depressed versus the close sixty trading sessions earlier, which may capture medium-horizon overreaction and subsequent mean reversion. This avoids the discarded pure volatility, near-low, downside-only, short-drawdown, close-from-high, and crash-prone turnover confirmation or turnover divergence paths. The expression uses only the allowed close field, the allowed 60 day window, and one allowed Ref operator."
