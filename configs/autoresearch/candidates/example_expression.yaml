@@ -1,6 +1,6 @@
-name: upper_shadow_relief_reversal_60_5_v1
-family: divergence
-expression: "Mean($high / $close - 1, 60) - Mean($high / $close - 1, 5)"
+name: low_anchor_dual_high_ceiling_reversion_60_5_10_v1
+family: reversal
+expression: "Mean($low, 60) / ((Max($high, 5) + Max($high, 10)) / 2) - 1"
 direction: 1
-description: "Long-run average upper-shadow pressure minus recent upper-shadow pressure; stocks whose recent closes are nearer to intraday highs than their 60 day baseline rank higher."
-expected_behavior: "Tests a simple price-position divergence rather than another low-anchor variant: a high value means the 5 day average high-to-close gap has compressed below its 60 day norm, suggesting recent selling into intraday strength has eased. The factor uses only allowed high/close fields, 60 and 5 day windows, and two Mean operators, while avoiding discarded turnover, VWAP, range-normalized, distance-from-low, and disallowed-window ideas."
+description: "60 day low-anchor reversion measured against a blended 5 and 10 day high ceiling; stocks whose recent rebound ceilings remain close to their longer-run low anchor rank higher."
+expected_behavior: "Extends the reviewed low-anchor reversal family without repeating discarded upper-shadow, turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, or disallowed-window ideas. The 5 day maximum high captures the nearest rebound ceiling, the 10 day maximum high adds a slightly more persistent rebound constraint, and the 60 day average low keeps the downside anchor. Higher values should favor stocks still compressed near their longer-run low after recent high-price attempts, using only allowed low/high fields, 5/10/60 windows, and simple rolling operators."
