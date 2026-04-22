@@ -1,6 +1,6 @@
-name: high_anchor_reversion_60_v1
+name: low_anchor_reversion_60_v1
 family: reversal
-expression: "Mean($high, 60) / $close - 1"
+expression: "Mean($low, 60) / $close - 1"
 direction: 1
-description: "60 day high-anchor reversion; stocks whose current close sits below their recent average high rank higher."
-expected_behavior: "Tests a simple upper-price anchor distinct from discarded turnover, range-normalized, VWAP-anchor, and illegal-window ideas. The signal should retain the medium-horizon reversal interpretation of mean reversion while using the average high as a conservative reference for prior trading range pressure."
+description: "60 day low-anchor reversion; stocks whose current close is depressed toward their recent average low rank higher."
+expected_behavior: "Tests a simple lower-price anchor that complements reviewed close, open, midpoint, and high-anchor reversion variants while staying distinct from the discarded Min-based distance-from-low idea. The signal should preserve the medium-horizon reversal interpretation without adding turnover, volatility scaling, range normalization, or disallowed windows."
