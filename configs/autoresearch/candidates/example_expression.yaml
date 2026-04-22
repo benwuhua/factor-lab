@@ -1,6 +1,6 @@
-name: open_high_mid_pressure_reversal_20_60_v1
-family: reversal
-expression: "Mean(($open + $high - 2 * $close) / $close, 20) + Mean(($open + $high - 2 * $close) / $close, 60)"
+name: turnover_weighted_open_pressure_reversal_20_60_v1
+family: divergence
+expression: "Mean((($open - $close) / $open) * $turnover, 20) / Mean($turnover, 20) + Mean((($open - $close) / $open) * $turnover, 60) / Mean($turnover, 60)"
 direction: 1
-description: "20 and 60 day blend of how far the close finishes below the open-high midpoint, scaled by close; persistent weak closes versus the upper intraday anchor rank higher."
-expected_behavior: "Tests a low-complexity reversal signal in the selling-pressure family without repeating the discarded full OHLC average variant. Mean(($open + $high - 2 * $close) / $close, 20) captures recent closes below the open-high midpoint, while the 60 day term captures more persistent closing weakness. Higher values should favor names with sustained intraday selling pressure that may be prone to reversal. The expression uses only allowed open, high, and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
+description: "20 and 60 day turnover-weighted open-to-close selling pressure; names whose weak closes occur on heavier turnover rank higher."
+expected_behavior: "Tests whether open-to-close selling pressure is more informative when the down closes are concentrated on higher-turnover days. Each horizon averages (($open - $close) / $open) weighted by turnover and divides by the same horizon's average turnover, keeping the signal focused on turnover-conditioned pressure rather than raw liquidity. Higher values should favor names with persistent, high-participation intraday selling that may be prone to reversal. The expression uses only allowed open, close, and turnover fields, the allowed 20 and 60 day windows, and four rolling Mean operators."
