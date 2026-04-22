@@ -1,6 +1,6 @@
-name: low_anchor_recent_open_reversion_60_5_v1
+name: low_anchor_recent_high_ceiling_reversion_60_5_v1
 family: reversal
-expression: "Mean($low, 60) / Mean($open, 5) - 1"
+expression: "Mean($low, 60) / Max($high, 5) - 1"
 direction: 1
-description: "60 day low-anchor reversion measured against the recent 5 day open; stocks whose recent opening levels remain close to their longer-run low anchor rank higher."
-expected_behavior: "Tests whether using recent opens as the short-term anchor preserves the reviewed low-anchor reversal signal while adding overnight/session-start information not covered by the recent high and close variants. The expression uses only allowed low and open fields with 60 and 5 day windows, stays very low complexity, and avoids previously discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, and disallowed-window ideas."
+description: "60 day low-anchor reversion measured against the recent 5 day high ceiling; stocks whose recent highest traded prices remain close to their longer-run low anchor rank higher."
+expected_behavior: "Tests a stricter variant of the reviewed low-anchor reversal family by replacing the recent mean high anchor with the 5 day maximum high. The factor should favor stocks still compressed near their longer-run low even after recent intraday rebounds, while using only allowed low/high fields, 60 and 5 day windows, and two simple operators. It avoids discarded turnover, VWAP, volatility-scaled, range-normalized, distance-from-low, and disallowed-window ideas."
