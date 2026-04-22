@@ -1,6 +1,6 @@
-name: open_low_mid_dual_anchor_pressure_reversal_20_60_120_v1
+name: short_mean_discount_low_norm_pressure_reversal_3_20_60_v1
 family: reversal
-expression: "Mean((($open+$low)/2-$close)/$low,20)+Mean(($open-$close)/$low,60)+Mean(($open-$close)/$low,120)"
+expression: "Mean((Mean($close,3)-$close)/$low,20)+Mean(($open-$close)/$low,60)"
 direction: 1
-description: "20 day open-low midpoint discount reversal with 60 and 120 day low-normalized selling-pressure anchors."
-expected_behavior: "Mean((($open+$low)/2-$close)/$low,20) rewards names whose closes persistently finish below the lower intraday open-low midpoint, capturing weak end-of-day price position on a simple low-normalized scale. The 60 day Mean(($open-$close)/$low,60) keeps the reviewed medium-horizon selling-pressure anchor, while the 120 day Mean(($open-$close)/$low,120) adds a slower memory as a secondary stabilizer rather than replacing the 60 day leg. This tests whether the reviewed open-low midpoint discount idea benefits from a dual medium/slow pressure anchor while avoiding the discarded intraday shortfall, pure volatility, near-low, high-complexity normalized-divergence, and crashed turnover-divergence paths. It uses only allowed open, low, and close fields; allowed 20, 60, and 120 day windows; and three allowed Mean operators."
+description: "20 day short-mean close discount reversal with a 60 day low-normalized selling-pressure anchor."
+expected_behavior: "Mean((Mean($close,3)-$close)/$low,20) rewards stocks whose closes have sat below their own short 3 day close mean, capturing a simple recent pullback without using disallowed one-day references or high-complexity branches. Mean(($open-$close)/$low,60) keeps the reviewed medium-horizon low-normalized selling-pressure anchor as a stabilizer. The candidate tests whether short mean discount plus persistent open-to-close pressure is cleaner than the discarded pure volatility, near-low, short-drawdown, intraday-shortfall, and crashed turnover-divergence paths. It uses only allowed open, low, and close fields; allowed 3, 20, and 60 day windows; and three allowed Mean operators."
