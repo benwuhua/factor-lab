@@ -1,6 +1,6 @@
-name: short_persistent_pct_selling_pressure_reversal_10_60_v1
+name: open_norm_selling_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean(($open - $close) / $close, 10) + Mean(($open - $close) / $close, 60)"
+expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60)"
 direction: 1
-description: "10 and 60 day percent intraday selling-pressure reversal blend; stocks with both fresh and persistent down bodies as a share of close rank higher."
-expected_behavior: "Extends the reviewed percent selling-pressure reversal family by replacing the 20 day recent leg with a 10 day leg while keeping the persistent 60 day term. Mean(($open - $close) / $close, 10) captures fresher session-level selling pressure, and Mean(($open - $close) / $close, 60) preserves the medium-term overextension signal that has reviewed well. Higher values should favor names with recent and persistent intraday selling pressure that may be prone to reversal. The expression uses only allowed open and close fields, the allowed 10 and 60 day windows, and two rolling Mean operators."
+description: "20 and 60 day open-normalized intraday selling-pressure reversal blend; stocks with repeated closes below open as a share of open rank higher."
+expected_behavior: "Tests a low-complexity variant of the reviewed selling-pressure reversal family by normalizing the open-to-close body by open instead of close. Mean(($open - $close) / $open, 20) captures recent intraday selling pressure, while Mean(($open - $close) / $open, 60) captures persistent medium-term selling pressure. Higher values should favor names with repeated weak intraday closes that may be prone to reversal. The expression uses only allowed open and close fields, the allowed 20 and 60 day windows, and two rolling Mean operators."
