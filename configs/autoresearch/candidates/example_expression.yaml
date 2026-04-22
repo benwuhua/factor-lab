@@ -1,6 +1,6 @@
-name: drawdown_from_high_reversal_120_v1
-family: price_position
-expression: "Max($high, 120) / $close - 1"
+name: quiet_mean_reversion_60_v1
+family: reversal
+expression: "If(Less(Mean($turnover, 20), Mean($turnover, 60)), Mean($close, 60) / $close - 1, 0)"
 direction: 1
-description: "120 day drawdown-from-high reversal; stocks trading farther below their recent high rank higher."
-expected_behavior: "Tests whether extending the reviewed drawdown-from-high reversal horizon from 60 to 120 sessions lowers turnover while preserving a simple price-position signal."
+description: "60 day close mean reversion gated by quiet turnover; stocks below their 60 day average close rank higher only when recent turnover is below its 60 day baseline."
+expected_behavior: "Tests whether a simple liquidity calm filter preserves the reviewed 60 day mean reversion edge while reducing noisy high-turnover reversal exposure."
