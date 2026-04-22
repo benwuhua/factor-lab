@@ -1,6 +1,6 @@
-name: upper_mid_liquidity_divergence_20_v1
+name: upper_wick_high_volume_divergence_reversal_20_v1
 family: divergence
-expression: "0-Corr(($high+$close)/Mean($high+$close,20),($volume/Mean($volume,20)+$amount/Mean($amount,20)),20)"
+expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)+($high-$close)/Mean($high,20)"
 direction: 1
-description: "20 day divergence between upper-mid price strength and normalized combined share/dollar liquidity."
-expected_behavior: "Ranks stocks higher when the high/close upper-mid price level is not confirmed by the combined normalized volume and amount series. This keeps the successful high/upper-mid price-volume divergence intuition, adds amount as a low-complexity liquidity confirmation check, and avoids the discarded average-trade-price discount and crashed turnover-divergence paths. The expression uses only allowed high, close, volume, and amount fields with one 20 day window, three Mean operators, and one Corr operator."
+description: "20 day high-price versus volume divergence with a small upper-wick reversal tilt."
+expected_behavior: "Ranks stocks higher when normalized high prices are weakly confirmed by normalized volume, and adds a modest boost when the close finishes below the intraday high. This keeps the successful high-price volume divergence intuition while adding a low-complexity reversal signal from upper-wick pressure. It avoids the discarded range-position, average-trade-price discount, volatility-damped, and crashed turnover-divergence paths. The expression uses only allowed high, close, and volume fields with one 20 day window, two Mean operators, and one Corr operator."
