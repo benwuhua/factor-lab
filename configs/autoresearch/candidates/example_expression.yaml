@@ -1,6 +1,6 @@
-name: range_damped_low_norm_selling_pressure_reversal_20_60_v1
+name: low_norm_selling_pressure_reversal_10_120_v1
 family: reversal
-expression: "Mean(($open-$close)/$low,20)+Mean(($open-$close)/$low,60)-0.5*Mean(($high-$low)/$close,20)"
+expression: "Mean(($open-$close)/$low,10)+Mean(($open-$close)/$low,120)"
 direction: 1
-description: "20 and 60 day low-normalized intraday selling-pressure reversal damped by recent intraday range."
-expected_behavior: "Keeps the reviewed low-normalized selling-pressure reversal backbone while testing whether noisy wide-range selloffs should be penalized. The two selling-pressure terms reward stocks that have repeatedly closed below the open relative to the session low, a simple mean-reversion setup. The 0.5 weighted Mean(($high-$low)/$close,20) term lightly reduces exposure to names whose recent pressure came with unusually large intraday ranges, avoiding a pure range-compression factor while adding a volatility sanity check. This avoids repeating the crashed turnover-confirmation path, the discarded pressure-volume divergence candidate, the pure low-volatility/range-compression idea, and high-complexity OHLC composites. The expression uses only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and three Mean operators."
+description: "10 and 120 day low-normalized intraday selling-pressure reversal."
+expected_behavior: "Tests whether a fast 10 day close-below-open pressure leg plus a slow 120 day persistence leg improves the reviewed low-normalized selling-pressure reversal family without adding gates or extra normalization. Higher values indicate recent and long-run intraday selling pressure relative to the session low, a simple capitulation and mean-reversion setup. This avoids the crashed turnover-confirmation path, discarded downside-only and range-compression variants, pressure-volume divergence discard, and high-complexity OHLC composites. The expression uses only allowed open, close, and low fields; allowed 10 and 120 day windows; and two Mean operators."
