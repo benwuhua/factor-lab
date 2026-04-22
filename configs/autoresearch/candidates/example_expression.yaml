@@ -1,6 +1,6 @@
-name: low_mean_discount_pressure_reversal_20_60_v1
+name: hl_mean_mid_discount_pressure_reversal_20_60_v1
 family: reversal
-expression: "Mean((Mean($low,20)-$close)/$low,20)+Mean(($open-$close)/$low,60)"
+expression: "Mean(((Mean($high,20)+Mean($low,20))/2-$close)/$low,20)+Mean(($open-$close)/$low,60)"
 direction: 1
-description: "20 day close discount versus the average intraday low, combined with a 60 day low-normalized selling-pressure anchor."
-expected_behavior: "Mean((Mean($low,20)-$close)/$low,20) rewards stocks whose closes have traded below their own recent average low level, capturing a simple price-position pullback without using the discarded near-60d-low Min path or high-complexity branches. Mean(($open-$close)/$low,60) keeps the reviewed medium-horizon low-normalized selling-pressure anchor as a stabilizer. The candidate tests whether a rolling-low mean discount is cleaner than repeating another low/open/close denominator tweak, turnover divergence, pure volatility damping, or short-drawdown idea. It uses only allowed open, low, and close fields; allowed 20 and 60 day windows; and three allowed Mean operators."
+description: "20 day close discount versus the rolling high-low mean midpoint, combined with a 60 day low-normalized selling-pressure anchor."
+expected_behavior: "Mean(((Mean($high,20)+Mean($low,20))/2-$close)/$low,20) rewards stocks whose closes sit below the recent high-low midpoint rather than only below the recent low average, testing a balanced price-position pullback after the weaker low-mean discount result. Mean(($open-$close)/$low,60) keeps the reviewed medium-horizon low-normalized selling-pressure anchor as a stabilizer. The candidate avoids repeating discarded near-60d-low Min, pure volatility damping, short-drawdown, turnover-divergence, and close-from-high ideas. It uses only allowed open, high, low, and close fields; allowed 20 and 60 day windows; and four allowed Mean operators."
