@@ -1,6 +1,6 @@
-name: fast_typical_price_volume_divergence_10_v1
+name: high_close_mid_price_volume_divergence_20_v1
 family: divergence
-expression: "0-Corr((($high+$low+$close)/3)/Mean(($high+$low+$close)/3,10),$volume/Mean($volume,10),10)"
+expression: "0-Corr((($high+$close)/2)/Mean(($high+$close)/2,20),$volume/Mean($volume,20),20)"
 direction: 1
-description: "10 day divergence between normalized typical price strength and normalized traded volume."
-expected_behavior: "A higher value means the short-window correlation between the typical price proxy, (high plus low plus close)/3, and traded volume is more negative. This favors stocks whose recent broad intraday price level is not being confirmed by volume, extending the reviewed price-volume divergence family with a faster balanced OHLC proxy while avoiding the crashed turnover-divergence path and discarded range-position ideas. The expression uses only allowed high, low, close, and volume fields, the allowed 10 day window, and one Corr plus two Mean operators."
+description: "20 day divergence between normalized high-close midpoint price strength and normalized traded volume."
+expected_behavior: "A higher value means the 20 day correlation between the high-close midpoint proxy, (high plus close)/2, and traded volume is more negative. This favors stocks whose upper intraday price zone is not being confirmed by volume, extending the reviewed high-norm and upper-mid price-volume divergence family with a simple two-price proxy while avoiding the crashed turnover-divergence path and discarded range-position ideas. The expression uses only allowed high, close, and volume fields, the allowed 20 day window, and one Corr plus two Mean operators."
