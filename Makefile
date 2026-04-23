@@ -20,8 +20,12 @@ FACTOR_SELECTION_CONFIG ?= configs/factor_selection.yaml
 SIGNAL_CONFIG ?= configs/signal.yaml
 SIGNAL_PROVIDER_CONFIG ?=
 SIGNAL_PROVIDER_ARGS = $(if $(SIGNAL_PROVIDER_CONFIG),--provider-config $(SIGNAL_PROVIDER_CONFIG),)
+SIGNAL_CSV ?= reports/signals_latest.csv
+TRADING_CONFIG ?= configs/trading.yaml
+PORTFOLIO_CONFIG ?= configs/portfolio.yaml
+RISK_CONFIG ?= configs/risk.yaml
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -40,6 +44,8 @@ help:
 	@printf "  make autoresearch-codex-loop  Run overnight Codex CLI expression autoresearch\n"
 	@printf "  make select-factors   Build approved factor governance artifacts\n"
 	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
+	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
+	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
@@ -51,6 +57,8 @@ help:
 	@printf "  make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30\n"
 	@printf "  make select-factors FACTOR_SELECTION_CONFIG=configs/factor_selection.yaml\n"
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
+	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
+	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -144,6 +152,18 @@ daily-signal:
 	$(PYTHON) scripts/build_daily_signal.py \
 		--config $(SIGNAL_CONFIG) \
 		$(SIGNAL_PROVIDER_ARGS)
+
+check-data-quality:
+	$(PYTHON) scripts/check_data_quality.py \
+		--signal-csv $(SIGNAL_CSV) \
+		--config $(TRADING_CONFIG)
+
+target-portfolio:
+	$(PYTHON) scripts/build_target_portfolio.py \
+		--signal-csv $(SIGNAL_CSV) \
+		--trading-config $(TRADING_CONFIG) \
+		--portfolio-config $(PORTFOLIO_CONFIG) \
+		--risk-config $(RISK_CONFIG)
 
 lgb-dry-run:
 	$(PYTHON) scripts/run_lgb_workflow.py \

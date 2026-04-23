@@ -120,6 +120,7 @@ def build_daily_signal(
         "date",
         "instrument",
         "tradable",
+        *_passthrough_columns(frame),
         "rule_score",
         "model_score",
         "ensemble_score",
@@ -149,6 +150,8 @@ def fetch_daily_factor_exposures(
 
     fields = [factor.expression for factor in factors]
     names = [factor.name for factor in factors]
+    fields.append("Mean($amount,20)")
+    names.append("amount_20d")
     frame = D.features(
         D.instruments(project_config.market),
         fields,
@@ -163,8 +166,9 @@ def fetch_daily_factor_exposures(
     if "date" not in frame.columns or "instrument" not in frame.columns:
         raise ValueError("qlib feature frame must include date/datetime and instrument columns")
     frame["date"] = pd.to_datetime(frame["date"]).dt.strftime("%Y-%m-%d")
-    frame["tradable"] = frame[names].notna().all(axis=1)
-    frame = frame.dropna(subset=names, how="all")
+    factor_names = [factor.name for factor in factors]
+    frame["tradable"] = frame[factor_names].notna().all(axis=1)
+    frame = frame.dropna(subset=factor_names, how="all")
     if frame.empty:
         raise ValueError(f"no factor exposures were available for {effective_run_date}")
     return frame.loc[:, ["date", "instrument", "tradable", *names]].reset_index(drop=True)
@@ -264,6 +268,11 @@ def _risk_flags(row: pd.Series, active_factor_count: int) -> str:
     if active_factor_count == 0:
         flags.append("regime_gated")
     return ";".join(flags)
+
+
+def _passthrough_columns(frame: pd.DataFrame) -> list[str]:
+    candidates = ["amount_20d", "amount", "volume_20d", "volume"]
+    return [column for column in candidates if column in frame.columns]
 
 
 def _bool_value(value: Any) -> bool:

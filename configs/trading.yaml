@@ -1,0 +1,20 @@
+data_quality:
+  required_columns:
+    - date
+    - instrument
+    - tradable
+    - ensemble_score
+    - rule_score
+    - risk_flags
+  score_column: ensemble_score
+  min_coverage_ratio: 0.8
+  require_single_date: true
+
+tradability:
+  require_tradable: true
+  min_amount_20d: 10000000
+  liquidity_column: amount_20d
+  blocked_risk_flags:
+    - not_tradable
+    - limit_locked
+    - regime_gated

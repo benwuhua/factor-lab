@@ -1,0 +1,10 @@
+portfolio:
+  top_k: 20
+  cash_buffer: 0.05
+  max_single_weight: 0.08
+  max_new_buys: 5
+  score_column: ensemble_score
+
+output:
+  target_portfolio: reports/target_portfolio_{run_yyyymmdd}.csv
+  summary: reports/target_portfolio_summary_{run_yyyymmdd}.md

@@ -1,0 +1,8 @@
+risk:
+  max_single_weight: 0.08
+  min_positions: 10
+  min_signal_coverage: 0.2
+  max_turnover: 1.0
+
+output:
+  report: reports/portfolio_risk_{run_yyyymmdd}.md
