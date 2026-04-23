@@ -86,6 +86,8 @@ def run_paper_batch(
                 "run_date": run_date,
                 "order_count": int(len(orders)),
                 "fill_count": int((fills["status"].isin(["filled", "partial"])).sum()) if "status" in fills else 0,
+                "rejected_count": _rejected_count(fills),
+                "top_reject_reason": _top_reject_reason(fills),
                 "turnover": _abs_sum(orders, "delta_weight"),
                 "filled_turnover": _abs_sum(fills, "fill_delta_weight"),
                 "transaction_cost": _sum(fills, "transaction_cost"),
@@ -112,6 +114,8 @@ def summarize_paper_batch(metrics: pd.DataFrame, final_positions: pd.DataFrame) 
             "max_target_drift": 0.0,
             "reconciliation_failures": 0,
             "total_transaction_cost": 0.0,
+            "execution_failure_count": 0,
+            "top_execution_failure_reason": "",
             "final_positions": int(len(final_positions)),
         }
     failures = int((~metrics["reconciliation_passed"].astype(bool)).sum())
@@ -122,6 +126,8 @@ def summarize_paper_batch(metrics: pd.DataFrame, final_positions: pd.DataFrame) 
         "max_target_drift": float(metrics["target_drift"].max()),
         "reconciliation_failures": failures,
         "total_transaction_cost": float(metrics["transaction_cost"].sum()),
+        "execution_failure_count": int(metrics.get("rejected_count", pd.Series(dtype=int)).sum()),
+        "top_execution_failure_reason": _top_metric_reason(metrics),
         "final_positions": int(len(final_positions)),
     }
 
@@ -137,17 +143,20 @@ def write_paper_batch_outputs(result: PaperBatchResult, config: PaperBatchConfig
         f"- average_turnover: {result.summary['average_turnover']:.6g}",
         f"- max_target_drift: {result.summary['max_target_drift']:.6g}",
         f"- reconciliation_failures: {result.summary['reconciliation_failures']}",
+        f"- execution_failure_count: {result.summary.get('execution_failure_count', 0)}",
+        f"- top_execution_failure_reason: {result.summary.get('top_execution_failure_reason', '')}",
         f"- total_transaction_cost: {result.summary['total_transaction_cost']:.6g}",
         f"- final_positions: {result.summary['final_positions']}",
         "",
         "## Daily Metrics",
         "",
-        "| run_date | order_count | turnover | target_drift | transaction_cost | reconciliation_passed |",
-        "|---|---:|---:|---:|---:|---|",
+        "| run_date | order_count | rejected_count | top_reject_reason | turnover | target_drift | transaction_cost | reconciliation_passed |",
+        "|---|---:|---:|---|---:|---:|---:|---|",
     ]
     for _, row in result.metrics.iterrows():
         lines.append(
-            f"| {row['run_date']} | {int(row['order_count'])} | {float(row['turnover']):.6g} | "
+            f"| {row['run_date']} | {int(row['order_count'])} | {int(row.get('rejected_count', 0))} | "
+            f"{row.get('top_reject_reason', '')} | {float(row['turnover']):.6g} | "
             f"{float(row['target_drift']):.6g} | {float(row['transaction_cost']):.6g} | "
             f"{bool(row['reconciliation_passed'])} |"
         )
@@ -175,6 +184,34 @@ def _sum(frame: pd.DataFrame, column: str) -> float:
     if frame.empty or column not in frame.columns:
         return 0.0
     return float(frame[column].sum())
+
+
+def _rejected_count(fills: pd.DataFrame) -> int:
+    if fills.empty or "status" not in fills.columns:
+        return 0
+    return int((fills["status"] == "rejected").sum())
+
+
+def _top_reject_reason(fills: pd.DataFrame) -> str:
+    if fills.empty or "reject_reason" not in fills.columns:
+        return ""
+    reasons = fills["reject_reason"].dropna().astype(str).str.strip()
+    reasons = reasons[~reasons.str.lower().isin(["", "nan", "none"])]
+    if reasons.empty:
+        return ""
+    return str(reasons.value_counts().idxmax())
+
+
+def _top_metric_reason(metrics: pd.DataFrame) -> str:
+    if metrics.empty or "top_reject_reason" not in metrics.columns:
+        return ""
+    rows = metrics[metrics.get("rejected_count", 0).astype(int) > 0]
+    reasons = rows["top_reject_reason"].dropna().astype(str).str.strip()
+    reasons = reasons[~reasons.str.lower().isin(["", "nan", "none"])]
+    if reasons.empty:
+        return ""
+    weighted = rows.loc[reasons.index].groupby("top_reject_reason")["rejected_count"].sum()
+    return str(weighted.idxmax())
 
 
 def _target_drift(target: pd.DataFrame, expected: pd.DataFrame) -> float:

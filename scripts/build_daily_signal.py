@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from _bootstrap import add_src_to_path, project_root
+from _bootstrap import add_src_to_path, project_root, suppress_runtime_warnings
 
+suppress_runtime_warnings()
 add_src_to_path()
 
 from qlib_factor_lab.config import load_project_config

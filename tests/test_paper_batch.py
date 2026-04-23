@@ -36,6 +36,36 @@ class PaperBatchTests(unittest.TestCase):
             self.assertGreater(float(result.summary["total_transaction_cost"]), 0)
             self.assertTrue((root / "runs/paper_batch/20260430/orders.csv").exists())
 
+    def test_run_paper_batch_summarizes_execution_failure_reasons(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target_dir = root / "targets"
+            target_dir.mkdir(parents=True)
+            target = target_dir / "target_portfolio_20260423.csv"
+            pd.DataFrame(
+                {
+                    "date": ["2026-04-23"],
+                    "instrument": ["LOCKED"],
+                    "target_weight": [0.1],
+                    "last_price": [10.0],
+                    "limit_up": [True],
+                }
+            ).to_csv(target, index=False)
+
+            result = run_paper_batch(
+                [target],
+                pd.DataFrame(columns=["instrument", "current_weight"]),
+                OrderConfig(total_equity=100_000, min_order_value=100, lot_size=100),
+                PaperFillConfig(fill_ratio=1.0),
+                ReconcileConfig(weight_tolerance=0.001),
+                PaperBatchConfig(run_root=root / "runs/paper_batch", max_days=1),
+            )
+
+            self.assertEqual(int(result.metrics.loc[0, "rejected_count"]), 1)
+            self.assertEqual(result.metrics.loc[0, "top_reject_reason"], "limit_up_buy_blocked")
+            self.assertEqual(int(result.summary["execution_failure_count"]), 1)
+            self.assertEqual(result.summary["top_execution_failure_reason"], "limit_up_buy_blocked")
+
     def test_run_paper_batch_cli_writes_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

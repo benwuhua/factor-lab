@@ -34,8 +34,9 @@ TARGET_GLOB ?= reports/paper_batch_targets/target_portfolio_*.csv
 ORDERS_CSV ?= runs/$(RUN_DATE)/orders.csv
 FILLS_CSV ?= runs/$(RUN_DATE)/fills.csv
 HISTORICAL_DAYS ?= 30
+EXECUTION_CALENDAR_OUTPUT ?= reports/execution_calendar_$(RUN_DATE).csv
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -53,6 +54,7 @@ help:
 	@printf "  make autoresearch-ledger  Summarize expression autoresearch ledger\n"
 	@printf "  make autoresearch-codex-loop  Run overnight Codex CLI expression autoresearch\n"
 	@printf "  make select-factors   Build approved factor governance artifacts\n"
+	@printf "  make execution-calendar  Build daily A-share execution status CSV\n"
 	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
 	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
 	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
@@ -71,6 +73,7 @@ help:
 	@printf "  make autoresearch-ledger AUTORESEARCH_LEDGER=reports/autoresearch/expression_results.tsv\n"
 	@printf "  make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30\n"
 	@printf "  make select-factors FACTOR_SELECTION_CONFIG=configs/factor_selection.yaml\n"
+	@printf "  make execution-calendar RUN_DATE=20260420\n"
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
@@ -166,6 +169,12 @@ autoresearch-codex-loop:
 select-factors:
 	$(PYTHON) scripts/select_factors.py \
 		--config $(FACTOR_SELECTION_CONFIG)
+
+execution-calendar:
+	$(PYTHON) scripts/build_execution_calendar.py \
+		--provider-config $(CSI500_PROVIDER) \
+		--run-date $(subst -,,$(RUN_DATE)) \
+		--output $(EXECUTION_CALENDAR_OUTPUT)
 
 daily-signal:
 	$(PYTHON) scripts/build_daily_signal.py \

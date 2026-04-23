@@ -88,7 +88,7 @@ def build_daily_signal(
         raise ValueError(f"exposures are missing columns: {sorted(missing)}")
 
     frame = exposures.copy()
-    frame = _apply_execution_calendar(frame, config.execution_calendar_path)
+    frame = _apply_execution_calendar(frame, _materialize_path(config.execution_calendar_path, config.run_date))
     if "tradable" not in frame.columns:
         frame["tradable"] = True
     frame["tradable"] = frame["tradable"].map(_bool_value)
@@ -218,6 +218,13 @@ def _apply_execution_calendar(frame: pd.DataFrame, calendar_path: Path | None) -
             merged[column] = merged[calendar_column]
         merged = merged.drop(columns=[calendar_column])
     return merged
+
+
+def _materialize_path(path: Path | None, run_date: str) -> Path | None:
+    if path is None:
+        return None
+    run_yyyymmdd = str(run_date).replace("-", "")
+    return Path(str(path).format(run_date=run_date, run_yyyymmdd=run_yyyymmdd))
 
 
 def resolve_run_date(project_config: ProjectConfig, run_date: str) -> str:

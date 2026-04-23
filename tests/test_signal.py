@@ -64,6 +64,25 @@ class SignalTests(unittest.TestCase):
             self.assertTrue(bool(by_instrument.loc["BBB", "limit_up"]))
             self.assertTrue(bool(by_instrument.loc["BBB", "buy_blocked"]))
 
+    def test_build_daily_signal_materializes_execution_calendar_template_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved_path, config_path = self._write_fixture(root)
+            calendar_path = root / "data/execution_calendar_20260423.csv"
+            calendar_path.parent.mkdir(parents=True)
+            pd.DataFrame(
+                {"date": ["2026-04-23"], "instrument": ["AAA"], "limit_up": [True]}
+            ).to_csv(calendar_path, index=False)
+            config = load_signal_config(config_path)
+            config = config.__class__(
+                **{**config.__dict__, "execution_calendar_path": root / "data/execution_calendar_{run_yyyymmdd}.csv"}
+            )
+            factors = load_approved_signal_factors(approved_path)
+
+            signal = build_daily_signal(self._exposures(), factors, config)
+
+            self.assertTrue(bool(signal.set_index("instrument").loc["AAA", "limit_up"]))
+
     def test_build_daily_signal_gates_down_sideways_factors_in_up_regime(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
