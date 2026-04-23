@@ -71,6 +71,8 @@ def main() -> int:
 
         init_qlib(project_config)
         signal_config = load_signal_config(_resolve(root, args.signal_config))
+        if signal_config.execution_calendar_path is not None:
+            signal_config = replace(signal_config, execution_calendar_path=_resolve(root, signal_config.execution_calendar_path))
         factors = load_approved_signal_factors(_resolve(root, signal_config.approved_factors_path))
         run_dates = recent_trading_dates(project_config, args.days, args.end_date)
         paths = build_historical_targets(

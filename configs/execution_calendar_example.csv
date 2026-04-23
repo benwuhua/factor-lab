@@ -1,0 +1,3 @@
+date,instrument,tradable,suspended,limit_up,limit_down,buy_blocked,sell_blocked
+2026-04-20,SH600000,true,false,false,false,false,false
+2026-04-20,SZ000001,false,true,false,false,true,true

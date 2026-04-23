@@ -1,5 +1,6 @@
 approved_factors_path: reports/approved_factors.yaml
 provider_config: configs/provider_current.yaml
+execution_calendar_path: null
 run_date: latest
 active_regime: sideways
 

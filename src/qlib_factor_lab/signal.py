@@ -34,6 +34,7 @@ class SignalConfig:
     model_weight: float
     signals_output_path: Path
     summary_output_path: Path
+    execution_calendar_path: Path | None = None
 
 
 def load_signal_config(path: str | Path) -> SignalConfig:
@@ -55,6 +56,7 @@ def load_signal_config(path: str | Path) -> SignalConfig:
         model_weight=float(ensemble.get("model_score", 0.0)),
         signals_output_path=Path(output.get("signals", "reports/signals_latest.csv")),
         summary_output_path=Path(output.get("summary", "reports/signal_summary_latest.md")),
+        execution_calendar_path=Path(data["execution_calendar_path"]) if data.get("execution_calendar_path") else None,
     )
 
 
@@ -86,6 +88,7 @@ def build_daily_signal(
         raise ValueError(f"exposures are missing columns: {sorted(missing)}")
 
     frame = exposures.copy()
+    frame = _apply_execution_calendar(frame, config.execution_calendar_path)
     if "tradable" not in frame.columns:
         frame["tradable"] = True
     frame["tradable"] = frame["tradable"].map(_bool_value)
@@ -143,11 +146,14 @@ def fetch_daily_factor_exposures(
     project_config: ProjectConfig,
     factors: list[SignalFactor],
     run_date: str,
+    *,
+    initialize: bool = True,
 ) -> pd.DataFrame:
     if not factors:
         raise ValueError("at least one approved factor is required to build daily signal exposures")
 
-    init_qlib(project_config)
+    if initialize:
+        init_qlib(project_config)
     effective_run_date = resolve_run_date(project_config, run_date)
 
     from qlib.data import D
@@ -178,6 +184,40 @@ def fetch_daily_factor_exposures(
     if frame.empty:
         raise ValueError(f"no factor exposures were available for {effective_run_date}")
     return frame.loc[:, ["date", "instrument", "tradable", *names]].reset_index(drop=True)
+
+
+def _apply_execution_calendar(frame: pd.DataFrame, calendar_path: Path | None) -> pd.DataFrame:
+    if calendar_path is None:
+        return frame
+    calendar = pd.read_csv(calendar_path)
+    required = {"date", "instrument"}
+    missing = required - set(calendar.columns)
+    if missing:
+        raise ValueError(f"execution calendar is missing columns: {sorted(missing)}")
+    calendar = calendar.copy()
+    calendar["date"] = pd.to_datetime(calendar["date"]).dt.strftime("%Y-%m-%d")
+    output = frame.copy()
+    output["date"] = pd.to_datetime(output["date"]).dt.strftime("%Y-%m-%d")
+    passthrough = [
+        "tradable",
+        "suspended",
+        "limit_up",
+        "limit_down",
+        "buy_blocked",
+        "sell_blocked",
+    ]
+    calendar_cols = ["date", "instrument", *[column for column in passthrough if column in calendar.columns]]
+    merged = output.merge(calendar.loc[:, calendar_cols], on=["date", "instrument"], how="left", suffixes=("", "_calendar"))
+    for column in passthrough:
+        calendar_column = f"{column}_calendar"
+        if calendar_column not in merged.columns:
+            continue
+        if column in merged.columns:
+            merged[column] = merged[calendar_column].combine_first(merged[column])
+        else:
+            merged[column] = merged[calendar_column]
+        merged = merged.drop(columns=[calendar_column])
+    return merged
 
 
 def resolve_run_date(project_config: ProjectConfig, run_date: str) -> str:

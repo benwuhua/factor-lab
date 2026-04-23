@@ -59,7 +59,7 @@ def build_historical_targets(
     target_dir.mkdir(parents=True, exist_ok=True)
     for run_date in run_dates:
         dated_signal_config = replace(signal_config, run_date=run_date)
-        exposures = fetch_daily_factor_exposures(project_config, factors, run_date)
+        exposures = fetch_daily_factor_exposures(project_config, factors, run_date, initialize=False)
         signal = build_daily_signal(exposures, factors, dated_signal_config)
         signal_path = signal_dir / f"signals_{run_date.replace('-', '')}.csv"
         write_daily_signal(signal, signal_path)

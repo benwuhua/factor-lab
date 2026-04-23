@@ -38,6 +38,8 @@ def main() -> int:
 
     root = Path(args.project_root).expanduser().resolve()
     config = load_signal_config(_resolve_path(root, args.config))
+    if config.execution_calendar_path is not None:
+        config = replace(config, execution_calendar_path=_resolve_path(root, config.execution_calendar_path))
     if args.run_date is not None:
         config = replace(config, run_date=args.run_date)
     if args.active_regime is not None:
