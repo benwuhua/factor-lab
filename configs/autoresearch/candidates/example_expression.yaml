@@ -1,6 +1,6 @@
-name: slow_corr_high_mean60_discount_volume_divergence_reversal_60_v1
+name: medium_anchor_high_volume_divergence_reversal_20_60_v1
 family: divergence
-expression: "0-Corr($high/Mean($high,60),$volume/Mean($volume,60),60)+(Mean($high,60)-$close)/$close"
+expression: "0-Corr($high/Mean($high,60),$volume/Mean($volume,20),20)+(Mean($high,60)-$close)/Mean($high,60)"
 direction: 1
-description: "60 day high-volume divergence with a 60 day mean-high discount reversal anchor."
-expected_behavior: "Ranks stocks higher when medium-term normalized highs are weakly confirmed by medium-term normalized volume, and when the close remains below the stock's 60 day average high. This keeps the reviewed high-volume divergence plus mean-high discount interpretation, but slows the correlation horizon to test whether the signal is more persistent without adding turnover, range-position, intraday rebound, or pure volatility terms that recently discarded or crashed. The expression uses only allowed high, close, and volume fields with a single 60 day window, three Mean calls, and one Corr call."
+description: "20 day high-volume divergence using a 60 day mean-high price anchor and a 60 day mean-high discount reversal term."
+expected_behavior: "Ranks stocks higher when highs relative to the stock's 60 day average high are weakly confirmed by recent volume, and when the close remains below that same 60 day average high. This keeps the productive high-discount volume-divergence interpretation while avoiding another slow 60 day correlation test, pure range-position reversal, pure volatility scaling, average-trade-price discount, or turnover-divergence path that recently underperformed, discarded, or crashed. The expression uses only allowed high, close, and volume fields with 20 and 60 day windows, four Mean calls, and one Corr call."
