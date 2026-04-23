@@ -1,6 +1,6 @@
-name: short_volume_baseline_high_mean60_discount_divergence_reversal_5_20_60_v1
+name: short_amount_baseline_high_mean60_discount_divergence_reversal_5_20_60_v1
 family: divergence
-expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,5),20)+(Mean($high,60)-$close)/$close"
+expression: "0-Corr($high/Mean($high,20),$amount/Mean($amount,5),20)+(Mean($high,60)-$close)/$close"
 direction: 1
-description: "20 day high-price versus short-baseline volume divergence with a 60 day mean-high discount reversal term."
-expected_behavior: "Ranks stocks higher when 20 day normalized highs are weakly confirmed by volume measured against a 5 day baseline, and when the close sits below the stock's 60 day average high. This keeps the reviewed high-discount volume-divergence structure while testing whether very recent participation is less redundant than the prior 20, 60, and 120 day volume or amount baselines, avoiding the discarded range-position, low-turnover, extra-smoothing, and crashed turnover-divergence paths. The expression uses only allowed high, close, and volume fields with 5, 20, and 60 day windows, three Mean calls, and one Corr call."
+description: "20 day high-price versus short-baseline amount divergence with a 60 day mean-high discount reversal term."
+expected_behavior: "Ranks stocks higher when 20 day normalized highs are weakly confirmed by traded value measured against a 5 day amount baseline, and when the close sits below the stock's 60 day average high. This keeps the reviewed high-discount divergence structure while testing whether very recent value participation is less redundant than prior 20 day amount, 20 day volume, 60 day volume, and 5 day volume baselines, avoiding the discarded range-position, low-turnover, extra-smoothing, and crashed turnover-divergence paths. The expression uses only allowed high, close, and amount fields with 5, 20, and 60 day windows, three Mean calls, and one Corr call."
