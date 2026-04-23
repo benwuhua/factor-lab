@@ -34,6 +34,9 @@ class SignalTests(unittest.TestCase):
             self.assertEqual(signal.loc[0, "top_factor_1"], "core_alpha")
             self.assertEqual(signal.loc[1, "risk_flags"], "")
             self.assertEqual(signal.loc[2, "risk_flags"], "not_tradable")
+            self.assertIn("limit_up", signal.columns)
+            self.assertFalse(bool(signal.loc[0, "limit_up"]))
+            self.assertFalse(bool(signal.loc[0, "suspended"]))
 
     def test_build_daily_signal_gates_down_sideways_factors_in_up_regime(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -10,6 +10,7 @@ paper_broker:
   slippage_bps: 5
   commission_bps: 2
   stamp_tax_bps: 10
+  min_trade_value: 1000
 
 reconcile:
   weight_tolerance: 0.0001

@@ -71,6 +71,43 @@ class StageDTests(unittest.TestCase):
         self.assertAlmostEqual(float(fills.loc[0, "transaction_cost"]), 2.4024)
         self.assertAlmostEqual(float(fills.loc[0, "net_cash_effect"]), -12014.4024)
 
+    def test_paper_fills_reject_a_share_blocked_orders(self):
+        target = pd.DataFrame(
+            {
+                "date": ["2026-04-23", "2026-04-23"],
+                "instrument": ["BUY_LOCKED", "SUSPENDED"],
+                "target_weight": [0.1, 0.1],
+                "last_price": [10.0, 10.0],
+                "limit_up": [True, False],
+                "suspended": [False, True],
+            }
+        )
+        current = pd.DataFrame(
+            {
+                "instrument": ["SELL_LOCKED"],
+                "current_weight": [0.1],
+                "last_price": [10.0],
+                "limit_down": [True],
+            }
+        )
+
+        orders = build_order_suggestions(
+            target,
+            current,
+            OrderConfig(total_equity=100_000, min_order_value=1_000, lot_size=100),
+        )
+        fills = simulate_paper_fills(
+            orders,
+            PaperFillConfig(fill_ratio=1.0, min_trade_value=1_000),
+        )
+
+        reasons = dict(zip(fills["instrument"], fills["reject_reason"]))
+        self.assertEqual(reasons["BUY_LOCKED"], "limit_up_buy_blocked")
+        self.assertEqual(reasons["SELL_LOCKED"], "limit_down_sell_blocked")
+        self.assertEqual(reasons["SUSPENDED"], "suspended")
+        self.assertTrue((fills["status"] == "rejected").all())
+        self.assertTrue((fills["fill_delta_weight"] == 0.0).all())
+
     def test_reconcile_positions_flags_weight_mismatch(self):
         expected = pd.DataFrame({"instrument": ["AAA", "CCC"], "current_weight": [0.15, 0.20]})
         actual = pd.DataFrame({"instrument": ["AAA", "CCC"], "current_weight": [0.15, 0.18]})

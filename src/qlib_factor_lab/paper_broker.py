@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -15,6 +16,7 @@ class PaperFillConfig:
     slippage_bps: float = 0.0
     commission_bps: float = 0.0
     stamp_tax_bps: float = 0.0
+    min_trade_value: float = 0.0
 
 
 def load_paper_fill_config(path: str | Path) -> PaperFillConfig:
@@ -25,6 +27,7 @@ def load_paper_fill_config(path: str | Path) -> PaperFillConfig:
         slippage_bps=float(raw.get("slippage_bps", 0.0)),
         commission_bps=float(raw.get("commission_bps", 0.0)),
         stamp_tax_bps=float(raw.get("stamp_tax_bps", 0.0)),
+        min_trade_value=float(raw.get("min_trade_value", 0.0)),
     )
 
 
@@ -41,9 +44,19 @@ def simulate_paper_fills(orders: pd.DataFrame, config: PaperFillConfig = PaperFi
         execution_price = _execution_price(reference_price, side, config)
         fill_value = _fill_value(reference_value, fill_shares, execution_price)
         transaction_cost = _transaction_cost(fill_value, side, config)
-        fill_delta_weight = (1 if side == "BUY" else -1) * fill_value / total_equity if total_equity else 0.0
-        net_cash_effect = -fill_value - transaction_cost if side == "BUY" else fill_value - transaction_cost
-        status = "filled" if fill_ratio >= 1.0 else "partial" if fill_ratio > 0 else "rejected"
+        reject_reason = _reject_reason(row, side, fill_value, config)
+        if reject_reason:
+            fill_value = 0.0
+            fill_shares = 0.0
+            transaction_cost = 0.0
+            fill_delta_weight = 0.0
+            net_cash_effect = 0.0
+            status = "rejected"
+        else:
+            fill_delta_weight = (1 if side == "BUY" else -1) * fill_value / total_equity if total_equity else 0.0
+            net_cash_effect = -fill_value - transaction_cost if side == "BUY" else fill_value - transaction_cost
+            status = "filled" if fill_ratio >= 1.0 else "partial" if fill_ratio > 0 else "rejected"
+            reject_reason = "" if fill_ratio > 0 else "zero_fill_ratio"
         rows.append(
             {
                 "fill_id": index + 1,
@@ -60,7 +73,7 @@ def simulate_paper_fills(orders: pd.DataFrame, config: PaperFillConfig = PaperFi
                 "transaction_cost": transaction_cost,
                 "net_cash_effect": net_cash_effect,
                 "status": status,
-                "reject_reason": "" if fill_ratio > 0 else "zero_fill_ratio",
+                "reject_reason": reject_reason,
             }
         )
     return pd.DataFrame(
@@ -112,7 +125,29 @@ def _transaction_cost(fill_value: float, side: str, config: PaperFillConfig) -> 
     return fill_value * bps / 10000.0
 
 
-def _float_or_nan(value) -> float:
+def _reject_reason(row: pd.Series, side: str, fill_value: float, config: PaperFillConfig) -> str:
+    if config.min_trade_value > 0 and fill_value < config.min_trade_value:
+        return "below_min_trade_value"
+    if not _bool_value(row.get("tradable", True)):
+        return "not_tradable"
+    if _bool_value(row.get("suspended", False)):
+        return "suspended"
+    if side == "BUY" and (_bool_value(row.get("limit_up", False)) or _bool_value(row.get("buy_blocked", False))):
+        return "limit_up_buy_blocked"
+    if side == "SELL" and (_bool_value(row.get("limit_down", False)) or _bool_value(row.get("sell_blocked", False))):
+        return "limit_down_sell_blocked"
+    return ""
+
+
+def _bool_value(value: Any) -> bool:
+    if pd.isna(value):
+        return False
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "no", "nan"}
+    return bool(value)
+
+
+def _float_or_nan(value: Any) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):

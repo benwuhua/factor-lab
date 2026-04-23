@@ -54,6 +54,8 @@ class StageCTests(unittest.TestCase):
         self.assertAlmostEqual(float(portfolio["target_weight"].sum()), 0.9)
         self.assertTrue((portfolio["target_weight"] == 0.45).all())
         self.assertEqual(list(portfolio["rank"]), [1, 2])
+        self.assertEqual(list(portfolio["last_price"]), [12.3, 45.6])
+        self.assertIn("limit_up", portfolio.columns)
 
     def test_target_portfolio_keeps_current_positions_inside_dropout_rank(self):
         signal = self._signal()
@@ -143,6 +145,9 @@ class StageCTests(unittest.TestCase):
                 "active_regime": ["sideways"] * 5,
                 "risk_flags": ["", "", "not_tradable", "limit_locked", ""],
                 "amount_20d": [100_000_000, 80_000_000, 90_000_000, 70_000_000, 1_000_000],
+                "last_price": [12.3, 45.6, 8.9, 23.4, 5.6],
+                "limit_up": [False, False, True, False, False],
+                "limit_down": [False, False, False, True, False],
             }
         )
 

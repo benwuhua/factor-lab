@@ -89,6 +89,10 @@ def build_daily_signal(
     if "tradable" not in frame.columns:
         frame["tradable"] = True
     frame["tradable"] = frame["tradable"].map(_bool_value)
+    for column in ["suspended", "limit_up", "limit_down", "buy_blocked", "sell_blocked"]:
+        if column not in frame.columns:
+            frame[column] = False
+        frame[column] = frame[column].map(_bool_value)
     frame["active_regime"] = config.active_regime
     frame["model_score"] = frame["model_score"].astype(float) if "model_score" in frame.columns else 0.0
 
@@ -152,6 +156,8 @@ def fetch_daily_factor_exposures(
     names = [factor.name for factor in factors]
     fields.append("Mean($amount,20)")
     names.append("amount_20d")
+    fields.append("$close")
+    names.append("last_price")
     frame = D.features(
         D.instruments(project_config.market),
         fields,
@@ -271,7 +277,18 @@ def _risk_flags(row: pd.Series, active_factor_count: int) -> str:
 
 
 def _passthrough_columns(frame: pd.DataFrame) -> list[str]:
-    candidates = ["amount_20d", "amount", "volume_20d", "volume"]
+    candidates = [
+        "amount_20d",
+        "last_price",
+        "amount",
+        "volume_20d",
+        "volume",
+        "suspended",
+        "limit_up",
+        "limit_down",
+        "buy_blocked",
+        "sell_blocked",
+    ]
     return [column for column in candidates if column in frame.columns]
 
 

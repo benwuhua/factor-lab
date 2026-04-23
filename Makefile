@@ -31,8 +31,11 @@ TARGET_PORTFOLIO ?= reports/target_portfolio_$(RUN_DATE).csv
 EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
 ACTUAL_POSITIONS ?= runs/$(RUN_DATE)/positions_actual.csv
 TARGET_GLOB ?= reports/paper_batch_targets/target_portfolio_*.csv
+ORDERS_CSV ?= runs/$(RUN_DATE)/orders.csv
+FILLS_CSV ?= runs/$(RUN_DATE)/fills.csv
+HISTORICAL_DAYS ?= 30
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio paper-orders reconcile-account paper-batch lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -56,6 +59,8 @@ help:
 	@printf "  make paper-orders    Generate paper orders/fills from target portfolio\n"
 	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
 	@printf "  make paper-batch     Run rolling paper batch over target portfolios\n"
+	@printf "  make historical-paper-batch  Generate historical targets and run paper batch\n"
+	@printf "  make manual-ticket   Generate human-reviewed manual order ticket\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
@@ -71,6 +76,8 @@ help:
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
 	@printf "  make paper-batch TARGET_GLOB='reports/paper_batch_targets/target_portfolio_*.csv'\n"
+	@printf "  make historical-paper-batch HISTORICAL_DAYS=30\n"
+	@printf "  make manual-ticket RUN_DATE=20260420\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -194,6 +201,22 @@ paper-batch:
 		--target-glob "$(TARGET_GLOB)" \
 		--initial-positions $(CURRENT_POSITIONS) \
 		--execution-config $(EXECUTION_CONFIG)
+
+historical-paper-batch:
+	$(PYTHON) scripts/run_historical_paper_batch.py \
+		--days $(HISTORICAL_DAYS) \
+		--provider-config $(CSI500_PROVIDER) \
+		--signal-config $(SIGNAL_CONFIG) \
+		--trading-config $(TRADING_CONFIG) \
+		--portfolio-config $(PORTFOLIO_CONFIG) \
+		--risk-config $(RISK_CONFIG) \
+		--execution-config $(EXECUTION_CONFIG) \
+		--current-positions $(CURRENT_POSITIONS)
+
+manual-ticket:
+	$(PYTHON) scripts/generate_manual_ticket.py \
+		--orders-csv $(ORDERS_CSV) \
+		--fills-csv $(FILLS_CSV)
 
 lgb-dry-run:
 	$(PYTHON) scripts/run_lgb_workflow.py \

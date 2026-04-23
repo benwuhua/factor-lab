@@ -8,6 +8,18 @@ import pandas as pd
 from .config import load_yaml
 
 
+EXECUTION_PASSTHROUGH_COLUMNS = (
+    "last_price",
+    "amount_20d",
+    "tradable",
+    "suspended",
+    "limit_up",
+    "limit_down",
+    "buy_blocked",
+    "sell_blocked",
+)
+
+
 @dataclass(frozen=True)
 class PortfolioConfig:
     top_k: int = 20
@@ -56,7 +68,16 @@ def build_target_portfolio(
     selected = _select_candidates(eligible, config, current_positions)
     if selected.empty:
         return pd.DataFrame(
-            columns=["date", "instrument", "rank", "target_weight", config.score_column, "risk_flags", "rejection_reason"]
+            columns=[
+                "date",
+                "instrument",
+                "rank",
+                "target_weight",
+                config.score_column,
+                "risk_flags",
+                "rejection_reason",
+                *EXECUTION_PASSTHROUGH_COLUMNS,
+            ]
         )
 
     investable_weight = max(0.0, 1.0 - config.cash_buffer)
@@ -71,6 +92,9 @@ def build_target_portfolio(
             cols.append(optional)
     if "selection_reason" in output.columns:
         cols.append("selection_reason")
+    for optional in EXECUTION_PASSTHROUGH_COLUMNS:
+        if optional in output.columns and optional not in cols:
+            cols.append(optional)
     return output.loc[:, cols].reset_index(drop=True)
 
 
