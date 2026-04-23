@@ -1,6 +1,6 @@
-name: smoothed_high_mean60_discount_volume_divergence_reversal_3_20_60_v1
+name: mean_close_high_mean60_discount_volume_divergence_reversal_20_60_v1
 family: divergence
-expression: "0-Corr(Mean($high,3)/Mean($high,20),$volume/Mean($volume,20),20)+(Mean($high,60)-$close)/$close"
+expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)+(Mean($high,60)-Mean($close,20))/Mean($close,20)"
 direction: 1
-description: "20 day smoothed high-price versus volume divergence with a 60 day mean-high discount reversal term scaled by close."
-expected_behavior: "Ranks stocks higher when the 3 day average high is weakly confirmed by normalized volume over 20 days, and when the close sits below the stock's 60 day average high. This keeps the reviewed high-discount volume-divergence structure while reducing single-day high noise, without repeating discarded range-position, average-trade-price, low-turnover, or crashed turnover-divergence ideas. The expression uses only allowed high, close, and volume fields with 3, 20, and 60 day windows, four Mean calls, and one Corr call."
+description: "20 day high-price versus volume divergence with a smoothed 60 day mean-high discount reversal term."
+expected_behavior: "Ranks stocks higher when normalized high prices are weakly confirmed by normalized volume over 20 days, and when the 20 day average close sits below the stock's 60 day average high. This keeps the reviewed high-discount volume-divergence structure but smooths the discount leg instead of adding the discarded 3 day high smoothing, so the idea remains low complexity and avoids repeated discarded range-position, low-turnover, and crashed turnover-divergence variants. The expression uses only allowed high, close, and volume fields with 20 and 60 day windows, five Mean calls, and one Corr call."
