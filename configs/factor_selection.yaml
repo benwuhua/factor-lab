@@ -1,0 +1,109 @@
+registry_path: factors/registry.yaml
+approval_date: "2026-04-23"
+generated_at: "2026-04-23T00:00:00"
+output:
+  approved_factors: reports/approved_factors.yaml
+  review_markdown: reports/factor_review_2026-04-23.md
+redundancy:
+  similarity_threshold: 0.35
+approved_factors:
+  - name: high_mean60_discount_volume_divergence_reversal_20_60_v1
+    family: divergence_weak_reversal
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: down_sideways
+    turnover_profile: medium
+    approval_status: core
+    evidence_paths:
+      - docs/factor_reviews/2026-04-23-autoresearch-divergence-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.040048747828434886
+      csi300_neutral_rank_ic_h20: 0.04487938779322186
+      weakest_year: 2023
+      weakest_year_neutral_rank_ic_h20: -0.03933765744923719
+      csi500_top_quantile_turnover_h20: 0.12563802073150543
+      csi500_down_regime_neutral_rank_ic_h20: 0.06889
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.04528
+      csi500_up_regime_neutral_rank_ic_h20: 0.01743
+    review_notes: "Core representative for the promoted divergence/weak-reversal family. Strongest cross-universe size-neutral H20 result, but 2023 diagnostics show up-regime weakness; use as down/sideways eligible until monitored live-like signal evidence says otherwise."
+  - name: fast_high_60d_discount_volume_divergence_reversal_10_60_v1
+    family: divergence_weak_reversal
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: down_sideways
+    turnover_profile: high
+    approval_status: challenger
+    evidence_paths:
+      - docs/factor_reviews/2026-04-23-autoresearch-divergence-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.034517316395143015
+      csi300_neutral_rank_ic_h20: 0.04337717184858735
+      weakest_year: 2023
+      weakest_year_neutral_rank_ic_h20: -0.035278310111316616
+      csi500_top_quantile_turnover_h20: 0.2261102099386095
+      csi500_down_regime_neutral_rank_ic_h20: 0.06053
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.03597
+      csi500_up_regime_neutral_rank_ic_h20: 0.01865
+    review_notes: "Faster 10/60 challenger. Strong 300 robustness, but turnover is materially higher than the core representative."
+  - name: high_norm_price_volume_divergence_20_v1
+    family: divergence_weak_reversal
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: down_sideways
+    turnover_profile: medium
+    approval_status: challenger
+    evidence_paths:
+      - docs/factor_reviews/2026-04-23-autoresearch-divergence-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.034494735524967894
+      csi300_neutral_rank_ic_h20: 0.042289275699611814
+      weakest_year: 2023
+      weakest_year_neutral_rank_ic_h20: -0.04622886569666183
+      csi500_top_quantile_turnover_h20: 0.12914021533312156
+      csi500_down_regime_neutral_rank_ic_h20: 0.04686
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.04226
+      csi500_up_regime_neutral_rank_ic_h20: 0.01712
+    review_notes: "Pure high-normalized price/volume divergence challenger. Cleaner and simpler than the core combo, but 2023 was the weakest year."
+  - name: normalized_price_volume_divergence_20_v1
+    family: divergence_weak_reversal
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: down_sideways
+    turnover_profile: medium
+    approval_status: reserve
+    evidence_paths:
+      - docs/factor_reviews/2026-04-23-autoresearch-divergence-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.031946059358119325
+      csi300_neutral_rank_ic_h20: 0.0407586767378283
+      weakest_year: 2023
+      weakest_year_neutral_rank_ic_h20: -0.03541192731021132
+      csi500_top_quantile_turnover_h20: 0.12803479175035626
+      csi500_down_regime_neutral_rank_ic_h20: 0.04816
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.03916
+      csi500_up_regime_neutral_rank_ic_h20: 0.01329
+    review_notes: "Close-normalized reserve variant. Useful for monitoring whether close-based divergence behaves better than high-based divergence."
+  - name: high_norm_price_amount_divergence_20_v1
+    family: divergence_weak_reversal
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: down_sideways
+    turnover_profile: medium
+    approval_status: reserve
+    evidence_paths:
+      - docs/factor_reviews/2026-04-23-autoresearch-divergence-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.03003126771660831
+      csi300_neutral_rank_ic_h20: 0.03926466144680329
+      weakest_year: 2023
+      weakest_year_neutral_rank_ic_h20: -0.04583779846715766
+      csi500_top_quantile_turnover_h20: 0.13048685933443396
+      csi500_down_regime_neutral_rank_ic_h20: 0.03648
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.03696
+      csi500_up_regime_neutral_rank_ic_h20: 0.01696
+    review_notes: "Amount-based reserve variant. Keep for comparison against volume-based divergence but do not treat as an independent core signal yet."

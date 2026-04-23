@@ -16,6 +16,8 @@ reports/*.png
 reports/*
 !reports/
 !reports/README.md
+!reports/approved_factors.yaml
+!reports/factor_review_*.md
 !reports/autoresearch/
 reports/autoresearch/*
 !reports/autoresearch/README.md
