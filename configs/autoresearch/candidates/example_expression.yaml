@@ -1,6 +1,6 @@
-name: volume_accel_high_mean60_discount_divergence_reversal_5_20_60_v1
-family: divergence
-expression: "0-Corr($high/Mean($high,20),Mean($volume,5)/Mean($volume,20),20)+(Mean($high,60)-$close)/$close"
+name: volume_confirmed_high_mean60_discount_reversal_20_60_v1
+family: reversal
+expression: "((Mean($high,60)-$close)/$close)*(Mean($volume,20)/Mean($volume,60))"
 direction: 1
-description: "20 day normalized high-price divergence against 5 over 20 day volume acceleration, with a 60 day mean-high discount reversal term."
-expected_behavior: "Ranks stocks higher when normalized highs are weakly confirmed by recent volume acceleration and when the close sits below the stock's 60 day average high. This keeps the reviewed high-discount divergence structure while testing whether a smoothed short-versus-medium volume participation ratio is cleaner than the prior raw volume, amount, 5 day baseline, and long baseline variants. It avoids the discarded range-position, low-turnover, heavy extra-smoothing, and crashed turnover-divergence paths while using only allowed high, close, and volume fields with 5, 20, and 60 day windows."
+description: "60 day mean-high discount reversal scaled by 20 over 60 day volume confirmation."
+expected_behavior: "Ranks stocks higher when the close sits below the stock's 60 day average high and recent 20 day volume is firm relative to its 60 day baseline. This keeps the successful high-discount reversal intuition but removes the Corr term and extra short-volume acceleration that pushed recent variants toward higher complexity. It avoids the discarded low-turnover, range-position, heavy extra-smoothing, and crashed turnover-divergence paths while using only allowed high, close, and volume fields with 20 and 60 day windows."
