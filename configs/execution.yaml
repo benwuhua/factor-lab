@@ -2,12 +2,24 @@ orders:
   total_equity: 1000000
   min_order_value: 1000
   weight_tolerance: 0.000001
+  lot_size: 100
+  price_column: last_price
 
 paper_broker:
   fill_ratio: 1.0
+  slippage_bps: 5
+  commission_bps: 2
+  stamp_tax_bps: 10
 
 reconcile:
   weight_tolerance: 0.0001
+
+batch:
+  max_days: 30
+  max_reconciliation_failures: 0
+  run_root: runs/paper_batch
+  summary_csv: runs/paper_batch_summary.csv
+  summary_md: runs/paper_batch_summary.md
 
 output:
   run_dir: runs/{run_yyyymmdd}

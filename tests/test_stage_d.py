@@ -44,6 +44,33 @@ class StageDTests(unittest.TestCase):
         self.assertAlmostEqual(weights["CCC"], 0.20)
         self.assertNotIn("OLD", weights)
 
+    def test_paper_orders_apply_lot_size_and_fill_costs(self):
+        target = pd.DataFrame(
+            {
+                "date": ["2026-04-23"],
+                "instrument": ["AAA"],
+                "target_weight": [0.123],
+                "last_price": [10.0],
+            }
+        )
+        current = pd.DataFrame(columns=["instrument", "current_weight"])
+
+        orders = build_order_suggestions(
+            target,
+            current,
+            OrderConfig(total_equity=100_000, min_order_value=1_000, lot_size=100),
+        )
+        fills = simulate_paper_fills(
+            orders,
+            PaperFillConfig(fill_ratio=1.0, slippage_bps=10, commission_bps=2, stamp_tax_bps=10),
+        )
+
+        self.assertEqual(int(orders.loc[0, "order_shares"]), 1200)
+        self.assertAlmostEqual(float(orders.loc[0, "delta_weight"]), 0.12)
+        self.assertAlmostEqual(float(fills.loc[0, "execution_price"]), 10.01)
+        self.assertAlmostEqual(float(fills.loc[0, "transaction_cost"]), 2.4024)
+        self.assertAlmostEqual(float(fills.loc[0, "net_cash_effect"]), -12014.4024)
+
     def test_reconcile_positions_flags_weight_mismatch(self):
         expected = pd.DataFrame({"instrument": ["AAA", "CCC"], "current_weight": [0.15, 0.20]})
         actual = pd.DataFrame({"instrument": ["AAA", "CCC"], "current_weight": [0.15, 0.18]})

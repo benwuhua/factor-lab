@@ -30,8 +30,9 @@ RUN_DATE ?= 20260420
 TARGET_PORTFOLIO ?= reports/target_portfolio_$(RUN_DATE).csv
 EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
 ACTUAL_POSITIONS ?= runs/$(RUN_DATE)/positions_actual.csv
+TARGET_GLOB ?= reports/paper_batch_targets/target_portfolio_*.csv
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio paper-orders reconcile-account lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio paper-orders reconcile-account paper-batch lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -54,6 +55,7 @@ help:
 	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
 	@printf "  make paper-orders    Generate paper orders/fills from target portfolio\n"
 	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
+	@printf "  make paper-batch     Run rolling paper batch over target portfolios\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
@@ -68,6 +70,7 @@ help:
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
+	@printf "  make paper-batch TARGET_GLOB='reports/paper_batch_targets/target_portfolio_*.csv'\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -184,6 +187,12 @@ reconcile-account:
 	$(PYTHON) scripts/reconcile_account.py \
 		--expected-positions $(EXPECTED_POSITIONS) \
 		--actual-positions $(ACTUAL_POSITIONS) \
+		--execution-config $(EXECUTION_CONFIG)
+
+paper-batch:
+	$(PYTHON) scripts/run_paper_batch.py \
+		--target-glob "$(TARGET_GLOB)" \
+		--initial-positions $(CURRENT_POSITIONS) \
 		--execution-config $(EXECUTION_CONFIG)
 
 lgb-dry-run:
