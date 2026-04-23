@@ -14,6 +14,7 @@ class PortfolioConfig:
     cash_buffer: float = 0.05
     max_single_weight: float = 0.1
     max_new_buys: int | None = None
+    dropout_rank: int | None = None
     score_column: str = "ensemble_score"
     target_output_path: Path = Path("reports/target_portfolio_{run_yyyymmdd}.csv")
     summary_output_path: Path = Path("reports/target_portfolio_summary_{run_yyyymmdd}.md")
@@ -29,6 +30,7 @@ def load_portfolio_config(path: str | Path) -> PortfolioConfig:
         cash_buffer=float(raw.get("cash_buffer", 0.05)),
         max_single_weight=float(raw.get("max_single_weight", 0.1)),
         max_new_buys=int(max_new_buys) if max_new_buys is not None else None,
+        dropout_rank=int(raw["dropout_rank"]) if raw.get("dropout_rank") is not None else None,
         score_column=str(raw.get("score_column", "ensemble_score")),
         target_output_path=Path(output.get("target_portfolio", "reports/target_portfolio_{run_yyyymmdd}.csv")),
         summary_output_path=Path(output.get("summary", "reports/target_portfolio_summary_{run_yyyymmdd}.md")),
@@ -67,6 +69,8 @@ def build_target_portfolio(
     for optional in ["rule_score", "model_score", "active_regime", "risk_flags", "rejection_reason"]:
         if optional in output.columns:
             cols.append(optional)
+    if "selection_reason" in output.columns:
+        cols.append("selection_reason")
     return output.loc[:, cols].reset_index(drop=True)
 
 
@@ -104,19 +108,47 @@ def _select_candidates(
     current_positions: pd.DataFrame | None,
 ) -> pd.DataFrame:
     if config.max_new_buys is None or current_positions is None or current_positions.empty:
-        return eligible.head(config.top_k)
+        if config.dropout_rank is None or current_positions is None or current_positions.empty:
+            selected = eligible.head(config.top_k).copy()
+            selected["selection_reason"] = "top_ranked"
+            return selected
 
     current = set(current_positions["instrument"].astype(str))
-    selected_rows = []
+    ranked = eligible.copy()
+    ranked["signal_rank"] = range(1, len(ranked) + 1)
+    keep = _dropout_keep(ranked, current, config)
+    selected_rows = [row for _, row in keep.iterrows()]
+    selected_instruments = {str(row["instrument"]) for row in selected_rows}
     new_buys = 0
-    for _, row in eligible.iterrows():
+    if config.max_new_buys is not None:
+        new_buys = sum(1 for row in selected_rows if str(row["instrument"]) not in current)
+    for _, row in ranked.iterrows():
         instrument = str(row["instrument"])
-        is_new = instrument not in current
-        if is_new and new_buys >= config.max_new_buys:
+        if instrument in selected_instruments:
             continue
+        is_new = instrument not in current
+        if config.max_new_buys is not None and is_new and new_buys >= config.max_new_buys:
+            continue
+        candidate = row.copy()
+        candidate["selection_reason"] = "new_buy" if is_new else "current_ranked"
+        selected_rows.append(candidate)
+        selected_instruments.add(instrument)
         if is_new:
             new_buys += 1
-        selected_rows.append(row)
         if len(selected_rows) >= config.top_k:
             break
-    return pd.DataFrame(selected_rows)
+    selected = pd.DataFrame(selected_rows)
+    if selected.empty:
+        return selected
+    return selected.sort_values(config.score_column, ascending=False).head(config.top_k)
+
+
+def _dropout_keep(ranked: pd.DataFrame, current: set[str], config: PortfolioConfig) -> pd.DataFrame:
+    if config.dropout_rank is None:
+        return ranked.iloc[0:0].copy()
+    keep = ranked[
+        ranked["instrument"].astype(str).isin(current)
+        & (ranked["signal_rank"] <= config.dropout_rank)
+    ].copy()
+    keep["selection_reason"] = "held_by_dropout"
+    return keep.sort_values(config.score_column, ascending=False).head(config.top_k)

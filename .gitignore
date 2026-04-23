@@ -24,5 +24,7 @@ reports/autoresearch/*
 !reports/joinquant_factorlib/
 !reports/joinquant_factorlib/*.csv
 !reports/joinquant_factorlib/*.json
+runs/
+state/
 mlruns/
 Users/

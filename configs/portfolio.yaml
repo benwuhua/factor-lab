@@ -3,6 +3,7 @@ portfolio:
   cash_buffer: 0.05
   max_single_weight: 0.08
   max_new_buys: 5
+  dropout_rank: 30
   score_column: ensemble_score
 
 output:

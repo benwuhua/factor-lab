@@ -55,6 +55,29 @@ class StageCTests(unittest.TestCase):
         self.assertTrue((portfolio["target_weight"] == 0.45).all())
         self.assertEqual(list(portfolio["rank"]), [1, 2])
 
+    def test_target_portfolio_keeps_current_positions_inside_dropout_rank(self):
+        signal = self._signal()
+        signal.loc[signal["instrument"] == "DDD", "risk_flags"] = ""
+        annotated = apply_tradability_filter(
+            signal,
+            TradabilityConfig(min_amount_20d=10_000_000, liquidity_column="amount_20d"),
+        )
+        current_positions = pd.DataFrame(
+            {
+                "instrument": ["DDD"],
+                "current_weight": [0.2],
+            }
+        )
+
+        portfolio = build_target_portfolio(
+            annotated,
+            PortfolioConfig(top_k=3, cash_buffer=0.1, max_single_weight=0.5, dropout_rank=4),
+            current_positions=current_positions,
+        )
+
+        self.assertEqual(list(portfolio["instrument"]), ["AAA", "BBB", "DDD"])
+        self.assertIn("held_by_dropout", set(portfolio["selection_reason"]))
+
     def test_risk_checks_report_concentration_failure(self):
         portfolio = pd.DataFrame(
             {

@@ -1,0 +1,13 @@
+orders:
+  total_equity: 1000000
+  min_order_value: 1000
+  weight_tolerance: 0.000001
+
+paper_broker:
+  fill_ratio: 1.0
+
+reconcile:
+  weight_tolerance: 0.0001
+
+output:
+  run_dir: runs/{run_yyyymmdd}

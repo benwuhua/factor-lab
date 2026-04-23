@@ -24,8 +24,14 @@ SIGNAL_CSV ?= reports/signals_latest.csv
 TRADING_CONFIG ?= configs/trading.yaml
 PORTFOLIO_CONFIG ?= configs/portfolio.yaml
 RISK_CONFIG ?= configs/risk.yaml
+EXECUTION_CONFIG ?= configs/execution.yaml
+CURRENT_POSITIONS ?= state/current_positions.csv
+RUN_DATE ?= 20260420
+TARGET_PORTFOLIO ?= reports/target_portfolio_$(RUN_DATE).csv
+EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
+ACTUAL_POSITIONS ?= runs/$(RUN_DATE)/positions_actual.csv
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal check-data-quality target-portfolio paper-orders reconcile-account lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -46,6 +52,8 @@ help:
 	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
 	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
 	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
+	@printf "  make paper-orders    Generate paper orders/fills from target portfolio\n"
+	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
@@ -59,6 +67,7 @@ help:
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
+	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -164,6 +173,18 @@ target-portfolio:
 		--trading-config $(TRADING_CONFIG) \
 		--portfolio-config $(PORTFOLIO_CONFIG) \
 		--risk-config $(RISK_CONFIG)
+
+paper-orders:
+	$(PYTHON) scripts/generate_orders.py \
+		--target-portfolio $(TARGET_PORTFOLIO) \
+		--current-positions $(CURRENT_POSITIONS) \
+		--execution-config $(EXECUTION_CONFIG)
+
+reconcile-account:
+	$(PYTHON) scripts/reconcile_account.py \
+		--expected-positions $(EXPECTED_POSITIONS) \
+		--actual-positions $(ACTUAL_POSITIONS) \
+		--execution-config $(EXECUTION_CONFIG)
 
 lgb-dry-run:
 	$(PYTHON) scripts/run_lgb_workflow.py \
