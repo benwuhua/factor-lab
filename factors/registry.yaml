@@ -39,3 +39,28 @@ factors:
     direction: 1
     category: price_position
     description: "Close location in the recent 20 day high-low range."
+  - name: high_mean60_discount_volume_divergence_reversal_20_60_v1
+    expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)+(Mean($high,60)-$close)/$close"
+    direction: 1
+    category: autoresearch_divergence
+    description: "Promoted autoresearch factor: 20 day high-price versus volume divergence with a 60 day mean-high discount reversal term."
+  - name: fast_high_60d_discount_volume_divergence_reversal_10_60_v1
+    expression: "0-Corr($high/Mean($high,10),$volume/Mean($volume,10),10)+(Mean($high,60)-$close)/Mean($high,60)"
+    direction: 1
+    category: autoresearch_divergence
+    description: "Promoted autoresearch factor: faster 10 day high-price versus volume divergence with a 60 day mean-high discount reversal term."
+  - name: high_norm_price_volume_divergence_20_v1
+    expression: "0-Corr($high/Mean($high,20),$volume/Mean($volume,20),20)"
+    direction: 1
+    category: autoresearch_divergence
+    description: "Promoted autoresearch factor: 20 day divergence between high-normalized price strength and normalized volume."
+  - name: normalized_price_volume_divergence_20_v1
+    expression: "0-Corr($close/Mean($close,20),$volume/Mean($volume,20),20)"
+    direction: 1
+    category: autoresearch_divergence
+    description: "Promoted autoresearch factor: 20 day negative correlation between normalized close and normalized volume."
+  - name: high_norm_price_amount_divergence_20_v1
+    expression: "0-Corr($high/Mean($high,20),$amount/Mean($amount,20),20)"
+    direction: 1
+    category: autoresearch_divergence
+    description: "Promoted autoresearch factor: 20 day divergence between high-normalized price strength and normalized traded amount."
