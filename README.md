@@ -13,6 +13,8 @@ Generated market data, Qlib binaries, MLflow records, and backtest reports are i
 
 For a compact command-by-command example, see [docs/factor-research-path.md](docs/factor-research-path.md).
 
+For the current repo evolution roadmap from alpha research to daily signal, paper trading, and manual-live readiness, see [docs/superpowers/plans/2026-04-23-factor-lab-evolution-blueprint.md](docs/superpowers/plans/2026-04-23-factor-lab-evolution-blueprint.md).
+
 ## Project Layout
 
 ```text
