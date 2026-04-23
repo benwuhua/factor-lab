@@ -89,6 +89,28 @@ class FactorRegistryTests(unittest.TestCase):
             self.assertEqual([f.name for f in by_category], ["ret_20"])
             self.assertEqual([f.name for f in by_name], ["vol_20"])
 
+    def test_project_registry_contains_promoted_autoresearch_factors(self):
+        root = Path(__file__).resolve().parents[1]
+        factors = load_factor_registry(root / "factors/registry.yaml")
+        promoted = {
+            factor.name
+            for factor in select_factors(
+                factors,
+                categories=["autoresearch_divergence"],
+            )
+        }
+
+        self.assertLessEqual(
+            {
+                "high_mean60_discount_volume_divergence_reversal_20_60_v1",
+                "fast_high_60d_discount_volume_divergence_reversal_10_60_v1",
+                "high_norm_price_volume_divergence_20_v1",
+                "normalized_price_volume_divergence_20_v1",
+                "high_norm_price_amount_divergence_20_v1",
+            },
+            promoted,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
