@@ -17,8 +17,11 @@ AUTORESEARCH_CODEX_MODEL ?= gpt-5.4
 AUTORESEARCH_CODEX_UNTIL ?= 08:30
 AUTORESEARCH_CODEX_ITERATIONS ?= 30
 FACTOR_SELECTION_CONFIG ?= configs/factor_selection.yaml
+SIGNAL_CONFIG ?= configs/signal.yaml
+SIGNAL_PROVIDER_CONFIG ?=
+SIGNAL_PROVIDER_ARGS = $(if $(SIGNAL_PROVIDER_CONFIG),--provider-config $(SIGNAL_PROVIDER_CONFIG),)
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors daily-signal lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -36,6 +39,7 @@ help:
 	@printf "  make autoresearch-ledger  Summarize expression autoresearch ledger\n"
 	@printf "  make autoresearch-codex-loop  Run overnight Codex CLI expression autoresearch\n"
 	@printf "  make select-factors   Build approved factor governance artifacts\n"
+	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
@@ -46,6 +50,7 @@ help:
 	@printf "  make autoresearch-ledger AUTORESEARCH_LEDGER=reports/autoresearch/expression_results.tsv\n"
 	@printf "  make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30\n"
 	@printf "  make select-factors FACTOR_SELECTION_CONFIG=configs/factor_selection.yaml\n"
+	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
 install:
@@ -134,6 +139,11 @@ autoresearch-codex-loop:
 select-factors:
 	$(PYTHON) scripts/select_factors.py \
 		--config $(FACTOR_SELECTION_CONFIG)
+
+daily-signal:
+	$(PYTHON) scripts/build_daily_signal.py \
+		--config $(SIGNAL_CONFIG) \
+		$(SIGNAL_PROVIDER_ARGS)
 
 lgb-dry-run:
 	$(PYTHON) scripts/run_lgb_workflow.py \

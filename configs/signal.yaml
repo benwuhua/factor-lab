@@ -1,0 +1,27 @@
+approved_factors_path: reports/approved_factors.yaml
+provider_config: configs/provider_current.yaml
+run_date: latest
+active_regime: sideways
+
+weights:
+  approval_status:
+    core: 1.0
+    challenger: 0.5
+    reserve: 0.25
+    regime_only: 0.25
+  regime:
+    down_sideways:
+      down: 1.0
+      sideways: 1.0
+      up: 0.0
+    all_weather:
+      down: 1.0
+      sideways: 1.0
+      up: 1.0
+  ensemble:
+    rule_score: 1.0
+    model_score: 0.0
+
+output:
+  signals: reports/signals_{run_yyyymmdd}.csv
+  summary: reports/signal_summary_{run_yyyymmdd}.md
