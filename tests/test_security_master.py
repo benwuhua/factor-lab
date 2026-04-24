@@ -54,6 +54,32 @@ class SecurityMasterTests(unittest.TestCase):
         self.assertTrue(bool(enriched.loc[0, "security_master_missing"]))
         self.assertTrue(pd.isna(enriched.loc[0, "name"]))
 
+    def test_security_master_handles_duplicate_signal_index_labels(self):
+        signal = pd.DataFrame(
+            {"date": ["2026-04-23", "2026-04-23"], "instrument": ["AAA", "BBB"]},
+            index=[0, 0],
+        )
+        master = pd.DataFrame(
+            {
+                "instrument": ["AAA", "BBB"],
+                "name": ["AAA Name", "BBB Name"],
+                "exchange": ["SSE", "SZSE"],
+                "board": ["main", "main"],
+                "industry_sw": ["sw_a", "sw_b"],
+                "industry_csrc": ["csrc_a", "csrc_b"],
+                "is_st": [False, False],
+                "listing_date": ["2020-01-01", "2020-01-01"],
+                "delisting_date": ["", ""],
+                "valid_from": ["2020-01-01", "2020-01-01"],
+                "valid_to": ["", ""],
+            }
+        )
+
+        enriched = enrich_with_security_master(signal, master)
+
+        self.assertEqual(list(enriched["name"]), ["AAA Name", "BBB Name"])
+        self.assertEqual(list(enriched["exchange"]), ["SSE", "SZSE"])
+
     def test_load_security_master_returns_empty_required_columns_when_path_none_or_missing(self):
         none_loaded = load_security_master(None)
 

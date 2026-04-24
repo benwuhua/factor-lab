@@ -33,7 +33,7 @@ def load_security_master(path: str | Path | None) -> pd.DataFrame:
 
 
 def enrich_with_security_master(signal: pd.DataFrame, master: pd.DataFrame) -> pd.DataFrame:
-    frame = signal.copy()
+    frame = signal.copy().reset_index(drop=True)
     for column in SECURITY_MASTER_COLUMNS:
         if column not in frame.columns:
             frame[column] = pd.NA
