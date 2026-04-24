@@ -161,6 +161,108 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["expert_review"]["decision"], "caution")
             self.assertIn("concentrated factor family", (root / "runs/20260423/expert_review_result.md").read_text(encoding="utf-8"))
 
+    def test_daily_pipeline_scales_portfolio_when_expert_review_is_caution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            execution_path = root / "configs/execution.yaml"
+            data = yaml.safe_load(execution_path.read_text(encoding="utf-8"))
+            data["expert_review"] = {
+                "enabled": True,
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); print('research_review_status: caution')",
+                ],
+                "caution_action": "scale",
+                "caution_weight_multiplier": 0.5,
+            }
+            execution_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            portfolio = pd.read_csv(root / "runs/20260423/target_portfolio.csv")
+            self.assertAlmostEqual(float(portfolio["target_weight"].sum()), 0.5)
+            self.assertTrue(portfolio["risk_flags"].str.contains("expert_review_caution_scaled").all())
+            manifest = json.loads((root / "runs/20260423/manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["expert_review_gate"]["status"], "scaled")
+
+    def test_daily_pipeline_blocks_orders_when_expert_review_rejects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            execution_path = root / "configs/execution.yaml"
+            data = yaml.safe_load(execution_path.read_text(encoding="utf-8"))
+            data["expert_review"] = {
+                "enabled": True,
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); print('research_review_status: reject')",
+                ],
+            }
+            execution_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            run_dir = root / "runs/20260423"
+            self.assertFalse((run_dir / "orders.csv").exists())
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "expert_review_blocked")
+            self.assertEqual(manifest["expert_review_gate"]["status"], "blocked")
+
     def _write_fixture(self, root: Path, min_positions: int = 1) -> None:
         (root / "configs").mkdir(parents=True)
         (root / "reports").mkdir(parents=True)
@@ -268,6 +370,13 @@ class DailyPipelineTests(unittest.TestCase):
                 "core_alpha": [3.0, 2.0, 1.0],
                 "last_price": [10.0, 20.0, 30.0],
                 "amount_20d": [1_000_000, 1_000_000, 1_000_000],
+                "turnover_20d": [0.02, 0.01, 0.0],
+                "industry": ["医药", "电力设备", "机械"],
+                "limit_up": [False, False, False],
+                "limit_down": [False, True, False],
+                "suspended": [False, False, False],
+                "abnormal_event": ["", "earnings_warning", ""],
+                "announcement_flag": [False, True, False],
             }
         ).to_csv(root / "data/exposures.csv", index=False)
         pd.DataFrame(columns=["instrument", "current_weight", "last_price"]).to_csv(

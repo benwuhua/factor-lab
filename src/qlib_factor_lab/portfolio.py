@@ -17,6 +17,10 @@ EXECUTION_PASSTHROUGH_COLUMNS = (
     "limit_down",
     "buy_blocked",
     "sell_blocked",
+    "turnover_20d",
+    "industry",
+    "abnormal_event",
+    "announcement_flag",
 )
 EXPLANATION_COLUMNS = (
     "top_factor_1",

@@ -9,12 +9,17 @@ from typing import Any
 import pandas as pd
 
 
+EXPERT_REVIEW_FLAG = "expert_review_caution_scaled"
+
+
 @dataclass(frozen=True)
 class ExpertReviewRunConfig:
     enabled: bool = False
     command: list[str] | None = None
     timeout_sec: int = 300
     required: bool = False
+    caution_action: str = "scale"
+    caution_weight_multiplier: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -42,6 +47,8 @@ def load_expert_review_run_config(data: dict[str, Any]) -> ExpertReviewRunConfig
         command=[str(part) for part in command] if command else None,
         timeout_sec=int(raw.get("timeout_sec", 300)),
         required=bool(raw.get("required", False)),
+        caution_action=str(raw.get("caution_action", "scale")),
+        caution_weight_multiplier=float(raw.get("caution_weight_multiplier", 0.5)),
     )
 
 
@@ -77,6 +84,58 @@ def run_expert_review_command(
     if completed.returncode != 0:
         return ExpertReviewResult(status="failed", decision="unknown", output=output, error=error or f"exit_code={completed.returncode}")
     return ExpertReviewResult(status="completed", decision=parse_expert_review_decision(output), output=output, error="")
+
+
+def apply_expert_review_portfolio_gate(
+    portfolio: pd.DataFrame,
+    *,
+    decision: str,
+    review_status: str = "completed",
+    review_required: bool = False,
+    caution_action: str = "scale",
+    caution_weight_multiplier: float = 0.5,
+) -> tuple[pd.DataFrame, dict[str, str]]:
+    normalized_decision = str(decision or "unknown").lower()
+    normalized_status = str(review_status or "unknown").lower()
+    normalized_action = str(caution_action or "scale").lower()
+    if review_required and (normalized_status != "completed" or normalized_decision == "unknown"):
+        return portfolio.iloc[0:0].copy(), {
+            "status": "blocked",
+            "action": "block",
+            "decision": normalized_decision,
+            "detail": f"required expert review did not complete with an actionable decision: {normalized_status}",
+        }
+    if normalized_decision == "reject":
+        return portfolio.iloc[0:0].copy(), {
+            "status": "blocked",
+            "action": "block",
+            "decision": normalized_decision,
+            "detail": "expert review rejected the portfolio",
+        }
+    if normalized_decision == "caution" and normalized_action in {"manual_confirmation", "require_confirmation"}:
+        return portfolio.copy(), {
+            "status": "manual_confirmation_required",
+            "action": "require_manual_confirmation",
+            "decision": normalized_decision,
+            "detail": "expert review requested manual confirmation before execution",
+        }
+    if normalized_decision == "caution":
+        gated = portfolio.copy()
+        if "target_weight" in gated.columns:
+            gated["target_weight"] = gated["target_weight"].astype(float) * float(caution_weight_multiplier)
+        gated = _append_risk_flag(gated, EXPERT_REVIEW_FLAG)
+        return gated, {
+            "status": "scaled",
+            "action": "scale",
+            "decision": normalized_decision,
+            "detail": f"target weights scaled by {float(caution_weight_multiplier):.6g}",
+        }
+    return portfolio.copy(), {
+        "status": "pass",
+        "action": "none",
+        "decision": normalized_decision,
+        "detail": "",
+    }
 
 
 def parse_expert_review_decision(text: str) -> str:
@@ -146,6 +205,47 @@ def build_expert_review_packet(
             )
             + " |"
         )
+    lines.extend(["", "## Pre-Trade Review Context", ""])
+    if target_portfolio.empty:
+        lines.append("- No portfolio candidates were supplied.")
+    else:
+        lines.extend(
+            [
+                "| rank | instrument | industry | amount_20d | turnover_20d | tradable | suspended | limit_up | limit_down | buy_blocked | sell_blocked | abnormal_event | announcement_flag |",
+                "|---:|---|---|---:|---:|---|---|---|---|---|---|---|---|",
+            ]
+        )
+        for _, row in portfolio.head(max_positions).iterrows():
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        str(row.get("rank", "")),
+                        str(row.get("instrument", "")),
+                        _text(row.get("industry", "")),
+                        _format_float(row.get("amount_20d")),
+                        _format_float(row.get("turnover_20d")),
+                        _text(row.get("tradable", "")),
+                        _text(row.get("suspended", "")),
+                        _text(row.get("limit_up", "")),
+                        _text(row.get("limit_down", "")),
+                        _text(row.get("buy_blocked", "")),
+                        _text(row.get("sell_blocked", "")),
+                        _text(row.get("abnormal_event", "")),
+                        _text(row.get("announcement_flag", "")),
+                    ]
+                )
+                + " |"
+            )
+        lines.extend(["", "### Pre-Trade Checks To Consider", ""])
+        lines.extend(
+            [
+                "- industry: review whether weights are concentrated in one industry or theme.",
+                "- liquidity: review amount_20d, turnover_20d, and whether order size is realistic.",
+                "- price limits: review limit_up, limit_down, suspended, buy/sell blocked flags before execution.",
+                "- announcements/events: review abnormal_event and announcement_flag before orders.",
+            ]
+        )
     lines.extend(["", "## Factor Diagnostics", ""])
     if factor_diagnostics is None or factor_diagnostics.empty:
         lines.append("- No factor diagnostics were supplied.")
@@ -200,3 +300,21 @@ def _text(value) -> str:
     if pd.isna(value):
         return ""
     return str(value)
+
+
+def _append_risk_flag(frame: pd.DataFrame, flag: str) -> pd.DataFrame:
+    output = frame.copy()
+    if "risk_flags" not in output.columns:
+        output["risk_flags"] = ""
+    output["risk_flags"] = output["risk_flags"].apply(lambda value: _join_flag(value, flag))
+    return output
+
+
+def _join_flag(value, flag: str) -> str:
+    existing = "" if pd.isna(value) else str(value).strip()
+    if not existing:
+        return flag
+    flags = [part.strip() for part in existing.split(";") if part.strip()]
+    if flag not in flags:
+        flags.append(flag)
+    return ";".join(flags)

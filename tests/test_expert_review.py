@@ -8,6 +8,7 @@ import pandas as pd
 
 from qlib_factor_lab.expert_review import (
     ExpertReviewRunConfig,
+    apply_expert_review_portfolio_gate,
     build_expert_review_packet,
     parse_expert_review_decision,
     run_expert_review_command,
@@ -30,6 +31,57 @@ class ExpertReviewTests(unittest.TestCase):
         self.assertIn("shadow_review", packet)
         self.assertIn("Questions For Expert LLM", packet)
         self.assertNotIn(" nan ", packet)
+
+    def test_build_expert_review_packet_includes_pre_trade_review_context(self):
+        packet = build_expert_review_packet(
+            target_portfolio=self._target_portfolio(),
+            factor_diagnostics=self._factor_diagnostics(),
+            run_date="2026-04-23",
+        )
+
+        self.assertIn("## Pre-Trade Review Context", packet)
+        self.assertIn("industry", packet)
+        self.assertIn("amount_20d", packet)
+        self.assertIn("limit_up", packet)
+        self.assertIn("abnormal_event", packet)
+        self.assertIn("liquidity", packet)
+
+    def test_apply_expert_review_portfolio_gate_scales_caution_weights(self):
+        portfolio = self._target_portfolio()
+
+        gated, gate = apply_expert_review_portfolio_gate(
+            portfolio,
+            decision="caution",
+            caution_action="scale",
+            caution_weight_multiplier=0.5,
+        )
+
+        self.assertEqual(gate["status"], "scaled")
+        self.assertAlmostEqual(float(gated["target_weight"].sum()), 0.0475)
+        self.assertTrue(gated["risk_flags"].str.contains("expert_review_caution_scaled").all())
+
+    def test_apply_expert_review_portfolio_gate_blocks_reject(self):
+        portfolio = self._target_portfolio()
+
+        gated, gate = apply_expert_review_portfolio_gate(portfolio, decision="reject")
+
+        self.assertTrue(gated.empty)
+        self.assertEqual(gate["status"], "blocked")
+        self.assertEqual(gate["action"], "block")
+
+    def test_apply_expert_review_portfolio_gate_blocks_missing_required_review(self):
+        portfolio = self._target_portfolio()
+
+        gated, gate = apply_expert_review_portfolio_gate(
+            portfolio,
+            decision="unknown",
+            review_status="timeout",
+            review_required=True,
+        )
+
+        self.assertTrue(gated.empty)
+        self.assertEqual(gate["status"], "blocked")
+        self.assertIn("required expert review", gate["detail"])
 
     def test_build_expert_review_packet_cli_writes_markdown(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -160,6 +212,13 @@ class ExpertReviewTests(unittest.TestCase):
                 "top_factor_1_contribution": [3.0, 4.0],
                 "risk_flags": ["", ""],
                 "amount_20d": [100_000_000, 80_000_000],
+                "turnover_20d": [0.03, 0.02],
+                "industry": ["医药", "电力设备"],
+                "limit_up": [False, False],
+                "limit_down": [False, True],
+                "suspended": [False, False],
+                "abnormal_event": ["", "earnings_warning"],
+                "announcement_flag": [False, True],
             }
         )
 

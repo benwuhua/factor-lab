@@ -24,7 +24,9 @@ expert_review:
     - read-only
     - "-"
   timeout_sec: 600
-  required: false
+  required: true
+  caution_action: scale
+  caution_weight_multiplier: 0.5
 
 batch:
   max_days: 30

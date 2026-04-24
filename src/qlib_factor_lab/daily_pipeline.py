@@ -13,6 +13,7 @@ import pandas as pd
 from .config import load_project_config, load_yaml
 from .data_quality import check_signal_quality, load_data_quality_config, write_quality_report
 from .expert_review import (
+    apply_expert_review_portfolio_gate,
     build_expert_review_packet,
     load_expert_review_run_config,
     run_expert_review_command,
@@ -101,10 +102,6 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         load_portfolio_config(_resolve(root_path, inputs.portfolio_config_path)),
         current_positions=current_positions,
     )
-    portfolio_config = load_portfolio_config(_resolve(root_path, inputs.portfolio_config_path))
-    portfolio_path = write_target_portfolio(portfolio, run_dir / "target_portfolio.csv")
-    portfolio_summary_path = write_portfolio_summary(portfolio, run_dir / "target_portfolio_summary.md")
-    artifacts.update({"target_portfolio": str(portfolio_path), "target_portfolio_summary": str(portfolio_summary_path)})
 
     diagnostics = _load_factor_diagnostics(root_path, run_date)
     expert_review_path = run_dir / "expert_review_packet.md"
@@ -112,13 +109,38 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     expert_review_path.write_text(expert_review_packet, encoding="utf-8")
     artifacts["expert_review_packet"] = str(expert_review_path)
     execution_config = load_yaml(_resolve(root_path, inputs.execution_config_path))
+    expert_review_config = load_expert_review_run_config(execution_config)
     expert_review = run_expert_review_command(
         expert_review_packet,
-        load_expert_review_run_config(execution_config),
+        expert_review_config,
         cwd=root_path,
     )
     expert_review_result_path = write_expert_review_result(expert_review, run_dir / "expert_review_result.md")
     artifacts["expert_review_result"] = str(expert_review_result_path)
+    portfolio, expert_review_gate = apply_expert_review_portfolio_gate(
+        portfolio,
+        decision=expert_review.decision,
+        review_status=expert_review.status,
+        review_required=expert_review_config.required,
+        caution_action=expert_review_config.caution_action,
+        caution_weight_multiplier=expert_review_config.caution_weight_multiplier,
+    )
+    portfolio_path = write_target_portfolio(portfolio, run_dir / "target_portfolio.csv")
+    portfolio_summary_path = write_portfolio_summary(portfolio, run_dir / "target_portfolio_summary.md")
+    artifacts.update({"target_portfolio": str(portfolio_path), "target_portfolio_summary": str(portfolio_summary_path)})
+    if expert_review_gate["status"] in {"blocked", "manual_confirmation_required"}:
+        manifest_path = _write_manifest(
+            root_path,
+            run_dir,
+            run_date,
+            "expert_review_blocked",
+            False,
+            artifacts,
+            inputs,
+            expert_review=expert_review.to_manifest(),
+            expert_review_gate=expert_review_gate,
+        )
+        return DailyPipelineResult(run_date, run_dir, "expert_review_blocked", False, manifest_path, artifacts)
 
     risk_report = check_portfolio_risk(
         portfolio,
@@ -138,6 +160,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             artifacts,
             inputs,
             expert_review=expert_review.to_manifest(),
+            expert_review_gate=expert_review_gate,
         )
         return DailyPipelineResult(run_date, run_dir, "risk_failed", False, manifest_path, artifacts)
 
@@ -167,6 +190,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         artifacts,
         inputs,
         expert_review=expert_review.to_manifest(),
+        expert_review_gate=expert_review_gate,
     )
     return DailyPipelineResult(run_date, run_dir, "pass", True, manifest_path, artifacts)
 
@@ -230,6 +254,7 @@ def _write_manifest(
     artifacts: dict[str, str],
     inputs: DailyPipelineInputs,
     expert_review: dict[str, str] | None = None,
+    expert_review_gate: dict[str, str] | None = None,
 ) -> Path:
     payload = {
         "run_date": run_date,
@@ -248,6 +273,7 @@ def _write_manifest(
         },
         "artifacts": artifacts,
         "expert_review": expert_review or {"status": "not_run", "decision": "not_run", "error": ""},
+        "expert_review_gate": expert_review_gate or {"status": "not_run", "action": "none", "decision": "not_run", "detail": ""},
     }
     path = run_dir / "manifest.json"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
