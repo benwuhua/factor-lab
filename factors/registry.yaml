@@ -64,3 +64,23 @@ factors:
     direction: 1
     category: autoresearch_divergence
     description: "Promoted autoresearch factor: 20 day divergence between high-normalized price strength and normalized traded amount."
+  - name: quiet_close_range_divergence_20_v1
+    expression: "0 - Corr($close / Mean($close, 20), $high / $low - 1, 20)"
+    direction: 1
+    category: autoresearch_divergence
+    description: "Promoted autoresearch factor: quiet close-strength versus intraday range divergence, intended to capture calm accumulation."
+  - name: intraday_volatility_skew_20_v1
+    expression: "Std($high / $open, 20) - Std($open / $low, 20)"
+    direction: -1
+    category: autoresearch_volatility
+    description: "Promoted autoresearch factor: difference between upside and downside intraday excursion volatility over 20 days."
+  - name: two_sided_excursion_convergence_20_v1
+    expression: "Corr(($high - $open) / ($open + 1e-12), ($open - $low) / ($open + 1e-12), 20)"
+    direction: -1
+    category: autoresearch_volatility
+    description: "Promoted autoresearch factor: 20 day convergence between upside and downside intraday excursions around the open."
+  - name: open_norm_selling_pressure_reversal_20_60_v1
+    expression: "Mean(($open - $close) / $open, 20) + Mean(($open - $close) / $open, 60)"
+    direction: 1
+    category: autoresearch_reversal
+    description: "Promoted autoresearch factor: blended 20 and 60 day open-normalized intraday selling-pressure reversal."

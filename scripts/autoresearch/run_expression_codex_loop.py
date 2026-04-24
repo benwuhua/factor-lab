@@ -16,6 +16,7 @@ add_src_to_path()
 from qlib_factor_lab.autoresearch.codex_loop import (
     DEFAULT_ALLOWED_FAMILIES,
     parse_until_deadline,
+    resolve_max_iterations,
     run_codex_autoloop,
 )
 
@@ -23,7 +24,12 @@ from qlib_factor_lab.autoresearch.codex_loop import (
 def main() -> int:
     root = project_root()
     parser = argparse.ArgumentParser(description="Run overnight expression autoresearch through Codex CLI.")
-    parser.add_argument("--max-iterations", type=int, default=30)
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=None,
+        help="Maximum iterations. Omit or set 0 to run until the time/hour stop condition.",
+    )
     parser.add_argument("--max-hours", type=float, default=None)
     parser.add_argument("--until", default=None, help='Stop at HH:MM or "YYYY-MM-DD HH:MM" in --timezone.')
     parser.add_argument("--timezone", default="Asia/Shanghai")
@@ -46,9 +52,14 @@ def main() -> int:
     args = parser.parse_args()
 
     deadline = parse_until_deadline(args.until, timezone=args.timezone)
+    max_iterations = resolve_max_iterations(
+        max_iterations=args.max_iterations,
+        has_deadline=deadline is not None,
+        max_hours=args.max_hours,
+    )
     result = run_codex_autoloop(
         root=root,
-        max_iterations=args.max_iterations,
+        max_iterations=max_iterations,
         max_crashes=args.max_crashes,
         deadline=deadline,
         max_hours=args.max_hours,

@@ -41,6 +41,19 @@ def parse_until_deadline(value: str | None, now: datetime | None = None, timezon
     return deadline
 
 
+def resolve_max_iterations(
+    max_iterations: int | None,
+    has_deadline: bool,
+    max_hours: float | None,
+    safe_default: int = 30,
+) -> int | None:
+    if max_iterations is not None:
+        return None if max_iterations <= 0 else max_iterations
+    if has_deadline or max_hours is not None:
+        return None
+    return safe_default
+
+
 def build_codex_command(
     root: Path,
     prompt: str,
@@ -124,7 +137,7 @@ def is_protected_branch(branch: str) -> bool:
 
 def run_codex_autoloop(
     root: Path,
-    max_iterations: int,
+    max_iterations: int | None,
     max_crashes: int,
     deadline: datetime | None,
     max_hours: float | None,
@@ -148,11 +161,16 @@ def run_codex_autoloop(
     iterations_started = 0
     crash_count = 0
     stop_reason = "max_iterations"
-    for iteration in range(1, max_iterations + 1):
+    iteration = 0
+    while True:
         if final_deadline is not None and datetime.now(final_deadline.tzinfo) >= final_deadline:
             stop_reason = "deadline"
             break
+        if max_iterations is not None and iteration >= max_iterations:
+            stop_reason = "max_iterations"
+            break
         _assert_clean_start(root)
+        iteration += 1
         iterations_started += 1
         iteration_dir = log_dir / f"iteration_{iteration:03d}"
         iteration_dir.mkdir(parents=True, exist_ok=True)
@@ -210,8 +228,6 @@ def run_codex_autoloop(
             break
         if sleep_sec > 0:
             time.sleep(sleep_sec)
-    else:
-        stop_reason = "max_iterations"
 
     (log_dir / "summary.txt").write_text(
         "\n".join(

@@ -9,6 +9,7 @@ from qlib_factor_lab.autoresearch.codex_loop import (
     find_disallowed_changes,
     is_protected_branch,
     parse_until_deadline,
+    resolve_max_iterations,
 )
 
 
@@ -33,6 +34,16 @@ class AutoresearchCodexLoopTests(unittest.TestCase):
         deadline = parse_until_deadline("2026-04-23 08:30", now=now, timezone="Asia/Shanghai")
 
         self.assertEqual(deadline.isoformat(), "2026-04-23T08:30:00+08:00")
+
+    def test_resolve_max_iterations_keeps_unbounded_when_deadline_present(self):
+        resolved = resolve_max_iterations(max_iterations=None, has_deadline=True, max_hours=None)
+
+        self.assertIsNone(resolved)
+
+    def test_resolve_max_iterations_uses_safe_default_without_stop_condition(self):
+        resolved = resolve_max_iterations(max_iterations=None, has_deadline=False, max_hours=None)
+
+        self.assertEqual(resolved, 30)
 
     def test_find_disallowed_changes_allows_only_candidate_file(self):
         changed = [

@@ -1,9 +1,9 @@
 registry_path: factors/registry.yaml
-approval_date: "2026-04-23"
-generated_at: "2026-04-23T00:00:00"
+approval_date: "2026-04-24"
+generated_at: "2026-04-24T00:00:00"
 output:
   approved_factors: reports/approved_factors.yaml
-  review_markdown: reports/factor_review_2026-04-23.md
+  review_markdown: reports/factor_review_2026-04-24.md
 redundancy:
   similarity_threshold: 0.35
 approved_factors:
@@ -107,3 +107,83 @@ approved_factors:
       csi500_sideways_regime_neutral_rank_ic_h20: 0.03696
       csi500_up_regime_neutral_rank_ic_h20: 0.01696
     review_notes: "Amount-based reserve variant. Keep for comparison against volume-based divergence but do not treat as an independent core signal yet."
+  - name: quiet_close_range_divergence_20_v1
+    family: quiet_range_divergence
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: all_weather
+    turnover_profile: medium
+    approval_status: challenger
+    evidence_paths:
+      - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.036312667846555506
+      csi300_neutral_rank_ic_h20: 0.03288805892867441
+      weakest_year: 2023
+      weakest_year_neutral_rank_ic_h20: -0.00828357125518618
+      csi500_top_quantile_turnover_h20: 0.1672571694750482
+      csi500_down_regime_neutral_rank_ic_h20: 0.04495563553707281
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.0359980432125377
+      csi500_up_regime_neutral_rank_ic_h20: 0.032109723122114804
+    review_notes: "Quiet accumulation style divergence candidate. Unlike the earlier price-volume divergence family, this signal stays usable through the 2023 weak patch and remains positive across down, sideways, and up regime cuts."
+  - name: intraday_volatility_skew_20_v1
+    family: intraday_excursion_volatility
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: all_weather
+    turnover_profile: medium
+    approval_status: core
+    evidence_paths:
+      - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.03369708374018693
+      csi300_neutral_rank_ic_h20: 0.02830868670059498
+      weakest_year: 2023
+      weakest_year_neutral_rank_ic_h20: 0.005888161879946356
+      csi500_top_quantile_turnover_h20: 0.14185724718785664
+      csi500_down_regime_neutral_rank_ic_h20: 0.05942261549579774
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.024661410502646735
+      csi500_up_regime_neutral_rank_ic_h20: 0.032597292437098566
+    review_notes: "Core representative for the intraday excursion volatility family. It is the cleanest new all-weather signal from the overnight batch, with positive yearly diagnostics even in its weakest csi500 year."
+  - name: two_sided_excursion_convergence_20_v1
+    family: intraday_excursion_volatility
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: all_weather
+    turnover_profile: medium
+    approval_status: challenger
+    evidence_paths:
+      - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.03427018315358846
+      csi300_neutral_rank_ic_h20: 0.02833403584673747
+      weakest_year: 2021
+      weakest_year_neutral_rank_ic_h20: -0.015022801196639344
+      csi500_top_quantile_turnover_h20: 0.17250608459886627
+      csi500_down_regime_neutral_rank_ic_h20: 0.039322840163119585
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.03362032206573197
+      csi500_up_regime_neutral_rank_ic_h20: 0.03226781079396152
+    review_notes: "Challenger for the intraday excursion volatility family. It adds a distinct two-sided instability signature around the open, with solid cross-universe stability but a weaker 2021 cut than the core skew variant."
+  - name: open_norm_selling_pressure_reversal_20_60_v1
+    family: selling_pressure_reversal
+    type: cross_sectional
+    primary_horizon: 20
+    supported_universes: [csi500_current, csi300_current]
+    regime_profile: down_sideways
+    turnover_profile: medium
+    approval_status: reserve
+    evidence_paths:
+      - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
+    evidence:
+      csi500_neutral_rank_ic_h20: 0.036176719699782214
+      csi300_neutral_rank_ic_h20: 0.021798910545965125
+      weakest_year: 2026
+      weakest_year_neutral_rank_ic_h20: -0.01343097453199281
+      csi500_top_quantile_turnover_h20: 0.15174655284465546
+      csi500_down_regime_neutral_rank_ic_h20: 0.08645944445911043
+      csi500_sideways_regime_neutral_rank_ic_h20: 0.022338361718636564
+      csi500_up_regime_neutral_rank_ic_h20: 0.028851403555123698
+    review_notes: "Reserve representative for selling-pressure reversal. The signal is strong enough to keep, but its cross-universe robustness is weaker and its weakest csi500 cut is a short 2026 partial sample, so it should stay regime-gated."

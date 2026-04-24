@@ -105,11 +105,19 @@ class FactorSelectionTests(unittest.TestCase):
 
         result = build_factor_selection(config, root=root)
 
-        self.assertEqual(len(result.approved_factors), 5)
+        self.assertEqual(len(result.approved_factors), 9)
         statuses = {factor.name: factor.approval_status for factor in result.approved_factors}
         self.assertEqual(statuses["high_mean60_discount_volume_divergence_reversal_20_60_v1"], "core")
+        self.assertEqual(statuses["intraday_volatility_skew_20_v1"], "core")
+        self.assertEqual(statuses["quiet_close_range_divergence_20_v1"], "challenger")
+        self.assertEqual(statuses["two_sided_excursion_convergence_20_v1"], "challenger")
+        self.assertEqual(statuses["open_norm_selling_pressure_reversal_20_60_v1"], "reserve")
         self.assertIn("challenger", set(statuses.values()))
-        self.assertTrue(all(factor.regime_profile == "down_sideways" for factor in result.approved_factors))
+        regimes = {factor.name: factor.regime_profile for factor in result.approved_factors}
+        self.assertEqual(regimes["intraday_volatility_skew_20_v1"], "all_weather")
+        self.assertEqual(regimes["quiet_close_range_divergence_20_v1"], "all_weather")
+        self.assertEqual(regimes["two_sided_excursion_convergence_20_v1"], "all_weather")
+        self.assertEqual(regimes["open_norm_selling_pressure_reversal_20_60_v1"], "down_sideways")
 
     def _write_fixture(self, root: Path, missing_evidence: bool = False):
         registry_path = root / "factors/registry.yaml"
