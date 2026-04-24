@@ -257,11 +257,13 @@ def _enrich_signal_with_event_risk(
     artifacts["event_risk_snapshot"] = str(snapshot_path)
 
     snapshot_value_columns = [column for column in EVENT_RISK_SNAPSHOT_COLUMNS if column not in {"date", "instrument"}]
-    enriched_signal = enriched_signal.drop(
-        columns=[column for column in snapshot_value_columns if column in enriched_signal.columns],
-        errors="ignore",
-    )
-    return enriched_signal.merge(snapshot, on=["date", "instrument"], how="left")
+    enriched_signal = enriched_signal.reset_index(drop=True)
+    snapshot = snapshot.reset_index(drop=True)
+    if len(enriched_signal) != len(snapshot):
+        raise ValueError("event risk snapshot row count must match signal row count")
+    for column in snapshot_value_columns:
+        enriched_signal[column] = snapshot[column]
+    return enriched_signal
 
 
 def _copy_configs(root: Path, run_dir: Path, inputs: DailyPipelineInputs, artifacts: dict[str, str]) -> None:

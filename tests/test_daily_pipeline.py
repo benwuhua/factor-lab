@@ -310,6 +310,52 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertEqual(aaa["industry_sw"], "Pharma")
             self.assertIn("earnings_watch", aaa["event_risk_summary"])
 
+    def test_daily_pipeline_event_risk_enrichment_preserves_duplicate_signal_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            self._write_event_risk_fixture(root, severity="watch", event_type="earnings_watch")
+            exposures_path = root / "data/exposures.csv"
+            exposures = pd.read_csv(exposures_path)
+            exposures = pd.concat([exposures, exposures.iloc[[2]]], ignore_index=True)
+            exposures.to_csv(exposures_path, index=False)
+            original_row_count = len(exposures)
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--event-risk-config",
+                    "configs/event_risk.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            run_dir = root / "runs/20260423"
+            signals = pd.read_csv(run_dir / "signals.csv")
+            event_snapshot = pd.read_csv(run_dir / "event_risk_snapshot.csv")
+            self.assertEqual(len(signals), original_row_count)
+            self.assertEqual(len(event_snapshot), original_row_count)
+
     def test_daily_pipeline_stops_before_orders_when_event_risk_blocks_selected_name(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
