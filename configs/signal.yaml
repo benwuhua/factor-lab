@@ -8,7 +8,8 @@ weights:
   approval_status:
     core: 1.0
     challenger: 0.5
-    reserve: 0.25
+    reserve: 0.0
+    shadow: 0.0
     regime_only: 0.25
   regime:
     down_sideways:
@@ -22,6 +23,14 @@ weights:
   ensemble:
     rule_score: 1.0
     model_score: 0.0
+
+combination:
+  mode: family_first
+  family_weights:
+    divergence_weak_reversal: 1.0
+    quiet_range_divergence: 1.0
+    intraday_excursion_volatility: 1.0
+    selling_pressure_reversal: 1.0
 
 output:
   signals: reports/signals_{run_yyyymmdd}.csv

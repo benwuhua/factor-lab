@@ -48,6 +48,7 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertTrue((run_dir / "signal_summary.md").exists())
             self.assertTrue((run_dir / "target_portfolio.csv").exists())
             self.assertTrue((run_dir / "target_portfolio_summary.md").exists())
+            self.assertTrue((run_dir / "expert_review_packet.md").exists())
             self.assertTrue((run_dir / "risk_report.md").exists())
             self.assertTrue((run_dir / "orders.csv").exists())
             self.assertTrue((run_dir / "fills.csv").exists())
@@ -58,6 +59,7 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "pass")
             self.assertTrue(manifest["risk_passed"])
             self.assertIn("signals", manifest["artifacts"])
+            self.assertIn("expert_review_packet", manifest["artifacts"])
             self.assertIn("orders", manifest["artifacts"])
             self.assertIn("wrote:", result.stdout)
 
@@ -97,6 +99,7 @@ class DailyPipelineTests(unittest.TestCase):
             run_dir = root / "runs/20260423"
             self.assertTrue((run_dir / "signals.csv").exists())
             self.assertTrue((run_dir / "target_portfolio.csv").exists())
+            self.assertTrue((run_dir / "expert_review_packet.md").exists())
             self.assertTrue((run_dir / "risk_report.md").exists())
             self.assertFalse((run_dir / "orders.csv").exists())
             self.assertFalse((run_dir / "fills.csv").exists())

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,8 @@ class SignalConfig:
     signals_output_path: Path
     summary_output_path: Path
     execution_calendar_path: Path | None = None
+    combination_mode: str = "factor_sum"
+    family_weights: dict[str, float] = field(default_factory=dict)
 
 
 def load_signal_config(path: str | Path) -> SignalConfig:
@@ -52,6 +54,8 @@ def load_signal_config(path: str | Path) -> SignalConfig:
             str(profile): {str(regime): float(value) for regime, value in mapping.items()}
             for profile, mapping in weights.get("regime", {}).items()
         },
+        combination_mode=str(data.get("combination", {}).get("mode", "factor_sum")),
+        family_weights={str(k): float(v) for k, v in data.get("combination", {}).get("family_weights", {}).items()},
         rule_weight=float(ensemble.get("rule_score", 1.0)),
         model_weight=float(ensemble.get("model_score", 0.0)),
         signals_output_path=Path(output.get("signals", "reports/signals_latest.csv")),
@@ -100,6 +104,7 @@ def build_daily_signal(
     frame["model_score"] = frame["model_score"].astype(float) if "model_score" in frame.columns else 0.0
 
     contribution_cols: list[str] = []
+    active_family_cols: dict[str, list[str]] = {}
     active_factor_count = 0
     for factor in factors:
         if factor.name not in frame.columns:
@@ -107,13 +112,21 @@ def build_daily_signal(
             contribution_cols.append(f"{factor.name}_contribution")
             continue
         multiplier = factor_weight(factor, config)
+        contribution_col = f"{factor.name}_contribution"
         if multiplier != 0:
             active_factor_count += 1
-        contribution_col = f"{factor.name}_contribution"
+            active_family_cols.setdefault(factor.family or factor.name, []).append(contribution_col)
         frame[contribution_col] = _zscore(frame[factor.name].astype(float) * factor.direction) * multiplier
         contribution_cols.append(contribution_col)
 
-    if contribution_cols:
+    family_score_cols: list[str] = []
+    if config.combination_mode == "family_first":
+        for family, cols in active_family_cols.items():
+            family_col = f"family_{_slug(family)}_score"
+            frame[family_col] = frame[cols].mean(axis=1) * config.family_weights.get(family, 1.0)
+            family_score_cols.append(family_col)
+        frame["rule_score"] = frame[family_score_cols].sum(axis=1) if family_score_cols else 0.0
+    elif contribution_cols:
         frame["rule_score"] = frame[contribution_cols].sum(axis=1)
     else:
         frame["rule_score"] = 0.0
@@ -137,6 +150,7 @@ def build_daily_signal(
         "top_factor_2",
         "top_factor_2_contribution",
         "risk_flags",
+        *family_score_cols,
         *contribution_cols,
     ]
     return frame.loc[:, output_cols].sort_values("ensemble_score", ascending=False).reset_index(drop=True)
@@ -337,6 +351,10 @@ def _passthrough_columns(frame: pd.DataFrame) -> list[str]:
         "sell_blocked",
     ]
     return [column for column in candidates if column in frame.columns]
+
+
+def _slug(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in str(value)).strip("_").lower() or "unknown"
 
 
 def _bool_value(value: Any) -> bool:

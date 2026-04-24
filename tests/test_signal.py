@@ -96,6 +96,38 @@ class SignalTests(unittest.TestCase):
             self.assertTrue((signal["ensemble_score"] == 0.0).all())
             self.assertEqual(signal.loc[0, "risk_flags"], "regime_gated")
 
+    def test_build_daily_signal_can_combine_by_family_and_shadow_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved_path, config_path = self._write_fixture(root)
+            config_data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            config_data["weights"]["approval_status"]["shadow"] = 0.0
+            config_data["combination"] = {"mode": "family_first"}
+            config_path.write_text(yaml.safe_dump(config_data, sort_keys=False), encoding="utf-8")
+            approved_data = yaml.safe_load(approved_path.read_text(encoding="utf-8"))
+            approved_data["approved_factors"].append(
+                {
+                    "name": "shadow_alpha",
+                    "expression": "$amount",
+                    "direction": 1,
+                    "family": "test_family",
+                    "approval_status": "shadow",
+                    "regime_profile": "down_sideways",
+                }
+            )
+            approved_path.write_text(yaml.safe_dump(approved_data, sort_keys=False), encoding="utf-8")
+            exposures = self._exposures()
+            exposures["shadow_alpha"] = [300.0, 200.0, 100.0]
+
+            signal = build_daily_signal(exposures, load_approved_signal_factors(approved_path), load_signal_config(config_path))
+
+            first = signal.loc[signal["instrument"] == "AAA"].iloc[0]
+            self.assertAlmostEqual(first["core_alpha_contribution"], 1.0)
+            self.assertAlmostEqual(first["challenger_alpha_contribution"], 0.5)
+            self.assertAlmostEqual(first["shadow_alpha_contribution"], 0.0)
+            self.assertAlmostEqual(first["family_test_family_score"], 0.75)
+            self.assertAlmostEqual(first["rule_score"], 0.75)
+
     def test_build_daily_signal_cli_writes_csv_and_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

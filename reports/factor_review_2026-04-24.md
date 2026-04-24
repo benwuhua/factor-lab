@@ -13,9 +13,9 @@
 | `normalized_price_volume_divergence_20_v1` | reserve | divergence_weak_reversal | down_sideways | csi500_current,csi300_current | 0.03195 | 0.04076 | 2023 | F001 |
 | `high_norm_price_amount_divergence_20_v1` | reserve | divergence_weak_reversal | down_sideways | csi500_current,csi300_current | 0.03003 | 0.03926 | 2023 | F001 |
 | `quiet_close_range_divergence_20_v1` | challenger | quiet_range_divergence | all_weather | csi500_current,csi300_current | 0.03631 | 0.03289 | 2023 | F002 |
-| `intraday_volatility_skew_20_v1` | core | intraday_excursion_volatility | all_weather | csi500_current,csi300_current | 0.03370 | 0.02831 | 2023 | F003 |
+| `intraday_volatility_skew_20_v1` | shadow | intraday_excursion_volatility | all_weather | csi500_current,csi300_current | 0.03370 | 0.02831 | 2023 | F003 |
 | `two_sided_excursion_convergence_20_v1` | challenger | intraday_excursion_volatility | all_weather | csi500_current,csi300_current | 0.03427 | 0.02833 | 2021 | F003 |
-| `open_norm_selling_pressure_reversal_20_60_v1` | reserve | selling_pressure_reversal | down_sideways | csi500_current,csi300_current | 0.03618 | 0.02180 | 2026 | F004 |
+| `open_norm_selling_pressure_reversal_20_60_v1` | shadow | selling_pressure_reversal | down_sideways | csi500_current,csi300_current | 0.03618 | 0.02180 | 2026 | F004 |
 
 ## Redundancy Groups
 
@@ -57,7 +57,7 @@ Quiet accumulation style divergence candidate. Unlike the earlier price-volume d
 
 ### intraday_volatility_skew_20_v1
 
-Core representative for the intraday excursion volatility family. It is the cleanest new all-weather signal from the overnight batch, with positive yearly diagnostics even in its weakest csi500 year.
+Shadow representative for the intraday excursion volatility family. The factor keeps acceptable neutral Rank IC evidence, but the 2026-04-24 single-factor diagnostic shows negative size-neutral long-short return, so it should be monitored but excluded from the main daily score until the payoff profile improves.
 
 ### two_sided_excursion_convergence_20_v1
 
@@ -65,4 +65,4 @@ Challenger for the intraday excursion volatility family. It adds a distinct two-
 
 ### open_norm_selling_pressure_reversal_20_60_v1
 
-Reserve representative for selling-pressure reversal. The signal is strong enough to keep, but its cross-universe robustness is weaker and its weakest csi500 cut is a short 2026 partial sample, so it should stay regime-gated.
+Shadow representative for selling-pressure reversal. The signal is strong enough to keep under observation, but the 2026-04-24 single-factor diagnostic shows negative size-neutral long-short return, so it should not influence the main daily score yet.

@@ -195,7 +195,7 @@ approved_factors:
   - csi300_current
   regime_profile: all_weather
   turnover_profile: medium
-  approval_status: core
+  approval_status: shadow
   approval_date: '2026-04-24'
   evidence_paths:
   - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
@@ -211,9 +211,10 @@ approved_factors:
   redundancy_group: F003
   redundancy_representative: intraday_volatility_skew_20_v1
   similarity_to_representative: 1.0
-  review_notes: Core representative for the intraday excursion volatility family.
-    It is the cleanest new all-weather signal from the overnight batch, with positive
-    yearly diagnostics even in its weakest csi500 year.
+  review_notes: Shadow representative for the intraday excursion volatility family.
+    The factor keeps acceptable neutral Rank IC evidence, but the 2026-04-24 single-factor
+    diagnostic shows negative size-neutral long-short return, so it should be monitored
+    but excluded from the main daily score until the payoff profile improves.
 - name: two_sided_excursion_convergence_20_v1
   expression: Corr(($high - $open) / ($open + 1e-12), ($open - $low) / ($open + 1e-12),
     20)
@@ -259,7 +260,7 @@ approved_factors:
   - csi300_current
   regime_profile: down_sideways
   turnover_profile: medium
-  approval_status: reserve
+  approval_status: shadow
   approval_date: '2026-04-24'
   evidence_paths:
   - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
@@ -275,9 +276,10 @@ approved_factors:
   redundancy_group: F004
   redundancy_representative: open_norm_selling_pressure_reversal_20_60_v1
   similarity_to_representative: 1.0
-  review_notes: Reserve representative for selling-pressure reversal. The signal is
-    strong enough to keep, but its cross-universe robustness is weaker and its weakest
-    csi500 cut is a short 2026 partial sample, so it should stay regime-gated.
+  review_notes: Shadow representative for selling-pressure reversal. The signal is
+    strong enough to keep under observation, but the 2026-04-24 single-factor diagnostic
+    shows negative size-neutral long-short return, so it should not influence the
+    main daily score yet.
 redundancy:
 - group: F001
   name: high_mean60_discount_volume_divergence_reversal_20_60_v1
@@ -320,7 +322,7 @@ redundancy:
   representative: intraday_volatility_skew_20_v1
   similarity_to_representative: 1.0
   family: intraday_excursion_volatility
-  approval_status: core
+  approval_status: shadow
 - group: F003
   name: two_sided_excursion_convergence_20_v1
   representative: intraday_volatility_skew_20_v1
@@ -332,4 +334,4 @@ redundancy:
   representative: open_norm_selling_pressure_reversal_20_60_v1
   similarity_to_representative: 1.0
   family: selling_pressure_reversal
-  approval_status: reserve
+  approval_status: shadow

@@ -108,10 +108,10 @@ class FactorSelectionTests(unittest.TestCase):
         self.assertEqual(len(result.approved_factors), 9)
         statuses = {factor.name: factor.approval_status for factor in result.approved_factors}
         self.assertEqual(statuses["high_mean60_discount_volume_divergence_reversal_20_60_v1"], "core")
-        self.assertEqual(statuses["intraday_volatility_skew_20_v1"], "core")
+        self.assertEqual(statuses["intraday_volatility_skew_20_v1"], "shadow")
         self.assertEqual(statuses["quiet_close_range_divergence_20_v1"], "challenger")
         self.assertEqual(statuses["two_sided_excursion_convergence_20_v1"], "challenger")
-        self.assertEqual(statuses["open_norm_selling_pressure_reversal_20_60_v1"], "reserve")
+        self.assertEqual(statuses["open_norm_selling_pressure_reversal_20_60_v1"], "shadow")
         self.assertIn("challenger", set(statuses.values()))
         regimes = {factor.name: factor.regime_profile for factor in result.approved_factors}
         self.assertEqual(regimes["intraday_volatility_skew_20_v1"], "all_weather")

@@ -12,6 +12,7 @@ import pandas as pd
 
 from .config import load_project_config, load_yaml
 from .data_quality import check_signal_quality, load_data_quality_config, write_quality_report
+from .expert_review import build_expert_review_packet
 from .orders import build_order_suggestions, load_order_config, write_orders
 from .paper_broker import load_paper_fill_config, simulate_paper_fills, write_fills
 from .portfolio import build_target_portfolio, load_portfolio_config, write_portfolio_summary, write_target_portfolio
@@ -100,6 +101,14 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     portfolio_summary_path = write_portfolio_summary(portfolio, run_dir / "target_portfolio_summary.md")
     artifacts.update({"target_portfolio": str(portfolio_path), "target_portfolio_summary": str(portfolio_summary_path)})
 
+    diagnostics = _load_factor_diagnostics(root_path, run_date)
+    expert_review_path = run_dir / "expert_review_packet.md"
+    expert_review_path.write_text(
+        build_expert_review_packet(portfolio, diagnostics, run_date=run_date),
+        encoding="utf-8",
+    )
+    artifacts["expert_review_packet"] = str(expert_review_path)
+
     risk_report = check_portfolio_risk(
         portfolio,
         tradable_signal,
@@ -148,6 +157,18 @@ def _load_current_positions(root: Path, current_positions_csv: Path | None) -> p
     if not path.exists():
         return pd.DataFrame(columns=columns)
     return pd.read_csv(path)
+
+
+def _load_factor_diagnostics(root: Path, run_date: str) -> pd.DataFrame | None:
+    candidates = [
+        root / "reports" / f"single_factor_diagnostics_{run_date.replace('-', '')}.csv",
+        root / "reports" / f"single_factor_diagnostics_{run_date}.csv",
+        root / "reports" / "single_factor_diagnostics.csv",
+    ]
+    for path in candidates:
+        if path.exists():
+            return pd.read_csv(path)
+    return None
 
 
 def _copy_configs(root: Path, run_dir: Path, inputs: DailyPipelineInputs, artifacts: dict[str, str]) -> None:

@@ -134,7 +134,7 @@ approved_factors:
     supported_universes: [csi500_current, csi300_current]
     regime_profile: all_weather
     turnover_profile: medium
-    approval_status: core
+    approval_status: shadow
     evidence_paths:
       - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
     evidence:
@@ -146,7 +146,7 @@ approved_factors:
       csi500_down_regime_neutral_rank_ic_h20: 0.05942261549579774
       csi500_sideways_regime_neutral_rank_ic_h20: 0.024661410502646735
       csi500_up_regime_neutral_rank_ic_h20: 0.032597292437098566
-    review_notes: "Core representative for the intraday excursion volatility family. It is the cleanest new all-weather signal from the overnight batch, with positive yearly diagnostics even in its weakest csi500 year."
+    review_notes: "Shadow representative for the intraday excursion volatility family. The factor keeps acceptable neutral Rank IC evidence, but the 2026-04-24 single-factor diagnostic shows negative size-neutral long-short return, so it should be monitored but excluded from the main daily score until the payoff profile improves."
   - name: two_sided_excursion_convergence_20_v1
     family: intraday_excursion_volatility
     type: cross_sectional
@@ -174,7 +174,7 @@ approved_factors:
     supported_universes: [csi500_current, csi300_current]
     regime_profile: down_sideways
     turnover_profile: medium
-    approval_status: reserve
+    approval_status: shadow
     evidence_paths:
       - docs/factor_reviews/2026-04-24-autoresearch-overnight-review.md
     evidence:
@@ -186,4 +186,4 @@ approved_factors:
       csi500_down_regime_neutral_rank_ic_h20: 0.08645944445911043
       csi500_sideways_regime_neutral_rank_ic_h20: 0.022338361718636564
       csi500_up_regime_neutral_rank_ic_h20: 0.028851403555123698
-    review_notes: "Reserve representative for selling-pressure reversal. The signal is strong enough to keep, but its cross-universe robustness is weaker and its weakest csi500 cut is a short 2026 partial sample, so it should stay regime-gated."
+    review_notes: "Shadow representative for selling-pressure reversal. The signal is strong enough to keep under observation, but the 2026-04-24 single-factor diagnostic shows negative size-neutral long-short return, so it should not influence the main daily score yet."
