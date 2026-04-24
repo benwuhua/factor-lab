@@ -21,6 +21,7 @@ def main() -> int:
     parser.add_argument("--portfolio-config", default="configs/portfolio.yaml")
     parser.add_argument("--risk-config", default="configs/risk.yaml")
     parser.add_argument("--execution-config", default="configs/execution.yaml")
+    parser.add_argument("--event-risk-config", default="configs/event_risk.yaml")
     parser.add_argument("--exposures-csv", default=None, help="Optional precomputed exposures CSV.")
     parser.add_argument("--current-positions-csv", default="state/current_positions.csv")
     parser.add_argument("--run-date", default=None)
@@ -36,6 +37,7 @@ def main() -> int:
             portfolio_config_path=Path(args.portfolio_config),
             risk_config_path=Path(args.risk_config),
             execution_config_path=Path(args.execution_config),
+            event_risk_config_path=Path(args.event_risk_config) if args.event_risk_config else None,
             exposures_csv=Path(args.exposures_csv) if args.exposures_csv else None,
             current_positions_csv=Path(args.current_positions_csv) if args.current_positions_csv else None,
             run_date=args.run_date,

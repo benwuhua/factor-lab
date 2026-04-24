@@ -10,6 +10,12 @@ from typing import Any
 
 import pandas as pd
 
+from .company_events import (
+    EVENT_RISK_SNAPSHOT_COLUMNS,
+    build_event_risk_snapshot,
+    load_company_events,
+    load_event_risk_config,
+)
 from .config import load_project_config, load_yaml
 from .data_quality import check_signal_quality, load_data_quality_config, write_quality_report
 from .expert_review import (
@@ -24,6 +30,7 @@ from .paper_broker import load_paper_fill_config, simulate_paper_fills, write_fi
 from .portfolio import build_target_portfolio, load_portfolio_config, write_portfolio_summary, write_target_portfolio
 from .reconcile import load_reconcile_config, reconcile_positions, write_reconciliation_report
 from .risk import check_portfolio_risk, load_risk_config, write_risk_report
+from .security_master import enrich_with_security_master, load_security_master
 from .signal import (
     build_daily_signal,
     fetch_daily_factor_exposures,
@@ -43,6 +50,7 @@ class DailyPipelineInputs:
     portfolio_config_path: Path
     risk_config_path: Path
     execution_config_path: Path
+    event_risk_config_path: Path | None = None
     exposures_csv: Path | None = None
     current_positions_csv: Path | None = None
     run_date: str | None = None
@@ -82,6 +90,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     run_dir.mkdir(parents=True, exist_ok=True)
 
     artifacts: dict[str, str] = {}
+    signal = _enrich_signal_with_event_risk(root_path, run_dir, signal, inputs, artifacts)
     signal_path = write_daily_signal(signal, run_dir / "signals.csv")
     signal_summary_path = write_signal_summary(signal, factors, signal_config, run_dir / "signal_summary.md")
     artifacts.update({"signals": str(signal_path), "signal_summary": str(signal_summary_path)})
@@ -224,16 +233,50 @@ def _load_factor_diagnostics(root: Path, run_date: str) -> pd.DataFrame | None:
     return None
 
 
+def _enrich_signal_with_event_risk(
+    root: Path,
+    run_dir: Path,
+    signal: pd.DataFrame,
+    inputs: DailyPipelineInputs,
+    artifacts: dict[str, str],
+) -> pd.DataFrame:
+    if inputs.event_risk_config_path is None:
+        return signal
+
+    config_path = _resolve(root, inputs.event_risk_config_path)
+    if not config_path.exists():
+        return signal
+
+    event_risk_config = load_event_risk_config(config_path)
+    security_master = load_security_master(_resolve_optional(root, event_risk_config.security_master_path))
+    enriched_signal = enrich_with_security_master(signal, security_master)
+    company_events = load_company_events(_resolve_optional(root, event_risk_config.events_path))
+    snapshot = build_event_risk_snapshot(enriched_signal, company_events, event_risk_config)
+    snapshot_path = run_dir / "event_risk_snapshot.csv"
+    snapshot.to_csv(snapshot_path, index=False)
+    artifacts["event_risk_snapshot"] = str(snapshot_path)
+
+    snapshot_value_columns = [column for column in EVENT_RISK_SNAPSHOT_COLUMNS if column not in {"date", "instrument"}]
+    enriched_signal = enriched_signal.drop(
+        columns=[column for column in snapshot_value_columns if column in enriched_signal.columns],
+        errors="ignore",
+    )
+    return enriched_signal.merge(snapshot, on=["date", "instrument"], how="left")
+
+
 def _copy_configs(root: Path, run_dir: Path, inputs: DailyPipelineInputs, artifacts: dict[str, str]) -> None:
     config_dir = run_dir / "configs"
     config_dir.mkdir(parents=True, exist_ok=True)
-    for name, path in [
+    config_paths = [
         ("signal_config", inputs.signal_config_path),
         ("trading_config", inputs.trading_config_path),
         ("portfolio_config", inputs.portfolio_config_path),
         ("risk_config", inputs.risk_config_path),
         ("execution_config", inputs.execution_config_path),
-    ]:
+    ]
+    if inputs.event_risk_config_path is not None:
+        config_paths.append(("event_risk_config", inputs.event_risk_config_path))
+    for name, path in config_paths:
         _copy_if_exists(_resolve(root, path), config_dir / Path(path).name, artifacts, name)
 
 
@@ -268,6 +311,7 @@ def _write_manifest(
             "portfolio_config": str(inputs.portfolio_config_path),
             "risk_config": str(inputs.risk_config_path),
             "execution_config": str(inputs.execution_config_path),
+            "event_risk_config": str(inputs.event_risk_config_path) if inputs.event_risk_config_path else None,
             "exposures_csv": str(inputs.exposures_csv) if inputs.exposures_csv else None,
             "current_positions_csv": str(inputs.current_positions_csv) if inputs.current_positions_csv else None,
         },
@@ -296,3 +340,9 @@ def _resolve(root: Path, path: str | Path) -> Path:
     if candidate.is_absolute():
         return candidate
     return root / candidate
+
+
+def _resolve_optional(root: Path, path: str | Path | None) -> Path | None:
+    if path is None:
+        return None
+    return _resolve(root, path)

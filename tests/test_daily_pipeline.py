@@ -263,6 +263,98 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "expert_review_blocked")
             self.assertEqual(manifest["expert_review_gate"]["status"], "blocked")
 
+    def test_daily_pipeline_writes_event_risk_snapshot_and_enriches_portfolio(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            self._write_event_risk_fixture(root, severity="watch", event_type="earnings_watch")
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--event-risk-config",
+                    "configs/event_risk.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run_dir = root / "runs/20260423"
+            self.assertTrue((run_dir / "event_risk_snapshot.csv").exists())
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertIn("event_risk_snapshot", manifest["artifacts"])
+            portfolio = pd.read_csv(run_dir / "target_portfolio.csv")
+            self.assertIn("industry_sw", portfolio.columns)
+            self.assertIn("event_risk_summary", portfolio.columns)
+            aaa = portfolio[portfolio["instrument"] == "AAA"].iloc[0]
+            self.assertEqual(aaa["industry_sw"], "Pharma")
+            self.assertIn("earnings_watch", aaa["event_risk_summary"])
+
+    def test_daily_pipeline_stops_before_orders_when_event_risk_blocks_selected_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            self._write_event_risk_fixture(root, severity="block", event_type="disciplinary_action")
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--event-risk-config",
+                    "configs/event_risk.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            run_dir = root / "runs/20260423"
+            self.assertFalse((run_dir / "orders.csv").exists())
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "risk_failed")
+            self.assertFalse(manifest["risk_passed"])
+            risk_report = (run_dir / "risk_report.md").read_text(encoding="utf-8")
+            self.assertIn("event_blocked_positions", risk_report)
+            self.assertIn("AAA:", risk_report)
+
     def _write_fixture(self, root: Path, min_positions: int = 1) -> None:
         (root / "configs").mkdir(parents=True)
         (root / "reports").mkdir(parents=True)
@@ -383,6 +475,54 @@ class DailyPipelineTests(unittest.TestCase):
             root / "state/current_positions.csv",
             index=False,
         )
+
+    def _write_event_risk_fixture(self, root: Path, severity: str, event_type: str) -> None:
+        (root / "configs/event_risk.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "event_risk": {
+                        "security_master_path": "data/security_master.csv",
+                        "events_path": "data/company_events.csv",
+                        "default_lookback_days": 30,
+                        "block_event_types": ["disciplinary_action"],
+                        "block_severities": ["block"],
+                        "max_events_per_name": 3,
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        pd.DataFrame(
+            {
+                "instrument": ["AAA", "BBB", "CCC"],
+                "name": ["Alpha A", "Beta B", "Gamma C"],
+                "exchange": ["XSHG", "XSHE", "XSHG"],
+                "board": ["main", "main", "main"],
+                "industry_sw": ["Pharma", "Power Equipment", "Machinery"],
+                "industry_csrc": ["Healthcare", "Manufacturing", "Manufacturing"],
+                "is_st": [False, False, False],
+                "listing_date": ["2020-01-01", "2020-01-01", "2020-01-01"],
+                "delisting_date": ["", "", ""],
+                "valid_from": ["2020-01-01", "2020-01-01", "2020-01-01"],
+                "valid_to": ["", "", ""],
+            }
+        ).to_csv(root / "data/security_master.csv", index=False)
+        pd.DataFrame(
+            {
+                "event_id": ["evt-1"],
+                "instrument": ["AAA"],
+                "event_type": [event_type],
+                "event_date": ["2026-04-20"],
+                "source": ["exchange"],
+                "source_url": ["https://example.test/events/evt-1"],
+                "title": ["AAA event"],
+                "severity": [severity],
+                "summary": ["selected name event context"],
+                "evidence": ["fixture"],
+                "active_until": [""],
+            }
+        ).to_csv(root / "data/company_events.csv", index=False)
 
 
 if __name__ == "__main__":

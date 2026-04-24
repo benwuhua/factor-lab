@@ -66,6 +66,18 @@ def check_portfolio_risk(
 
     negative_count = int((portfolio.get("target_weight", pd.Series(dtype=float)) < 0).sum())
     rows.append(_row("no_negative_weights", negative_count == 0, negative_count, 0, ""))
+
+    blocked_detail = _event_blocked_detail(portfolio)
+    blocked_count = int(len(blocked_detail))
+    rows.append(
+        _row(
+            "event_blocked_positions",
+            blocked_count == 0,
+            blocked_count,
+            0,
+            "; ".join(blocked_detail),
+        )
+    )
     return RiskReport(tuple(rows))
 
 
@@ -109,6 +121,36 @@ def _weights_by_instrument(frame: pd.DataFrame | None, weight_col: str) -> dict[
     if frame is None or frame.empty or weight_col not in frame.columns:
         return {}
     return {str(row["instrument"]): float(row[weight_col]) for _, row in frame.iterrows()}
+
+
+def _event_blocked_detail(portfolio: pd.DataFrame) -> list[str]:
+    if portfolio.empty or "event_blocked" not in portfolio.columns:
+        return []
+
+    blocked = portfolio[portfolio["event_blocked"].map(_truthy_bool)]
+    details = []
+    for _, row in blocked.iterrows():
+        summary = _clean_event_detail(row.get("event_risk_summary"))
+        if not summary:
+            summary = _clean_event_detail(row.get("active_event_types"))
+        if not summary:
+            summary = _clean_event_detail(row.get("max_event_severity"))
+        details.append(f"{row['instrument']}: {summary}")
+    return details
+
+
+def _truthy_bool(value: Any) -> bool:
+    if pd.isna(value):
+        return False
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _clean_event_detail(value: Any) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value).strip().replace("|", "/")
 
 
 def _row(check: str, passed: bool, value: Any, threshold: Any, detail: str) -> dict[str, Any]:
