@@ -303,7 +303,12 @@ def _ledger_context(path: Path, max_lines: int = 80) -> str:
     if not path.exists():
         return ""
     lines = path.read_text(encoding="utf-8").splitlines()
-    return "\n".join(lines[-max_lines:])
+    if not lines:
+        return ""
+    header, rows = lines[0], lines[1:]
+    if not rows:
+        return header
+    return "\n".join([header, *rows[-max_lines:]])
 
 
 def _run_capture(command: list[str], cwd: Path, stdout_path: Path, stderr_path: Path) -> subprocess.CompletedProcess[str]:
