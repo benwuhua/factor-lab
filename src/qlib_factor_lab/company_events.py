@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -112,26 +113,29 @@ def _active_events_for_signal(
     if events.empty:
         return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
 
-    signal_date = pd.to_datetime(signal_row["date"])
+    signal_date = _calendar_date(signal_row["date"])
+    if signal_date is None:
+        return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
+
     matching_events = events[events["instrument"] == signal_row["instrument"]].copy()
     if matching_events.empty:
         return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
 
     active_mask = []
     for _, event_row in matching_events.iterrows():
-        event_date = pd.to_datetime(event_row.get("event_date"))
-        if pd.isna(event_date) or event_date > signal_date:
+        event_date = _calendar_date(event_row.get("event_date"))
+        if event_date is None or event_date > signal_date:
             active_mask.append(False)
             continue
 
-        active_until = _event_active_until(event_row, config)
-        active_mask.append(not pd.isna(active_until) and signal_date <= active_until)
+        active_until = _event_active_until_date(event_row, config)
+        active_mask.append(active_until is not None and signal_date <= active_until)
 
     active = matching_events.loc[active_mask].copy()
     if active.empty:
         return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
 
-    active["_event_date_sort"] = pd.to_datetime(active["event_date"])
+    active["_event_date_sort"] = active["event_date"].map(_calendar_date)
     return active.sort_values("_event_date_sort", kind="mergesort").drop(columns=["_event_date_sort"])
 
 
@@ -164,15 +168,18 @@ def _snapshot_row(
     }
 
 
-def _event_active_until(event_row: pd.Series, config: EventRiskConfig) -> pd.Timestamp:
+def _event_active_until_date(event_row: pd.Series, config: EventRiskConfig) -> date | None:
     active_until = event_row.get("active_until")
     if not _is_blank(active_until):
-        return pd.to_datetime(active_until)
+        return _calendar_date(active_until)
 
-    event_date = pd.to_datetime(event_row.get("event_date"))
+    event_date = _calendar_date(event_row.get("event_date"))
+    if event_date is None:
+        return None
+
     event_type = _clean(event_row.get("event_type"))
     lookback_days = int(config.event_type_lookbacks.get(event_type, config.default_lookback_days))
-    return event_date + pd.Timedelta(days=lookback_days)
+    return event_date + timedelta(days=lookback_days)
 
 
 def _has_blocking_event(events: pd.DataFrame, config: EventRiskConfig) -> bool:
@@ -231,6 +238,16 @@ def _optional_path(value: Any) -> Path | None:
     if _is_blank(value):
         return None
     return Path(str(value))
+
+
+def _calendar_date(value: Any) -> date | None:
+    if _is_blank(value):
+        return None
+
+    timestamp = pd.to_datetime(value, errors="coerce", utc=True)
+    if pd.isna(timestamp):
+        return None
+    return timestamp.date()
 
 
 def _clean(value: Any) -> str:

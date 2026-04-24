@@ -78,6 +78,52 @@ class CompanyEventTests(unittest.TestCase):
         self.assertNotIn("Expired inquiry", snapshot.loc[0, "event_risk_summary"])
         self.assertEqual(snapshot.loc[0, "event_source_urls"], "https://example.test/active")
 
+    def test_date_only_active_until_includes_full_calendar_day(self):
+        signal = pd.DataFrame({"date": ["2026-04-23 15:00:00"], "instrument": ["AAA"]})
+        events = pd.DataFrame(
+            {
+                "event_id": ["evt-1"],
+                "instrument": ["AAA"],
+                "event_type": ["regulatory_inquiry"],
+                "event_date": ["2026-04-01"],
+                "source": ["exchange"],
+                "source_url": ["https://example.test/date-only"],
+                "title": ["Inquiry"],
+                "severity": ["watch"],
+                "summary": ["Inquiry remains active through the end date."],
+                "evidence": ["notice"],
+                "active_until": ["2026-04-23"],
+            }
+        )
+
+        snapshot = build_event_risk_snapshot(signal, events, EventRiskConfig())
+
+        self.assertEqual(snapshot.loc[0, "event_count"], 1)
+        self.assertEqual(snapshot.loc[0, "active_event_types"], "regulatory_inquiry")
+
+    def test_timezone_event_date_compares_with_naive_signal_date(self):
+        signal = pd.DataFrame({"date": ["2026-04-23"], "instrument": ["AAA"]})
+        events = pd.DataFrame(
+            {
+                "event_id": ["evt-1"],
+                "instrument": ["AAA"],
+                "event_type": ["regulatory_inquiry"],
+                "event_date": ["2026-04-01T00:00:00Z"],
+                "source": ["exchange"],
+                "source_url": ["https://example.test/timezone"],
+                "title": ["Inquiry"],
+                "severity": ["watch"],
+                "summary": ["Timezone-stamped event remains comparable."],
+                "evidence": ["notice"],
+                "active_until": [""],
+            }
+        )
+
+        snapshot = build_event_risk_snapshot(signal, events, EventRiskConfig(default_lookback_days=30))
+
+        self.assertEqual(snapshot.loc[0, "event_count"], 1)
+        self.assertEqual(snapshot.loc[0, "active_event_types"], "regulatory_inquiry")
+
     def test_empty_events_returns_default_snapshot_rows(self):
         signal = pd.DataFrame(
             {
