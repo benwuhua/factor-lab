@@ -43,6 +43,10 @@ def enrich_with_security_master(signal: pd.DataFrame, master: pd.DataFrame) -> p
         master_row = _select_security_master_row(row, master)
         if master_row is None:
             missing.append(True)
+            for column in SECURITY_MASTER_COLUMNS:
+                if column == "instrument":
+                    continue
+                frame.at[index, column] = pd.NA
             continue
 
         missing.append(False)

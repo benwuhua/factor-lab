@@ -45,6 +45,15 @@ class SecurityMasterTests(unittest.TestCase):
         self.assertTrue(bool(enriched.loc[0, "security_master_missing"]))
         self.assertTrue(pd.isna(enriched.loc[0, "name"]))
 
+    def test_security_master_clears_stale_metadata_when_missing(self):
+        signal = pd.DataFrame({"date": ["2026-04-23"], "instrument": ["MISSING"], "name": ["stale"]})
+        master = pd.DataFrame(columns=SECURITY_MASTER_COLUMNS)
+
+        enriched = enrich_with_security_master(signal, master)
+
+        self.assertTrue(bool(enriched.loc[0, "security_master_missing"]))
+        self.assertTrue(pd.isna(enriched.loc[0, "name"]))
+
     def test_load_security_master_returns_empty_required_columns_when_path_none_or_missing(self):
         none_loaded = load_security_master(None)
 
