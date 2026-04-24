@@ -259,9 +259,12 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             run_dir = root / "runs/20260423"
             self.assertFalse((run_dir / "orders.csv").exists())
+            self.assertTrue((run_dir / "block_report.md").exists())
+            self.assertIn("expert_review_blocked", (run_dir / "block_report.md").read_text(encoding="utf-8"))
             manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["status"], "expert_review_blocked")
             self.assertEqual(manifest["expert_review_gate"]["status"], "blocked")
+            self.assertIn("block_report", manifest["artifacts"])
 
     def test_daily_pipeline_writes_event_risk_snapshot_and_enriches_portfolio(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -397,6 +400,11 @@ class DailyPipelineTests(unittest.TestCase):
             manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["status"], "risk_failed")
             self.assertFalse(manifest["risk_passed"])
+            self.assertTrue((run_dir / "block_report.md").exists())
+            block_report = (run_dir / "block_report.md").read_text(encoding="utf-8")
+            self.assertIn("risk_failed", block_report)
+            self.assertIn("event_blocked_positions", block_report)
+            self.assertIn("block_report", manifest["artifacts"])
             risk_report = (run_dir / "risk_report.md").read_text(encoding="utf-8")
             self.assertIn("event_blocked_positions", risk_report)
             self.assertIn("AAA:", risk_report)

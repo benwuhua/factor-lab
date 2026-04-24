@@ -138,6 +138,12 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     portfolio_summary_path = write_portfolio_summary(portfolio, run_dir / "target_portfolio_summary.md")
     artifacts.update({"target_portfolio": str(portfolio_path), "target_portfolio_summary": str(portfolio_summary_path)})
     if expert_review_gate["status"] in {"blocked", "manual_confirmation_required"}:
+        block_report_path = _write_block_report(
+            run_dir / "block_report.md",
+            status="expert_review_blocked",
+            expert_review_gate=expert_review_gate,
+        )
+        artifacts["block_report"] = str(block_report_path)
         manifest_path = _write_manifest(
             root_path,
             run_dir,
@@ -160,6 +166,13 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     risk_path = write_risk_report(risk_report, run_dir / "risk_report.md")
     artifacts["risk_report"] = str(risk_path)
     if not risk_report.passed:
+        block_report_path = _write_block_report(
+            run_dir / "block_report.md",
+            status="risk_failed",
+            risk_report=risk_report,
+            expert_review_gate=expert_review_gate,
+        )
+        artifacts["block_report"] = str(block_report_path)
         manifest_path = _write_manifest(
             root_path,
             run_dir,
@@ -288,6 +301,57 @@ def _copy_if_exists(source: Path, dest: Path, artifacts: dict[str, str], key: st
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, dest)
     artifacts[key] = str(dest)
+
+
+def _write_block_report(
+    path: str | Path,
+    *,
+    status: str,
+    risk_report: Any | None = None,
+    expert_review_gate: dict[str, str] | None = None,
+) -> Path:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Block Report",
+        "",
+        "## Status",
+        "",
+        f"- status: {status}",
+        "",
+        "## Expert Review Gate",
+        "",
+    ]
+    if expert_review_gate:
+        for key in ["status", "action", "decision", "detail"]:
+            lines.append(f"- {key}: {expert_review_gate.get(key, '')}")
+    else:
+        lines.append("- No expert review gate was available.")
+
+    lines.extend(["", "## Failed Risk Checks", ""])
+    if risk_report is None:
+        lines.append("- No risk report was generated before this block.")
+    else:
+        failed = [row for row in risk_report.rows if row["status"] != "pass"]
+        if not failed:
+            lines.append("- No failed risk checks.")
+        else:
+            lines.extend(["| check | value | threshold | detail |", "|---|---:|---:|---|"])
+            for row in failed:
+                lines.append(f"| {row['check']} | {row['value']} | {row['threshold']} | {row['detail']} |")
+
+    lines.extend(
+        [
+            "",
+            "## Next Actions",
+            "",
+            "- Review the expert gate and failed risk checks before releasing orders.",
+            "- Update event, risk, or review inputs if the block is cleared by a human reviewer.",
+            "- Re-run the daily pipeline after the blocking condition is resolved.",
+        ]
+    )
+    output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return output
 
 
 def _write_manifest(

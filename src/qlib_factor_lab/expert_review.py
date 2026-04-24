@@ -246,6 +246,33 @@ def build_expert_review_packet(
                 "- announcements/events: review abnormal_event and announcement_flag before orders.",
             ]
         )
+    lines.extend(["", "## Event Risk Context", ""])
+    if target_portfolio.empty:
+        lines.append("- No portfolio candidates were supplied.")
+    else:
+        lines.extend(
+            [
+                "| rank | instrument | industry_sw | event_count | event_blocked | active_event_types | event_risk_summary | event_source_urls |",
+                "|---:|---|---|---:|---|---|---|---|",
+            ]
+        )
+        for _, row in portfolio.head(max_positions).iterrows():
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        str(row.get("rank", "")),
+                        str(row.get("instrument", "")),
+                        _text(row.get("industry_sw", "")),
+                        _format_float(row.get("event_count")),
+                        _text(row.get("event_blocked", "")),
+                        _text(row.get("active_event_types", "")),
+                        _text(row.get("event_risk_summary", "")),
+                        _text(row.get("event_source_urls", "")),
+                    ]
+                )
+                + " |"
+            )
     lines.extend(["", "## Factor Diagnostics", ""])
     if factor_diagnostics is None or factor_diagnostics.empty:
         lines.append("- No factor diagnostics were supplied.")
@@ -282,6 +309,7 @@ def build_expert_review_packet(
             "2. 哪些股票看起来像因子误伤，需要人工看图或基本面复核？",
             "3. 哪些风险最值得在下单前拦截：流动性、涨跌停、行业集中、拥挤交易、市场状态冲突？",
             "4. 给出 `pass` / `caution` / `reject` 的研究复核结论，并列出原因。",
+            "5. 哪些候选需要因为公告、监管、减持、解禁、ST/退市、诉讼或异常波动被阻断或人工复核？",
         ]
     )
     return "\n".join(lines) + "\n"

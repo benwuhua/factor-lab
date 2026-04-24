@@ -46,6 +46,22 @@ class ExpertReviewTests(unittest.TestCase):
         self.assertIn("abnormal_event", packet)
         self.assertIn("liquidity", packet)
 
+    def test_build_expert_review_packet_includes_event_risk_context(self):
+        packet = build_expert_review_packet(
+            target_portfolio=self._target_portfolio(),
+            factor_diagnostics=self._factor_diagnostics(),
+            run_date="2026-04-23",
+        )
+
+        self.assertIn("## Event Risk Context", packet)
+        self.assertIn("active_event_types", packet)
+        self.assertIn("event_risk_summary", packet)
+        self.assertIn("event_source_urls", packet)
+        self.assertIn("disciplinary_action", packet)
+        self.assertIn("selected name event context", packet)
+        self.assertIn("https://example.test/events/evt-1", packet)
+        self.assertIn("5. 哪些候选需要因为公告、监管、减持、解禁、ST/退市、诉讼或异常波动被阻断或人工复核？", packet)
+
     def test_apply_expert_review_portfolio_gate_scales_caution_weights(self):
         portfolio = self._target_portfolio()
 
@@ -219,6 +235,12 @@ class ExpertReviewTests(unittest.TestCase):
                 "suspended": [False, False],
                 "abnormal_event": ["", "earnings_warning"],
                 "announcement_flag": [False, True],
+                "industry_sw": ["Pharma", "Power Equipment"],
+                "event_count": [1, 0],
+                "event_blocked": [True, False],
+                "active_event_types": ["disciplinary_action", ""],
+                "event_risk_summary": ["disciplinary_action | AAA event | selected name event context", ""],
+                "event_source_urls": ["https://example.test/events/evt-1", ""],
             }
         )
 
