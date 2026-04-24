@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,34 @@ AKSHARE_COLUMNS = {
     "涨跌额": "change_amount",
     "换手率": "turnover",
 }
+
+SECURITY_MASTER_COLUMNS = [
+    "instrument",
+    "name",
+    "exchange",
+    "board",
+    "industry_sw",
+    "industry_csrc",
+    "is_st",
+    "listing_date",
+    "delisting_date",
+    "valid_from",
+    "valid_to",
+]
+
+COMPANY_EVENT_COLUMNS = [
+    "event_id",
+    "instrument",
+    "event_type",
+    "event_date",
+    "source",
+    "source_url",
+    "title",
+    "severity",
+    "summary",
+    "evidence",
+    "active_until",
+]
 
 
 @dataclass(frozen=True)
@@ -93,6 +122,103 @@ def normalize_akshare_history(raw: pd.DataFrame, code: str) -> pd.DataFrame:
     optional = [col for col in ["change", "turnover"] if col in frame.columns]
     frame = frame[columns + optional].dropna(subset=["date", "open", "close", "high", "low", "volume"])
     return frame.sort_values("date").drop_duplicates("date")
+
+
+def normalize_security_master_snapshot(raw: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
+    if raw is None or raw.empty:
+        return pd.DataFrame(columns=SECURITY_MASTER_COLUMNS)
+    code_col = _first_present(raw, ["代码", "品种代码", "证券代码", "symbol", "code"])
+    name_col = _first_present(raw, ["名称", "股票简称", "证券简称", "name"])
+    rows = []
+    for _, row in raw.iterrows():
+        code = str(row.get(code_col, "")).strip()
+        if not code:
+            continue
+        instrument = qlib_symbol_from_code(code)
+        name = str(row.get(name_col, "")).strip()
+        rows.append(
+            {
+                "instrument": instrument,
+                "name": name,
+                "exchange": _exchange_from_instrument(instrument),
+                "board": _board_from_code(code),
+                "industry_sw": _optional_text(row, ["申万行业", "行业", "industry_sw", "所属行业"]),
+                "industry_csrc": _optional_text(row, ["证监会行业", "industry_csrc"]),
+                "is_st": _is_st_name(name),
+                "listing_date": _optional_date(row, ["上市日期", "上市时间", "listing_date"]),
+                "delisting_date": _optional_date(row, ["退市日期", "delisting_date"]),
+                "valid_from": as_of_date,
+                "valid_to": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=SECURITY_MASTER_COLUMNS).drop_duplicates("instrument", keep="last")
+
+
+def normalize_akshare_notices(raw: pd.DataFrame) -> pd.DataFrame:
+    if raw is None or raw.empty:
+        return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
+    code_col = _first_present(raw, ["代码", "品种代码", "证券代码", "symbol", "code"])
+    title_col = _first_present(raw, ["公告标题", "标题", "title"])
+    date_col = _first_present(raw, ["公告日期", "发布日期", "date", "公告时间"])
+    type_col = _first_present(raw, ["公告类型", "类型", "category"], required=False)
+    url_col = _first_present(raw, ["网址", "公告链接", "url", "source_url"], required=False)
+    rows = []
+    for _, row in raw.iterrows():
+        code = str(row.get(code_col, "")).strip()
+        title = str(row.get(title_col, "")).strip()
+        if not code or not title:
+            continue
+        instrument = qlib_symbol_from_code(code)
+        event_date = pd.to_datetime(row.get(date_col), errors="coerce")
+        event_date_text = "" if pd.isna(event_date) else str(event_date.date())
+        event_type, severity = classify_notice_event(title, str(row.get(type_col, "") if type_col else ""))
+        source_url = str(row.get(url_col, "") if url_col else "").strip()
+        event_key = "|".join([instrument, event_date_text, title, source_url])
+        rows.append(
+            {
+                "event_id": hashlib.sha1(event_key.encode("utf-8")).hexdigest()[:16],
+                "instrument": instrument,
+                "event_type": event_type,
+                "event_date": event_date_text,
+                "source": "akshare_notice",
+                "source_url": source_url,
+                "title": title,
+                "severity": severity,
+                "summary": title,
+                "evidence": title,
+                "active_until": "",
+            }
+        )
+    return pd.DataFrame(rows, columns=COMPANY_EVENT_COLUMNS)
+
+
+def classify_notice_event(title: str, category: str = "") -> tuple[str, str]:
+    text = f"{title} {category}"
+    if any(word in text for word in ["纪律处分", "处罚", "行政处罚"]):
+        return "disciplinary_action", "block"
+    if any(word in text for word in ["退市", "终止上市"]):
+        return "delisting_risk", "block"
+    if "停牌" in text:
+        return "trading_suspension", "block"
+    if any(word in text for word in ["ST", "风险警示", "退市风险警示"]):
+        return "st_status", "block"
+    if any(word in text for word in ["问询函", "关注函", "监管函", "监管工作函"]):
+        return "regulatory_inquiry", "risk"
+    if "减持" in text:
+        return "shareholder_reduction", "risk"
+    if any(word in text for word in ["解禁", "限售股上市流通", "限售股份上市流通"]):
+        return "large_unlock", "watch"
+    if any(word in text for word in ["业绩预告", "预亏", "业绩下修", "向下修正"]):
+        return "performance_warning_down", "risk"
+    if any(word in text for word in ["诉讼", "仲裁"]):
+        return "lawsuit", "risk"
+    if "担保" in text:
+        return "guarantee", "watch"
+    if "质押" in text:
+        return "pledge_risk", "watch"
+    if any(word in text for word in ["异动", "异常波动"]):
+        return "abnormal_volatility", "watch"
+    return "announcement", "info"
 
 
 def write_symbol_csv(frame: pd.DataFrame, output_dir: str | Path, symbol: str) -> Path:
@@ -232,6 +358,32 @@ def fetch_universe_symbols(universe: str, fallback_qlib_dir: str | Path | None =
     return UniverseSpec(f"{universe}_current", benchmark, symbols)
 
 
+def fetch_security_master_snapshot(as_of_date: str, limit: int | None = None) -> pd.DataFrame:
+    ak = _get_akshare()
+    raw = ak.stock_info_a_code_name()
+    if limit is not None:
+        raw = raw.head(limit)
+    return normalize_security_master_snapshot(raw, as_of_date=as_of_date)
+
+
+def fetch_company_notices(start_date: str, end_date: str, delay: float = 0.2) -> pd.DataFrame:
+    ak = _get_akshare()
+    frames = []
+    for day in pd.date_range(start=start_date, end=end_date, freq="D"):
+        date_text = day.strftime("%Y%m%d")
+        try:
+            raw = ak.stock_notice_report(symbol="全部", date=date_text)
+        except TypeError:
+            raw = ak.stock_notice_report(date=date_text)
+        if raw is not None and not raw.empty:
+            frames.append(raw)
+        if delay > 0:
+            time.sleep(delay)
+    if not frames:
+        return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
+    return normalize_akshare_notices(pd.concat(frames, ignore_index=True))
+
+
 def download_history_csvs(
     symbols: Iterable[str],
     output_dir: str | Path,
@@ -310,3 +462,51 @@ def dump_csvs_to_qlib(
     command = build_dump_bin_command(dump_bin_path, source_dir, qlib_path, python_bin=python_bin, max_workers=max_workers)
     print("+", " ".join(command))
     subprocess.run(command, check=True)
+
+
+def _first_present(frame: pd.DataFrame, candidates: list[str], required: bool = True) -> str | None:
+    for column in candidates:
+        if column in frame.columns:
+            return column
+    if required:
+        raise ValueError(f"cannot find any of columns {candidates} in frame columns: {list(frame.columns)}")
+    return None
+
+
+def _exchange_from_instrument(instrument: str) -> str:
+    if str(instrument).startswith("SH"):
+        return "SSE"
+    if str(instrument).startswith("SZ"):
+        return "SZSE"
+    return ""
+
+
+def _board_from_code(code: str) -> str:
+    pure = "".join(ch for ch in str(code).strip() if ch.isdigit()).zfill(6)
+    if pure.startswith(("688", "689")):
+        return "STAR"
+    if pure.startswith(("300", "301")):
+        return "ChiNext"
+    if pure.startswith(("8", "4", "920")):
+        return "BSE"
+    return "main"
+
+
+def _is_st_name(name: str) -> bool:
+    upper = str(name).upper()
+    return "ST" in upper or "退" in upper
+
+
+def _optional_text(row: pd.Series, candidates: list[str]) -> str:
+    for column in candidates:
+        if column in row.index and not pd.isna(row[column]):
+            return str(row[column]).strip()
+    return ""
+
+
+def _optional_date(row: pd.Series, candidates: list[str]) -> str:
+    text = _optional_text(row, candidates)
+    if not text:
+        return ""
+    value = pd.to_datetime(text, errors="coerce")
+    return "" if pd.isna(value) else str(value.date())

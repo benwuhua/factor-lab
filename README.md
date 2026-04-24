@@ -114,6 +114,27 @@ python scripts/build_akshare_qlib_data.py \
 
 AkShare free sources are good enough for local research prototypes, but production research should use a stable vendor feed. Use `--limit` for smoke tests and `--delay`/`--retries` when a source throttles requests.
 
+Build the daily research context used by event risk gates and expert review packets:
+
+```bash
+python scripts/build_research_context_data.py \
+  --as-of-date 2026-04-24 \
+  --notice-start 2026-04-01 \
+  --notice-end 2026-04-24 \
+  --security-master-output data/security_master.csv \
+  --company-events-output data/company_events.csv
+```
+
+For offline smoke tests, normalize local raw AkShare-like CSV files instead of calling the network:
+
+```bash
+python scripts/build_research_context_data.py \
+  --security-master-source-csv raw/security.csv \
+  --notice-source-csv raw/notices.csv
+```
+
+The generated `data/security_master.csv` and `data/company_events.csv` feed `configs/event_risk.yaml`, `event_risk_snapshot.csv`, the daily risk gate, and the expert review packet.
+
 ## Factor Evaluation
 
 Evaluate one registry factor:

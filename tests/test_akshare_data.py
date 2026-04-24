@@ -1,4 +1,6 @@
 import tempfile
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -7,6 +9,8 @@ import yaml
 
 from qlib_factor_lab.akshare_data import (
     build_dump_bin_command,
+    normalize_akshare_notices,
+    normalize_security_master_snapshot,
     normalize_akshare_history,
     qlib_symbol_from_code,
     write_instrument_alias,
@@ -102,6 +106,85 @@ class AkShareDataTests(unittest.TestCase):
 
             self.assertEqual(target.name, "csi500_current.txt")
             self.assertEqual(target.read_text(encoding="utf-8"), "SH600000\t2015-01-01\t2026-04-20\n")
+
+    def test_normalize_security_master_snapshot_maps_current_a_share_metadata(self):
+        raw = pd.DataFrame(
+            {
+                "代码": ["600000", "300750", "688111"],
+                "名称": ["浦发银行", "宁德时代", "*ST科创"],
+            }
+        )
+
+        result = normalize_security_master_snapshot(raw, as_of_date="2026-04-24")
+
+        self.assertEqual(result["instrument"].tolist(), ["SH600000", "SZ300750", "SH688111"])
+        self.assertEqual(result["exchange"].tolist(), ["SSE", "SZSE", "SSE"])
+        self.assertEqual(result["board"].tolist(), ["main", "ChiNext", "STAR"])
+        self.assertEqual(result["valid_from"].tolist(), ["2026-04-24", "2026-04-24", "2026-04-24"])
+        self.assertTrue(bool(result[result["instrument"] == "SH688111"]["is_st"].iloc[0]))
+
+    def test_normalize_akshare_notices_classifies_event_risk(self):
+        raw = pd.DataFrame(
+            {
+                "代码": ["600000", "000001", "300750"],
+                "公告标题": ["关于收到纪律处分决定书的公告", "股东减持计划公告", "年度报告"],
+                "公告日期": ["2026-04-20", "2026-04-21", "2026-04-22"],
+                "公告类型": ["监管", "股东", "定期报告"],
+                "网址": ["https://example.test/a", "https://example.test/b", ""],
+            }
+        )
+
+        result = normalize_akshare_notices(raw)
+
+        self.assertEqual(len(result), 3)
+        disciplinary = result[result["instrument"] == "SH600000"].iloc[0]
+        self.assertEqual(disciplinary["event_type"], "disciplinary_action")
+        self.assertEqual(disciplinary["severity"], "block")
+        reduction = result[result["instrument"] == "SZ000001"].iloc[0]
+        self.assertEqual(reduction["event_type"], "shareholder_reduction")
+        self.assertEqual(reduction["severity"], "risk")
+
+    def test_build_research_context_data_cli_normalizes_local_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "raw").mkdir()
+            raw_master = root / "raw/security.csv"
+            raw_notices = root / "raw/notices.csv"
+            raw_master.write_text("代码,名称\n600000,浦发银行\n", encoding="utf-8")
+            raw_notices.write_text(
+                "代码,公告标题,公告日期,公告类型,网址\n600000,关于收到监管函的公告,2026-04-20,监管,https://example.test/r\n",
+                encoding="utf-8",
+            )
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/build_research_context_data.py"),
+                    "--project-root",
+                    str(root),
+                    "--security-master-source-csv",
+                    str(raw_master.relative_to(root)),
+                    "--notice-source-csv",
+                    str(raw_notices.relative_to(root)),
+                    "--security-master-output",
+                    "data/security_master.csv",
+                    "--company-events-output",
+                    "data/company_events.csv",
+                    "--as-of-date",
+                    "2026-04-24",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((root / "data/security_master.csv").exists())
+            self.assertTrue((root / "data/company_events.csv").exists())
+            events = pd.read_csv(root / "data/company_events.csv")
+            self.assertEqual(events.loc[0, "event_type"], "regulatory_inquiry")
+            self.assertIn("wrote:", result.stdout)
 
 
 if __name__ == "__main__":

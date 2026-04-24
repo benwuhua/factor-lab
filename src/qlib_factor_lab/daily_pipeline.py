@@ -101,6 +101,14 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     quality_path = write_quality_report(quality_report, run_dir / "data_quality.md")
     artifacts["data_quality"] = str(quality_path)
     if not quality_report.passed:
+        run_summary_path = _write_run_summary(
+            run_dir / "run_summary.md",
+            run_date=run_date,
+            status="quality_failed",
+            risk_passed=False,
+            artifacts=artifacts,
+        )
+        artifacts["run_summary"] = str(run_summary_path)
         manifest_path = _write_manifest(root_path, run_dir, run_date, "quality_failed", False, artifacts, inputs)
         return DailyPipelineResult(run_date, run_dir, "quality_failed", False, manifest_path, artifacts)
 
@@ -144,6 +152,17 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             expert_review_gate=expert_review_gate,
         )
         artifacts["block_report"] = str(block_report_path)
+        run_summary_path = _write_run_summary(
+            run_dir / "run_summary.md",
+            run_date=run_date,
+            status="expert_review_blocked",
+            risk_passed=False,
+            artifacts=artifacts,
+            expert_review=expert_review.to_manifest(),
+            expert_review_gate=expert_review_gate,
+            block_report_path=block_report_path,
+        )
+        artifacts["run_summary"] = str(run_summary_path)
         manifest_path = _write_manifest(
             root_path,
             run_dir,
@@ -173,6 +192,17 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             expert_review_gate=expert_review_gate,
         )
         artifacts["block_report"] = str(block_report_path)
+        run_summary_path = _write_run_summary(
+            run_dir / "run_summary.md",
+            run_date=run_date,
+            status="risk_failed",
+            risk_passed=False,
+            artifacts=artifacts,
+            expert_review=expert_review.to_manifest(),
+            expert_review_gate=expert_review_gate,
+            block_report_path=block_report_path,
+        )
+        artifacts["run_summary"] = str(run_summary_path)
         manifest_path = _write_manifest(
             root_path,
             run_dir,
@@ -203,6 +233,16 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             "reconciliation": str(reconciliation_path),
         }
     )
+    run_summary_path = _write_run_summary(
+        run_dir / "run_summary.md",
+        run_date=run_date,
+        status="pass",
+        risk_passed=True,
+        artifacts=artifacts,
+        expert_review=expert_review.to_manifest(),
+        expert_review_gate=expert_review_gate,
+    )
+    artifacts["run_summary"] = str(run_summary_path)
     manifest_path = _write_manifest(
         root_path,
         run_dir,
@@ -352,6 +392,56 @@ def _write_block_report(
     )
     output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return output
+
+
+def _write_run_summary(
+    path: str | Path,
+    *,
+    run_date: str,
+    status: str,
+    risk_passed: bool,
+    artifacts: dict[str, str],
+    expert_review: dict[str, str] | None = None,
+    expert_review_gate: dict[str, str] | None = None,
+    block_report_path: str | Path | None = None,
+) -> Path:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Daily Run Summary",
+        "",
+        f"- run_date: {run_date}",
+        f"- status: {status}",
+        f"- risk_passed: {risk_passed}",
+        "",
+        "## Expert Review",
+        "",
+    ]
+    expert_review = expert_review or {"status": "not_run", "decision": "not_run", "error": ""}
+    for key in ["status", "decision", "error"]:
+        lines.append(f"- {key}: {expert_review.get(key, '')}")
+    lines.extend(["", "## Expert Review Gate", ""])
+    expert_review_gate = expert_review_gate or {"status": "not_run", "action": "none", "decision": "not_run", "detail": ""}
+    for key in ["status", "action", "decision", "detail"]:
+        lines.append(f"- {key}: {expert_review_gate.get(key, '')}")
+
+    if block_report_path is not None and Path(block_report_path).exists():
+        lines.extend(["", "## Block Report Summary", ""])
+        lines.extend(_block_report_excerpt(Path(block_report_path)))
+
+    lines.extend(["", "## Artifacts", ""])
+    for key in sorted(artifacts):
+        lines.append(f"- {key}: {artifacts[key]}")
+    output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return output
+
+
+def _block_report_excerpt(path: Path, max_lines: int = 40) -> list[str]:
+    lines = [line.rstrip() for line in path.read_text(encoding="utf-8").splitlines()]
+    kept = [line for line in lines if line.strip()]
+    if len(kept) <= max_lines:
+        return kept
+    return kept[:max_lines] + ["...", f"- See full block report: {path}"]
 
 
 def _write_manifest(
