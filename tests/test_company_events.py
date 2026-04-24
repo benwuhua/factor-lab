@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -193,6 +195,74 @@ class CompanyEventTests(unittest.TestCase):
 
         self.assertTrue(missing_loaded.empty)
         self.assertEqual(list(missing_loaded.columns), COMPANY_EVENT_COLUMNS)
+
+    def test_build_event_risk_snapshot_cli_writes_blocking_snapshot(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "build_event_risk_snapshot.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = Path(tmp)
+            (project_root / "configs").mkdir()
+            (project_root / "runs" / "20260423").mkdir(parents=True)
+            (project_root / "data").mkdir()
+            (project_root / "configs" / "event_risk.yaml").write_text(
+                "\n".join(
+                    [
+                        "event_risk:",
+                        "  events_path: data/company_events.csv",
+                        "  default_lookback_days: 30",
+                        "  block_event_types:",
+                        "    - disciplinary_action",
+                        "  block_severities:",
+                        "    - block",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (project_root / "runs" / "20260423" / "signals.csv").write_text(
+                "\n".join(
+                    [
+                        "date,instrument,score",
+                        "2026-04-23,AAA,0.7",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (project_root / "data" / "company_events.csv").write_text(
+                "\n".join(
+                    [
+                        "event_id,instrument,event_type,event_date,source,source_url,title,severity,summary,evidence,active_until",
+                        "evt-1,AAA,disciplinary_action,2026-04-10,exchange,https://example.test/evt-1,Exchange sanction,block,Formal sanction,notice,",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            output = project_root / "runs" / "20260423" / "event_risk_snapshot.csv"
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--signals",
+                    "runs/20260423/signals.csv",
+                    "--event-risk-config",
+                    "configs/event_risk.yaml",
+                    "--output",
+                    "runs/20260423/event_risk_snapshot.csv",
+                    "--project-root",
+                    str(project_root),
+                ],
+                check=False,
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(output.exists())
+            snapshot = pd.read_csv(output)
+            self.assertEqual(len(snapshot), 1)
+            self.assertTrue(bool(snapshot.loc[0, "event_blocked"]))
 
 
 if __name__ == "__main__":
