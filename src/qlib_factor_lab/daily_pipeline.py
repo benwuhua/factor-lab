@@ -12,7 +12,12 @@ import pandas as pd
 
 from .config import load_project_config, load_yaml
 from .data_quality import check_signal_quality, load_data_quality_config, write_quality_report
-from .expert_review import build_expert_review_packet
+from .expert_review import (
+    build_expert_review_packet,
+    load_expert_review_run_config,
+    run_expert_review_command,
+    write_expert_review_result,
+)
 from .orders import build_order_suggestions, load_order_config, write_orders
 from .paper_broker import load_paper_fill_config, simulate_paper_fills, write_fills
 from .portfolio import build_target_portfolio, load_portfolio_config, write_portfolio_summary, write_target_portfolio
@@ -103,11 +108,17 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
 
     diagnostics = _load_factor_diagnostics(root_path, run_date)
     expert_review_path = run_dir / "expert_review_packet.md"
-    expert_review_path.write_text(
-        build_expert_review_packet(portfolio, diagnostics, run_date=run_date),
-        encoding="utf-8",
-    )
+    expert_review_packet = build_expert_review_packet(portfolio, diagnostics, run_date=run_date)
+    expert_review_path.write_text(expert_review_packet, encoding="utf-8")
     artifacts["expert_review_packet"] = str(expert_review_path)
+    execution_config = load_yaml(_resolve(root_path, inputs.execution_config_path))
+    expert_review = run_expert_review_command(
+        expert_review_packet,
+        load_expert_review_run_config(execution_config),
+        cwd=root_path,
+    )
+    expert_review_result_path = write_expert_review_result(expert_review, run_dir / "expert_review_result.md")
+    artifacts["expert_review_result"] = str(expert_review_result_path)
 
     risk_report = check_portfolio_risk(
         portfolio,
@@ -118,7 +129,16 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     risk_path = write_risk_report(risk_report, run_dir / "risk_report.md")
     artifacts["risk_report"] = str(risk_path)
     if not risk_report.passed:
-        manifest_path = _write_manifest(root_path, run_dir, run_date, "risk_failed", False, artifacts, inputs)
+        manifest_path = _write_manifest(
+            root_path,
+            run_dir,
+            run_date,
+            "risk_failed",
+            False,
+            artifacts,
+            inputs,
+            expert_review=expert_review.to_manifest(),
+        )
         return DailyPipelineResult(run_date, run_dir, "risk_failed", False, manifest_path, artifacts)
 
     execution_path = _resolve(root_path, inputs.execution_config_path)
@@ -138,7 +158,16 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             "reconciliation": str(reconciliation_path),
         }
     )
-    manifest_path = _write_manifest(root_path, run_dir, run_date, "pass", True, artifacts, inputs)
+    manifest_path = _write_manifest(
+        root_path,
+        run_dir,
+        run_date,
+        "pass",
+        True,
+        artifacts,
+        inputs,
+        expert_review=expert_review.to_manifest(),
+    )
     return DailyPipelineResult(run_date, run_dir, "pass", True, manifest_path, artifacts)
 
 
@@ -200,6 +229,7 @@ def _write_manifest(
     risk_passed: bool,
     artifacts: dict[str, str],
     inputs: DailyPipelineInputs,
+    expert_review: dict[str, str] | None = None,
 ) -> Path:
     payload = {
         "run_date": run_date,
@@ -217,6 +247,7 @@ def _write_manifest(
             "current_positions_csv": str(inputs.current_positions_csv) if inputs.current_positions_csv else None,
         },
         "artifacts": artifacts,
+        "expert_review": expert_review or {"status": "not_run", "decision": "not_run", "error": ""},
     }
     path = run_dir / "manifest.json"
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

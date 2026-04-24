@@ -49,6 +49,7 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertTrue((run_dir / "target_portfolio.csv").exists())
             self.assertTrue((run_dir / "target_portfolio_summary.md").exists())
             self.assertTrue((run_dir / "expert_review_packet.md").exists())
+            self.assertTrue((run_dir / "expert_review_result.md").exists())
             self.assertTrue((run_dir / "risk_report.md").exists())
             self.assertTrue((run_dir / "orders.csv").exists())
             self.assertTrue((run_dir / "fills.csv").exists())
@@ -60,6 +61,8 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertTrue(manifest["risk_passed"])
             self.assertIn("signals", manifest["artifacts"])
             self.assertIn("expert_review_packet", manifest["artifacts"])
+            self.assertIn("expert_review_result", manifest["artifacts"])
+            self.assertEqual(manifest["expert_review"]["decision"], "not_run")
             self.assertIn("orders", manifest["artifacts"])
             self.assertIn("wrote:", result.stdout)
 
@@ -100,6 +103,7 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertTrue((run_dir / "signals.csv").exists())
             self.assertTrue((run_dir / "target_portfolio.csv").exists())
             self.assertTrue((run_dir / "expert_review_packet.md").exists())
+            self.assertTrue((run_dir / "expert_review_result.md").exists())
             self.assertTrue((run_dir / "risk_report.md").exists())
             self.assertFalse((run_dir / "orders.csv").exists())
             self.assertFalse((run_dir / "fills.csv").exists())
@@ -107,6 +111,55 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "risk_failed")
             self.assertFalse(manifest["risk_passed"])
             self.assertNotIn("orders", manifest["artifacts"])
+
+    def test_daily_pipeline_runs_configured_expert_review_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            execution_path = root / "configs/execution.yaml"
+            data = yaml.safe_load(execution_path.read_text(encoding="utf-8"))
+            data["expert_review"] = {
+                "enabled": True,
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); print('research_review_status: caution\\nreason: concentrated factor family')",
+                ],
+            }
+            execution_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest = json.loads((root / "runs/20260423/manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["expert_review"]["status"], "completed")
+            self.assertEqual(manifest["expert_review"]["decision"], "caution")
+            self.assertIn("concentrated factor family", (root / "runs/20260423/expert_review_result.md").read_text(encoding="utf-8"))
 
     def _write_fixture(self, root: Path, min_positions: int = 1) -> None:
         (root / "configs").mkdir(parents=True)

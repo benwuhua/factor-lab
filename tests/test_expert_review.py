@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from qlib_factor_lab.expert_review import build_expert_review_packet
+from qlib_factor_lab.expert_review import (
+    ExpertReviewRunConfig,
+    build_expert_review_packet,
+    parse_expert_review_decision,
+    run_expert_review_command,
+    write_expert_review_result,
+)
 
 
 class ExpertReviewTests(unittest.TestCase):
@@ -61,6 +67,83 @@ class ExpertReviewTests(unittest.TestCase):
             self.assertTrue(output_path.exists())
             self.assertIn("Expert Portfolio Review Packet", output_path.read_text(encoding="utf-8"))
             self.assertIn("wrote:", result.stdout)
+
+    def test_build_expert_review_packet_cli_can_run_review_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target_path = root / "runs/20260423/target_portfolio.csv"
+            output_path = root / "runs/20260423/expert_review_packet.md"
+            result_path = root / "runs/20260423/expert_review_result.md"
+            target_path.parent.mkdir(parents=True)
+            self._target_portfolio().to_csv(target_path, index=False)
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/build_expert_review_packet.py"),
+                    "--target-portfolio",
+                    str(target_path.relative_to(root)),
+                    "--run-date",
+                    "2026-04-23",
+                    "--output",
+                    str(output_path.relative_to(root)),
+                    "--run-review",
+                    "--llm-command",
+                    f"{sys.executable} -c \"import sys; sys.stdin.read(); print('research_review_status: reject')\"",
+                    "--review-output",
+                    str(result_path.relative_to(root)),
+                    "--project-root",
+                    str(root),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue(result_path.exists())
+            self.assertIn("decision: reject", result_path.read_text(encoding="utf-8"))
+
+    def test_run_expert_review_command_records_decision(self):
+        packet = "# packet\n"
+        command = [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdin.read(); print('research_review_status: caution\\nreason: too concentrated')",
+        ]
+
+        result = run_expert_review_command(packet, ExpertReviewRunConfig(enabled=True, command=command))
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(result.decision, "caution")
+        self.assertIn("too concentrated", result.output)
+
+    def test_parse_expert_review_decision_accepts_markdown_and_defaults_to_unknown(self):
+        self.assertEqual(parse_expert_review_decision("研究复核结论: reject"), "reject")
+        self.assertEqual(parse_expert_review_decision("**结论：`caution`**，不是 `reject`。"), "caution")
+        self.assertEqual(parse_expert_review_decision("No explicit decision."), "unknown")
+
+    def test_write_expert_review_result_outputs_markdown(self):
+        result = run_expert_review_command(
+            "# packet\n",
+            ExpertReviewRunConfig(
+                enabled=True,
+                command=[
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); print('research_review_status: pass')",
+                ],
+            ),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "expert_review_result.md"
+
+            write_expert_review_result(result, output)
+
+            text = output.read_text(encoding="utf-8")
+            self.assertIn("status: completed", text)
+            self.assertIn("decision: pass", text)
 
     def _target_portfolio(self):
         return pd.DataFrame(

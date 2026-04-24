@@ -15,6 +15,17 @@ paper_broker:
 reconcile:
   weight_tolerance: 0.0001
 
+expert_review:
+  enabled: true
+  command:
+    - codex
+    - exec
+    - --sandbox
+    - read-only
+    - "-"
+  timeout_sec: 600
+  required: false
+
 batch:
   max_days: 30
   max_reconciliation_failures: 0

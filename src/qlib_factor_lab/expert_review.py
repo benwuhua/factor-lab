@@ -1,6 +1,114 @@
 from __future__ import annotations
 
+import subprocess
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
+
+
+@dataclass(frozen=True)
+class ExpertReviewRunConfig:
+    enabled: bool = False
+    command: list[str] | None = None
+    timeout_sec: int = 300
+    required: bool = False
+
+
+@dataclass(frozen=True)
+class ExpertReviewResult:
+    status: str
+    decision: str
+    output: str
+    error: str = ""
+
+    def to_manifest(self) -> dict[str, str]:
+        return {
+            "status": self.status,
+            "decision": self.decision,
+            "error": self.error,
+        }
+
+
+def load_expert_review_run_config(data: dict[str, Any]) -> ExpertReviewRunConfig:
+    raw = data.get("expert_review", {}) if isinstance(data, dict) else {}
+    command = raw.get("command")
+    if isinstance(command, str):
+        command = command.split()
+    return ExpertReviewRunConfig(
+        enabled=bool(raw.get("enabled", False)),
+        command=[str(part) for part in command] if command else None,
+        timeout_sec=int(raw.get("timeout_sec", 300)),
+        required=bool(raw.get("required", False)),
+    )
+
+
+def run_expert_review_command(
+    packet: str,
+    config: ExpertReviewRunConfig = ExpertReviewRunConfig(),
+    *,
+    cwd: str | Path | None = None,
+) -> ExpertReviewResult:
+    if not config.enabled:
+        return ExpertReviewResult(status="not_run", decision="not_run", output="Expert review command is disabled.")
+    if not config.command:
+        return ExpertReviewResult(status="not_run", decision="not_run", output="Expert review command is not configured.")
+    try:
+        completed = subprocess.run(
+            config.command,
+            input=packet,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=config.timeout_sec,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return ExpertReviewResult(
+            status="timeout",
+            decision="unknown",
+            output=exc.stdout or "",
+            error=f"expert review timed out after {config.timeout_sec}s",
+        )
+    output = completed.stdout.strip()
+    error = completed.stderr.strip()
+    if completed.returncode != 0:
+        return ExpertReviewResult(status="failed", decision="unknown", output=output, error=error or f"exit_code={completed.returncode}")
+    return ExpertReviewResult(status="completed", decision=parse_expert_review_decision(output), output=output, error="")
+
+
+def parse_expert_review_decision(text: str) -> str:
+    lower = text.lower()
+    explicit = re.search(
+        r"(?:research_review_status|review_status|decision|研究复核结论|复核结论|结论)\s*[：:]\s*`?(pass|caution|reject)`?",
+        lower,
+    )
+    if explicit:
+        return explicit.group(1)
+    for value in ["reject", "caution", "pass"]:
+        if f"`{value}`" in lower:
+            return value
+    return "unknown"
+
+
+def write_expert_review_result(result: ExpertReviewResult, output_path: str | Path) -> Path:
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Expert Review Result",
+        "",
+        f"- status: {result.status}",
+        f"- decision: {result.decision}",
+        f"- error: {result.error}",
+        "",
+        "## Output",
+        "",
+        result.output.strip() if result.output else "",
+    ]
+    output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return output
 
 
 def build_expert_review_packet(

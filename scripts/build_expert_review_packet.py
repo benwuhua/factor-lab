@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 
 import pandas as pd
@@ -10,7 +11,12 @@ from _bootstrap import add_src_to_path, project_root
 
 add_src_to_path()
 
-from qlib_factor_lab.expert_review import build_expert_review_packet
+from qlib_factor_lab.expert_review import (
+    ExpertReviewRunConfig,
+    build_expert_review_packet,
+    run_expert_review_command,
+    write_expert_review_result,
+)
 
 
 def main() -> int:
@@ -20,6 +26,10 @@ def main() -> int:
     parser.add_argument("--factor-diagnostics", default=None, help="Optional single factor diagnostics CSV.")
     parser.add_argument("--run-date", default="")
     parser.add_argument("--output", default="reports/expert_review_packet.md")
+    parser.add_argument("--run-review", action="store_true", help="Run an expert LLM command with the packet on stdin.")
+    parser.add_argument("--llm-command", default=None, help="Command string used when --run-review is set.")
+    parser.add_argument("--review-output", default=None, help="Optional expert review result Markdown path.")
+    parser.add_argument("--timeout-sec", type=int, default=300)
     parser.add_argument("--project-root", default=str(default_root), help="Project root used to resolve relative paths.")
     args = parser.parse_args()
 
@@ -31,6 +41,21 @@ def main() -> int:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(packet, encoding="utf-8")
     print(f"wrote: {output}")
+    if args.run_review:
+        result = run_expert_review_command(
+            packet,
+            ExpertReviewRunConfig(
+                enabled=True,
+                command=shlex.split(args.llm_command or ""),
+                timeout_sec=args.timeout_sec,
+            ),
+            cwd=root,
+        )
+        review_output = _resolve(root, args.review_output) if args.review_output else output.with_name("expert_review_result.md")
+        write_expert_review_result(result, review_output)
+        print(f"expert_review_status: {result.status}")
+        print(f"expert_review_decision: {result.decision}")
+        print(f"wrote: {review_output}")
     return 0
 
 
