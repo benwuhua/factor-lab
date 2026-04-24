@@ -56,6 +56,15 @@ class StageCTests(unittest.TestCase):
         self.assertEqual(list(portfolio["rank"]), [1, 2])
         self.assertEqual(list(portfolio["last_price"]), [12.3, 45.6])
         self.assertIn("limit_up", portfolio.columns)
+        self.assertEqual(
+            list(portfolio["selection_explanation"]),
+            [
+                "selected by ensemble_score 5; main drivers: core_alpha 3.2, challenger_alpha 1.8",
+                "selected by ensemble_score 4; main drivers: core_alpha 2.6, challenger_alpha 1.4",
+            ],
+        )
+        self.assertIn("top_factor_1", portfolio.columns)
+        self.assertIn("top_factor_2_contribution", portfolio.columns)
 
     def test_target_portfolio_keeps_current_positions_inside_dropout_rank(self):
         signal = self._signal()
@@ -143,6 +152,10 @@ class StageCTests(unittest.TestCase):
                 "rule_score": [5.0, 4.0, 3.0, 2.0, 1.0],
                 "model_score": [0.0] * 5,
                 "active_regime": ["sideways"] * 5,
+                "top_factor_1": ["core_alpha", "core_alpha", "core_alpha", "core_alpha", "core_alpha"],
+                "top_factor_1_contribution": [3.2, 2.6, 1.5, 0.5, 0.1],
+                "top_factor_2": ["challenger_alpha", "challenger_alpha", "", "", ""],
+                "top_factor_2_contribution": [1.8, 1.4, 0.0, 0.0, 0.0],
                 "risk_flags": ["", "", "not_tradable", "limit_locked", ""],
                 "amount_20d": [100_000_000, 80_000_000, 90_000_000, 70_000_000, 1_000_000],
                 "last_price": [12.3, 45.6, 8.9, 23.4, 5.6],

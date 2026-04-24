@@ -18,6 +18,12 @@ EXECUTION_PASSTHROUGH_COLUMNS = (
     "buy_blocked",
     "sell_blocked",
 )
+EXPLANATION_COLUMNS = (
+    "top_factor_1",
+    "top_factor_1_contribution",
+    "top_factor_2",
+    "top_factor_2_contribution",
+)
 
 
 @dataclass(frozen=True)
@@ -86,12 +92,17 @@ def build_target_portfolio(
     output = selected.copy()
     output["rank"] = range(1, len(output) + 1)
     output["target_weight"] = target_weight
+    output["selection_explanation"] = output.apply(lambda row: _selection_explanation(row, config.score_column), axis=1)
     cols = ["date", "instrument", "rank", "target_weight", config.score_column]
     for optional in ["rule_score", "model_score", "active_regime", "risk_flags", "rejection_reason"]:
         if optional in output.columns:
             cols.append(optional)
     if "selection_reason" in output.columns:
         cols.append("selection_reason")
+    cols.append("selection_explanation")
+    for optional in EXPLANATION_COLUMNS:
+        if optional in output.columns and optional not in cols:
+            cols.append(optional)
     for optional in EXECUTION_PASSTHROUGH_COLUMNS:
         if optional in output.columns and optional not in cols:
             cols.append(optional)
@@ -176,3 +187,25 @@ def _dropout_keep(ranked: pd.DataFrame, current: set[str], config: PortfolioConf
     ].copy()
     keep["selection_reason"] = "held_by_dropout"
     return keep.sort_values(config.score_column, ascending=False).head(config.top_k)
+
+
+def _selection_explanation(row: pd.Series, score_column: str) -> str:
+    drivers = []
+    for factor_col, contribution_col in [
+        ("top_factor_1", "top_factor_1_contribution"),
+        ("top_factor_2", "top_factor_2_contribution"),
+    ]:
+        factor = str(row.get(factor_col, "") or "").strip()
+        if not factor:
+            continue
+        contribution = row.get(contribution_col)
+        if pd.isna(contribution):
+            continue
+        drivers.append(f"{factor} {_format_float(float(contribution))}")
+    if drivers:
+        return f"selected by {score_column} {_format_float(float(row[score_column]))}; main drivers: {', '.join(drivers)}"
+    return f"selected by {score_column} {_format_float(float(row[score_column]))}"
+
+
+def _format_float(value: float) -> str:
+    return f"{value:.6g}"
