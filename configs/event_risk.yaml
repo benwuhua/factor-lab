@@ -1,0 +1,18 @@
+event_risk:
+  security_master_path: data/security_master.csv
+  events_path: data/company_events.csv
+  default_lookback_days: 30
+  event_type_lookbacks:
+    shareholder_reduction: 60
+    large_unlock: 45
+    regulatory_inquiry: 45
+    disciplinary_action: 180
+    delisting_risk: 180
+  block_event_types:
+    - disciplinary_action
+    - delisting_risk
+    - trading_suspension
+    - st_status
+  block_severities:
+    - block
+  max_events_per_name: 3
