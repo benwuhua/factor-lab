@@ -299,7 +299,7 @@ def _git_changed_files(root: Path) -> list[str]:
     return files
 
 
-def _ledger_context(path: Path, max_lines: int = 120) -> str:
+def _ledger_context(path: Path, max_lines: int = 80) -> str:
     if not path.exists():
         return ""
     lines = path.read_text(encoding="utf-8").splitlines()

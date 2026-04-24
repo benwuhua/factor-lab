@@ -1,9 +1,11 @@
 import unittest
 from datetime import datetime
 from pathlib import Path
+import tempfile
 from zoneinfo import ZoneInfo
 
 from qlib_factor_lab.autoresearch.codex_loop import (
+    _ledger_context,
     build_codex_command,
     build_candidate_prompt,
     find_disallowed_changes,
@@ -87,6 +89,27 @@ class AutoresearchCodexLoopTests(unittest.TestCase):
         self.assertIn("configs/autoresearch/candidates/example_expression.yaml", prompt)
         self.assertIn("不要运行 make autoresearch-expression", prompt)
         self.assertIn("reversal, turnover", prompt)
+
+    def test_ledger_context_limits_recent_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = Path(tmp) / "expression_results.tsv"
+            ledger.write_text(
+                "timestamp\tcandidate_name\tstatus\tdecision_reason\tprimary_metric\trank_ic_mean_h20\t"
+                "neutral_rank_ic_mean_h20\tguard_metric\tcomplexity_score\n"
+                + "\n".join(
+                    f"2026-04-24T00:{index:02d}:00\tfactor_{index}\treview\t\t0.{index}\t0.{index}\t0.{index}\t0.{index}\t0.{index}"
+                    for index in range(120)
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            context = _ledger_context(ledger)
+
+            lines = context.splitlines()
+            self.assertEqual(len(lines), 81)
+            self.assertIn("factor_119", context)
+            self.assertNotIn("factor_0", context)
 
     def test_is_protected_branch_flags_main_and_master(self):
         self.assertTrue(is_protected_branch("main"))
