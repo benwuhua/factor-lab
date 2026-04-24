@@ -1,0 +1,139 @@
+generated_at: "2026-04-24"
+description: "Autoresearch lanes for avoiding same-style factor over-exploration."
+
+lanes:
+  expression_price_volume:
+    cadence: daily
+    editable_space: configs/autoresearch/expression_space.yaml
+    factor_type: cross_sectional
+    families:
+      - momentum
+      - reversal
+      - divergence
+      - price_position
+      - volatility
+      - liquidity
+    primary_metrics:
+      - neutral_rank_ic_mean_h20
+      - neutral_rank_icir_h20
+      - neutral_long_short_h20
+    guards:
+      max_top_quantile_turnover: 0.25
+      min_observations: 500000
+      duplicate_family_policy: representative_only
+
+  pattern_event:
+    cadence: daily
+    editable_space: configs/autoresearch/pattern_space.yaml
+    factor_type: event_like
+    families:
+      - wangji_like
+      - quiet_breakout
+      - washout_repair
+      - low_volume_pullback
+    primary_metrics:
+      - event_mean_return_h20
+      - event_payoff_h20
+      - mfe_mae_ratio
+    guards:
+      min_trade_count: 80
+      max_event_overlap: 0.35
+      ic_is_secondary: true
+
+  risk_structure:
+    cadence: daily
+    editable_space: configs/autoresearch/risk_space.yaml
+    factor_type: cross_sectional
+    families:
+      - drawdown_quality
+      - downside_volatility
+      - gap_risk
+      - intraday_excursion
+    primary_metrics:
+      - neutral_rank_ic_mean_h20
+      - downside_capture
+      - negative_tail_filter_value
+    guards:
+      max_top_quantile_turnover: 0.20
+      require_positive_in_down_regime: true
+
+  liquidity_microstructure:
+    cadence: daily
+    editable_space: configs/autoresearch/liquidity_space.yaml
+    factor_type: cross_sectional
+    families:
+      - turnover_stability
+      - amount_shock
+      - volume_dry_up
+      - liquidity_recovery
+    primary_metrics:
+      - neutral_rank_ic_mean_h5
+      - neutral_rank_ic_mean_h20
+      - slippage_proxy_value
+    guards:
+      max_liquidity_proxy_exposure: 0.35
+      max_top_quantile_turnover: 0.30
+
+  fundamental_quality:
+    cadence: weekly
+    editable_space: configs/autoresearch/fundamental_space.yaml
+    factor_type: cross_sectional
+    families:
+      - value
+      - quality
+      - growth
+      - earnings_revision
+    primary_metrics:
+      - neutral_rank_ic_mean_h20
+      - neutral_rank_ic_mean_h60
+      - yearly_stability
+    guards:
+      data_source_required: true
+      max_refresh_frequency: weekly
+
+  regime:
+    cadence: daily
+    editable_space: configs/autoresearch/regime_space.yaml
+    factor_type: allocator
+    families:
+      - index_trend
+      - breadth
+      - volatility_regime
+      - liquidity_regime
+    primary_metrics:
+      - factor_activation_accuracy
+      - drawdown_reduction
+      - regime_switch_turnover
+    guards:
+      cannot_select_stocks_directly: true
+      only_controls_weights: true
+
+portfolio_combination:
+  mode: family_first
+  rule: "Build family scores first, then combine family representatives."
+  default_family_caps:
+    max_single_family_weight: 0.35
+    max_single_factor_weight: 0.20
+  initial_family_weights:
+    divergence: 0.30
+    risk_structure: 0.25
+    pattern_event: 0.20
+    liquidity_microstructure: 0.15
+    fundamental_quality: 0.10
+  reserve_policy:
+    reserve_factors_in_main_score: false
+    reserve_factors_shadow_scored: true
+
+expert_review:
+  required_before_live: true
+  packet_script: scripts/build_expert_review_packet.py
+  decision_values:
+    - pass
+    - caution
+    - reject
+  review_scope:
+    - factor_family_concentration
+    - unexplained_single_name_risk
+    - liquidity_and_tradability
+    - market_regime_conflict
+    - suspicious_factor_misfire
