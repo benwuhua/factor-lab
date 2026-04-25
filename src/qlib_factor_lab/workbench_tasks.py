@@ -28,13 +28,16 @@ class WorkbenchTaskRecord:
 
 WORKBENCH_TASKS: dict[str, WorkbenchTask] = {
     "check-env": WorkbenchTask("check-env", "检查 provider 环境", ("make", "check-env"), "检查 Qlib provider、calendar 和因子注册表。"),
+    "data-governance": WorkbenchTask("data-governance", "检查数据治理", ("make", "data-governance"), "检查数据域覆盖率、PIT 字段和 lane 激活状态。"),
     "daily-signal": WorkbenchTask("daily-signal", "生成当日信号", ("make", "daily-signal"), "从 approved 因子生成当日解释型信号。"),
     "check-data-quality": WorkbenchTask("check-data-quality", "检查信号质量", ("make", "check-data-quality"), "对当日信号覆盖率和缺失情况做质量门禁。"),
     "select-factors": WorkbenchTask("select-factors", "生成 approved 因子", ("make", "select-factors"), "根据治理配置刷新 approved_factors.yaml。"),
     "autoresearch-codex-loop": WorkbenchTask("autoresearch-codex-loop", "启动自动挖掘", ("make", "autoresearch-codex-loop"), "启动受控候选表达式研究循环。"),
+    "autoresearch-multilane": WorkbenchTask("autoresearch-multilane", "多车道挖掘", ("make", "autoresearch-multilane"), "按 lane_space 运行 active lane，并记录 shadow/unsupported lane 状态。"),
     "autoresearch-review": WorkbenchTask("autoresearch-review", "复核自动挖掘", ("make", "autoresearch-review"), "汇总 nightly ledger、稳定性和重复簇。"),
     "research-context": WorkbenchTask("research-context", "刷新证据库", ("make", "research-context"), "刷新 data/security_master.csv 和 data/company_events.csv。"),
     "target-portfolio": WorkbenchTask("target-portfolio", "生成目标组合", ("make", "target-portfolio"), "把当日信号转换成 target_portfolio。"),
+    "stock-cards": WorkbenchTask("stock-cards", "生成股票卡片", ("make", "stock-cards"), "把 target_portfolio 转换成可复核 JSONL 股票卡片。"),
     "exposure-attribution": WorkbenchTask("exposure-attribution", "暴露归因", ("make", "exposure-attribution"), "解释行业、因子族和风格暴露。"),
     "paper-orders": WorkbenchTask("paper-orders", "生成纸面订单", ("make", "paper-orders"), "把目标组合转换为纸面订单和模拟成交。"),
     "reconcile-account": WorkbenchTask("reconcile-account", "账户对账", ("make", "reconcile-account"), "对 expected 和 actual positions 做对账。"),

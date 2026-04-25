@@ -147,6 +147,14 @@ python scripts/build_research_context_data.py \
 
 The generated `data/security_master.csv` and `data/company_events.csv` feed `configs/event_risk.yaml`, `event_risk_snapshot.csv`, the daily risk gate, and the expert review packet.
 
+Check point-in-time data-domain coverage and lane readiness:
+
+```bash
+make data-governance RUN_DATE=20260420
+```
+
+The report reads `configs/data_governance.yaml` and writes `reports/data_governance_YYYYMMDD.md` plus a sibling CSV. Missing non-price data domains are reported as `shadow` rather than promoted into the main portfolio.
+
 ## Factor Evaluation
 
 Evaluate one registry factor:
@@ -197,6 +205,14 @@ Build an attribution report after generating a target portfolio:
 ```bash
 make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv
 ```
+
+Build stock research cards for human review:
+
+```bash
+make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv RUN_DATE=20260420
+```
+
+Stock cards are JSONL evidence packets that combine target weights, factor drivers, event evidence, trading state, gate context, and audit fields.
 
 The report reads `reports/approved_factors.yaml` when available so factor drivers such as `top_factor_1` and `top_factor_2` can be grouped by approved factor family. Outputs are written under `reports/exposure_attribution/`.
 
@@ -267,6 +283,14 @@ make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_I
 ```
 
 The Codex loop uses the local `codex` ChatGPT login. Each iteration asks Codex to update only `configs/autoresearch/candidates/example_expression.yaml`; the runner then commits the candidate, runs the locked oracle, runs the ledger summary, and writes logs under `reports/autoresearch/codex_loop/`. The runner refuses to run on `main` or `master` unless `--allow-protected-branch` is passed directly to the script.
+
+Run the multi-lane orchestration layer:
+
+```bash
+make autoresearch-multilane
+```
+
+The first implementation executes `expression_price_volume` through the existing expression oracle and records other lanes as `shadow_skipped`, `disabled_skipped`, or `unsupported` until their data domains and oracles are ready.
 
 ## Event Backtests
 

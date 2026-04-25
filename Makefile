@@ -13,9 +13,13 @@ AUTORESEARCH_SPACE ?= configs/autoresearch/expression_space.yaml
 AUTORESEARCH_CANDIDATE ?= configs/autoresearch/candidates/example_expression.yaml
 AUTORESEARCH_LEDGER ?= reports/autoresearch/expression_results.tsv
 AUTORESEARCH_LEDGER_MD ?= reports/autoresearch/expression_results_summary.md
+AUTORESEARCH_LANE_SPACE ?= configs/autoresearch/lane_space.yaml
+AUTORESEARCH_MULTILANE_OUTPUT ?= reports/autoresearch/multilane_summary.md
 AUTORESEARCH_CODEX_MODEL ?= gpt-5.4
 AUTORESEARCH_CODEX_UNTIL ?= 08:30
 AUTORESEARCH_CODEX_ITERATIONS ?= 30
+DATA_GOVERNANCE_CONFIG ?= configs/data_governance.yaml
+DATA_GOVERNANCE_OUTPUT ?= reports/data_governance_$(RUN_DATE).md
 FACTOR_SELECTION_CONFIG ?= configs/factor_selection.yaml
 SIGNAL_CONFIG ?= configs/signal.yaml
 SIGNAL_PROVIDER_CONFIG ?=
@@ -28,6 +32,7 @@ EXECUTION_CONFIG ?= configs/execution.yaml
 CURRENT_POSITIONS ?= state/current_positions.csv
 RUN_DATE ?= 20260420
 TARGET_PORTFOLIO ?= reports/target_portfolio_$(RUN_DATE).csv
+STOCK_CARDS_OUTPUT ?= reports/stock_cards_$(RUN_DATE).jsonl
 EXPOSURE_INPUT ?= $(TARGET_PORTFOLIO)
 EXPOSURE_OUTPUT_DIR ?= reports/exposure_attribution
 EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
@@ -42,7 +47,7 @@ RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
 
-.PHONY: help install test workbench check-env research-context candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench check-env research-context data-governance candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -52,6 +57,7 @@ help:
 	@printf "  make workbench        Start the local Streamlit research workbench\n"
 	@printf "  make check-env        Check local Qlib provider environment\n"
 	@printf "  make research-context Refresh security master and company event evidence\n"
+	@printf "  make data-governance Check PIT data-domain coverage and lane readiness\n"
 	@printf "  make candidates       Generate candidate factor table for CSI500 config\n"
 	@printf "  make mine-csi500      Run 5/20 day candidate mining on CSI500 config\n"
 	@printf "  make mine-csi300      Run 5/20 day candidate mining on CSI300 config\n"
@@ -59,6 +65,7 @@ help:
 	@printf "  make event-csi300     Event backtest FACTOR on CSI300 config\n"
 	@printf "  make summarize-event  Render Markdown from an event summary CSV\n"
 	@printf "  make autoresearch-expression  Run one controlled expression-factor loop\n"
+	@printf "  make autoresearch-multilane  Run configured autoresearch lanes with shadow gating\n"
 	@printf "  make autoresearch-ledger  Summarize expression autoresearch ledger\n"
 	@printf "  make autoresearch-codex-loop  Run overnight Codex CLI expression autoresearch\n"
 	@printf "  make select-factors   Build approved factor governance artifacts\n"
@@ -66,6 +73,7 @@ help:
 	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
 	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
 	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
+	@printf "  make stock-cards      Build JSONL stock research cards from target portfolio\n"
 	@printf "  make exposure-attribution  Explain factor-family, industry, and style exposures\n"
 	@printf "  make paper-orders    Generate paper orders/fills from target portfolio\n"
 	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
@@ -87,7 +95,9 @@ help:
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make research-context RUN_DATE=20260420\n"
+	@printf "  make data-governance RUN_DATE=20260420\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
+	@printf "  make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv\n"
 	@printf "  make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv\n"
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
 	@printf "  make paper-batch TARGET_GLOB='reports/paper_batch_targets/target_portfolio_*.csv'\n"
@@ -116,6 +126,12 @@ research-context:
 		--notice-start $(RESEARCH_CONTEXT_NOTICE_START) \
 		--notice-end $(RESEARCH_CONTEXT_NOTICE_END) \
 		--universes $(RESEARCH_CONTEXT_UNIVERSES)
+
+data-governance:
+	$(PYTHON) scripts/check_data_governance.py \
+		--config $(DATA_GOVERNANCE_CONFIG) \
+		--as-of-date $(RUN_DATE) \
+		--output $(DATA_GOVERNANCE_OUTPUT)
 
 candidates:
 	$(PYTHON) scripts/mine_factors.py \
@@ -175,6 +191,14 @@ autoresearch-expression:
 		--space $(AUTORESEARCH_SPACE) \
 		--candidate $(AUTORESEARCH_CANDIDATE)
 
+autoresearch-multilane:
+	$(PYTHON) scripts/autoresearch/run_multilane_autoresearch.py \
+		--lane-space $(AUTORESEARCH_LANE_SPACE) \
+		--contract $(AUTORESEARCH_CONTRACT) \
+		--expression-space $(AUTORESEARCH_SPACE) \
+		--expression-candidate $(AUTORESEARCH_CANDIDATE) \
+		--output $(AUTORESEARCH_MULTILANE_OUTPUT)
+
 autoresearch-ledger:
 	$(PYTHON) scripts/autoresearch/summarize_expression_ledger.py \
 		--ledger $(AUTORESEARCH_LEDGER) \
@@ -214,6 +238,12 @@ target-portfolio:
 		--trading-config $(TRADING_CONFIG) \
 		--portfolio-config $(PORTFOLIO_CONFIG) \
 		--risk-config $(RISK_CONFIG)
+
+stock-cards:
+	$(PYTHON) scripts/build_stock_cards.py \
+		--target-portfolio $(TARGET_PORTFOLIO) \
+		--as-of-date $(RUN_DATE) \
+		--output $(STOCK_CARDS_OUTPUT)
 
 exposure-attribution:
 	$(PYTHON) scripts/build_exposure_attribution.py \

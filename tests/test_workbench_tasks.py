@@ -33,6 +33,11 @@ class WorkbenchTaskTests(unittest.TestCase):
         self.assertIn("security_master", task.description)
         self.assertIn("company_events", task.description)
 
+    def test_task_registry_includes_north_star_pipeline_tasks(self):
+        self.assertEqual(WORKBENCH_TASKS["data-governance"].command, ("make", "data-governance"))
+        self.assertEqual(WORKBENCH_TASKS["autoresearch-multilane"].command, ("make", "autoresearch-multilane"))
+        self.assertEqual(WORKBENCH_TASKS["stock-cards"].command, ("make", "stock-cards"))
+
     def test_launch_workbench_task_writes_manifest_and_starts_runner(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

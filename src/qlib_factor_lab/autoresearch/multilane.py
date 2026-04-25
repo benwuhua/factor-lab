@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from qlib_factor_lab.autoresearch.oracle import run_expression_oracle
+from qlib_factor_lab.config import load_yaml
+
+
+@dataclass(frozen=True)
+class MultiLaneReport:
+    rows: tuple[dict[str, Any], ...]
+    output_path: Path | None = None
+
+    def to_frame(self) -> pd.DataFrame:
+        return pd.DataFrame(
+            self.rows,
+            columns=[
+                "lane",
+                "activation_status",
+                "run_status",
+                "candidate",
+                "primary_metric",
+                "artifact_dir",
+                "detail",
+            ],
+        )
+
+
+def run_multilane_autoresearch(
+    *,
+    lane_space_path: str | Path,
+    project_root: str | Path = ".",
+    contract_path: str | Path = "configs/autoresearch/contracts/csi500_current_v1.yaml",
+    expression_space_path: str | Path = "configs/autoresearch/expression_space.yaml",
+    expression_candidate_path: str | Path = "configs/autoresearch/candidates/example_expression.yaml",
+    output_path: str | Path = "reports/autoresearch/multilane_summary.md",
+    include_shadow: bool = False,
+    max_workers: int = 4,
+) -> MultiLaneReport:
+    root = Path(project_root)
+    lane_space = load_yaml(_resolve(root, lane_space_path))
+    lanes = lane_space.get("lanes") or {}
+    rows: list[dict[str, Any]] = []
+    futures = {}
+    with ThreadPoolExecutor(max_workers=max(1, int(max_workers))) as executor:
+        for lane_name, lane in lanes.items():
+            activation = str((lane or {}).get("activation_status", "active"))
+            if activation == "shadow" and not include_shadow:
+                rows.append(_row(lane_name, activation, "shadow_skipped", "", float("nan"), "", "lane is shadow"))
+                continue
+            if activation == "disabled":
+                rows.append(_row(lane_name, activation, "disabled_skipped", "", float("nan"), "", "lane is disabled"))
+                continue
+            if lane_name != "expression_price_volume":
+                rows.append(_row(lane_name, activation, "unsupported", "", float("nan"), "", "no runner implemented"))
+                continue
+            future = executor.submit(
+                run_expression_oracle,
+                contract_path=contract_path,
+                space_path=expression_space_path,
+                candidate_path=expression_candidate_path,
+                project_root=root,
+            )
+            futures[future] = (lane_name, activation)
+        for future in as_completed(futures):
+            lane_name, activation = futures[future]
+            try:
+                payload, _ = future.result()
+                rows.append(
+                    _row(
+                        lane_name,
+                        activation,
+                        "completed",
+                        str(payload.get("candidate", "")),
+                        payload.get("primary_metric", float("nan")),
+                        str(payload.get("artifact_dir", "")),
+                        str(payload.get("status", "")),
+                    )
+                )
+            except Exception as exc:
+                rows.append(_row(lane_name, activation, "crash", "", float("nan"), "", str(exc)))
+    rows = sorted(rows, key=lambda item: item["lane"])
+    report = MultiLaneReport(tuple(rows), output_path=_resolve(root, output_path))
+    write_multilane_report(report, report.output_path)
+    return report
+
+
+def write_multilane_report(report: MultiLaneReport, output_path: str | Path | None) -> Path:
+    if output_path is None:
+        raise ValueError("output_path is required")
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame = report.to_frame()
+    lines = [
+        "# Multilane Autoresearch Summary",
+        "",
+        f"- generated_at: {datetime.now().isoformat(timespec='seconds')}",
+        f"- lanes: {len(frame)}",
+        "",
+        "| lane | activation | run_status | candidate | primary_metric | detail |",
+        "|---|---|---|---|---:|---|",
+    ]
+    for _, row in frame.iterrows():
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    str(row["lane"]),
+                    str(row["activation_status"]),
+                    str(row["run_status"]),
+                    str(row["candidate"]),
+                    _format_float(row["primary_metric"]),
+                    str(row["detail"]),
+                ]
+            )
+            + " |"
+        )
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output.with_suffix(".json").write_text(
+        json.dumps(frame.to_dict(orient="records"), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return output
+
+
+def _row(
+    lane: str,
+    activation_status: str,
+    run_status: str,
+    candidate: str,
+    primary_metric: Any,
+    artifact_dir: str,
+    detail: str,
+) -> dict[str, Any]:
+    return {
+        "lane": lane,
+        "activation_status": activation_status,
+        "run_status": run_status,
+        "candidate": candidate,
+        "primary_metric": primary_metric,
+        "artifact_dir": artifact_dir,
+        "detail": detail,
+    }
+
+
+def _resolve(root: Path, path: str | Path) -> Path:
+    value = Path(path)
+    return value if value.is_absolute() else root / value
+
+
+def _format_float(value: Any) -> str:
+    try:
+        return f"{float(value):.6g}"
+    except (TypeError, ValueError):
+        return ""

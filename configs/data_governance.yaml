@@ -1,0 +1,82 @@
+data_governance:
+  expected_universe_path: data/security_master.csv
+  min_coverage_ratio: 0.70
+  activation_if_missing: shadow
+  activation_if_failed: shadow
+  domains:
+    security_master:
+      path: data/security_master.csv
+      required_fields:
+        - instrument
+        - name
+        - valid_from
+        - valid_to
+      pit_fields:
+        - valid_from
+        - valid_to
+      min_coverage_ratio: 0.95
+      activation_lane: security_master
+    company_events:
+      path: data/company_events.csv
+      required_fields:
+        - instrument
+        - event_type
+        - event_date
+        - severity
+        - source_url
+        - active_until
+      pit_fields:
+        - event_date
+        - active_until
+      min_coverage_ratio: 0.01
+      activation_lane: company_events
+    liquidity_microstructure:
+      path: reports/execution_calendar_{run_yyyymmdd}.csv
+      required_fields:
+        - instrument
+        - tradable
+        - suspended
+        - limit_up
+        - limit_down
+        - buy_blocked
+      pit_fields:
+        - date
+      min_coverage_ratio: 0.90
+      activation_lane: liquidity_microstructure
+    emotion_atmosphere:
+      path: data/emotion_atmosphere.csv
+      required_fields:
+        - instrument
+        - trade_date
+        - available_at
+      pit_fields:
+        - trade_date
+        - available_at
+      min_coverage_ratio: 0.70
+      activation_lane: emotion_atmosphere
+    fundamental_quality:
+      path: data/fundamental_quality.csv
+      required_fields:
+        - instrument
+        - report_period
+        - announce_date
+        - available_at
+      pit_fields:
+        - report_period
+        - announce_date
+        - available_at
+      min_coverage_ratio: 0.70
+      activation_lane: fundamental_quality
+    shareholder_capital:
+      path: data/shareholder_capital.csv
+      required_fields:
+        - instrument
+        - event_date
+        - announce_date
+        - event_type
+      pit_fields:
+        - event_date
+        - announce_date
+        - available_at
+      min_coverage_ratio: 0.70
+      activation_lane: shareholder_capital
