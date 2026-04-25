@@ -13,6 +13,8 @@ Generated market data, Qlib binaries, MLflow records, and backtest reports are i
 
 For a compact command-by-command example, see [docs/factor-research-path.md](docs/factor-research-path.md).
 
+For the unified North-Star blueprint covering data governance, multi-lane autoresearch, stock cards, family-first portfolios, and expert review, see [docs/factor-lab-north-star-blueprint.md](docs/factor-lab-north-star-blueprint.md).
+
 For the current repo evolution roadmap from alpha research to daily signal, paper trading, and manual-live readiness, see [docs/superpowers/plans/2026-04-23-factor-lab-evolution-blueprint.md](docs/superpowers/plans/2026-04-23-factor-lab-evolution-blueprint.md).
 
 ## Project Layout
@@ -213,6 +215,8 @@ configs/factor_mining.yaml
 ```
 
 The current pool includes momentum, reversal, volatility, volume-price, liquidity, divergence, Wangji pattern, and JoinQuant-migrated turnover/emotion/technical factors.
+
+Longer-term autoresearch is organized by `configs/autoresearch/lane_space.yaml`: expression, pattern/event, emotion/atmosphere, liquidity, risk, shareholder/capital, fundamental, and regime lanes. Missing non-price data lanes must stay `shadow` or `disabled` until their point-in-time data governance gates pass.
 
 Generate the candidate table only:
 

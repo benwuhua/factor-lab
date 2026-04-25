@@ -2,6 +2,8 @@
 
 本文梳理当前 factor-lab 从数据、因子、自动挖掘、组合、专家复核到纸面执行的业务流程。
 
+项目的长期主指导文档是 [factor-lab-north-star-blueprint.md](factor-lab-north-star-blueprint.md)。当前 workflow 记录“现在怎么跑”，North-Star 蓝图记录“后续应该补齐到什么形态”。
+
 ## 1. 数据治理
 
 当前研究数据库固定服务两个 A 股核心股票池：
@@ -16,6 +18,12 @@
 - 数据质量检查: `scripts/check_data_quality.py`
 
 业务目标是保证研究、回测、组合和风控都在同一套股票池与同一套时点数据上运行。
+
+当前缺口：
+
+- 情绪气氛、基本面、股东与资本结构仍不是可回测的完整时点数据域。
+- 公告事件已经能服务风险门禁和专家复核，但还需要补齐 `available_at`、`usable_for_trade_date` 和覆盖率报告。
+- 后续新增数据域必须先通过 coverage、freshness、point-in-time 字段完整性和样本量门禁，再允许进入主组合。
 
 ## 2. 因子研究
 
@@ -36,6 +44,19 @@
 ## 3. 自动挖掘
 
 autoresearch 的核心原则是“agent 只改候选表达式，不改评估器”。
+
+当前实现仍以 expression loop 为主；North-Star 目标是按 lane 并行运行：
+
+- `expression_price_volume`
+- `pattern_event`
+- `emotion_atmosphere`
+- `liquidity_microstructure`
+- `risk_structure`
+- `shareholder_capital`
+- `fundamental_quality`
+- `regime`
+
+其中 `emotion_atmosphere`、`shareholder_capital`、`fundamental_quality` 在数据域未达标前只能 shadow research，不能直接进入主组合。
 
 固定边界：
 

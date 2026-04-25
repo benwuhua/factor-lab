@@ -1,11 +1,73 @@
 generated_at: "2026-04-24"
 description: "Autoresearch lanes for avoiding same-style factor over-exploration."
 
+data_governance:
+  default_universes:
+    - csi300
+    - csi500
+  required_domains:
+    market_ohlcv:
+      current_status: ready
+      pit_fields:
+        - trade_date
+        - as_of_date
+        - source_timestamp
+    security_master:
+      current_status: partial
+      pit_fields:
+        - valid_from
+        - valid_to
+    company_events:
+      current_status: partial
+      pit_fields:
+        - event_date
+        - announce_date
+        - available_at
+        - active_until
+    emotion_atmosphere:
+      current_status: missing
+      pit_fields:
+        - trade_date
+        - as_of_date
+        - available_at
+    liquidity_microstructure:
+      current_status: partial
+      pit_fields:
+        - trade_date
+        - as_of_date
+        - available_at
+        - limit_up
+        - limit_down
+        - suspended
+        - buy_blocked
+    fundamental_quality:
+      current_status: missing
+      pit_fields:
+        - report_period
+        - announce_date
+        - available_at
+    shareholder_capital:
+      current_status: missing
+      pit_fields:
+        - event_date
+        - announce_date
+        - effective_date
+        - available_at
+        - active_until
+
+lane_activation:
+  require_data_domain_coverage: true
+  min_required_pit_field_completeness: 0.98
+  missing_domain_status: shadow
+  promotion_requires_data_ready: true
+  main_portfolio_requires_active_lane: true
+
 lanes:
   expression_price_volume:
     cadence: daily
     editable_space: configs/autoresearch/expression_space.yaml
     factor_type: cross_sectional
+    activation_status: active
     families:
       - momentum
       - reversal
@@ -26,6 +88,7 @@ lanes:
     cadence: daily
     editable_space: configs/autoresearch/pattern_space.yaml
     factor_type: event_like
+    activation_status: active
     families:
       - wangji_like
       - quiet_breakout
@@ -40,10 +103,43 @@ lanes:
       max_event_overlap: 0.35
       ic_is_secondary: true
 
+  emotion_atmosphere:
+    cadence: daily
+    editable_space: configs/autoresearch/emotion_space.yaml
+    factor_type: market_state_event_like
+    activation_status: shadow
+    required_data_domains:
+      - market_ohlcv
+      - emotion_atmosphere
+    families:
+      - turnover_heat
+      - limit_pressure
+      - breadth_mood
+      - crowding
+      - volatility_mood
+      - sentiment_reversal
+    primary_metrics:
+      - event_mean_return_h5
+      - event_mean_return_h20
+      - conditional_rank_ic_h20_by_breadth_regime
+      - post_heat_max_drawdown_h20
+      - breadth_state_payoff_h20
+    guards:
+      require_point_in_time_market_state: true
+      require_available_at_or_lag_rule: true
+      ic_is_secondary: true
+      min_trade_count: 120
+      max_top_quantile_turnover: 0.35
+      max_size_exposure_abs: 0.25
+      max_liquidity_proxy_exposure: 0.35
+      require_breadth_regime_split: true
+      require_state_explanation: true
+
   risk_structure:
     cadence: daily
     editable_space: configs/autoresearch/risk_space.yaml
     factor_type: cross_sectional
+    activation_status: active
     families:
       - drawdown_quality
       - downside_volatility
@@ -61,6 +157,7 @@ lanes:
     cadence: daily
     editable_space: configs/autoresearch/liquidity_space.yaml
     factor_type: cross_sectional
+    activation_status: active
     families:
       - turnover_stability
       - amount_shock
@@ -74,10 +171,45 @@ lanes:
       max_liquidity_proxy_exposure: 0.35
       max_top_quantile_turnover: 0.30
 
+  shareholder_capital:
+    cadence: weekly_event
+    editable_space: configs/autoresearch/shareholder_space.yaml
+    factor_type: event_like
+    activation_status: shadow
+    required_data_domains:
+      - security_master
+      - shareholder_capital
+    families:
+      - holder_count_change
+      - buyback
+      - pledge_risk
+      - unlock_overhang
+      - reduction_increase
+      - capital_structure_change
+    primary_metrics:
+      - event_mean_return_h20
+      - event_mean_return_h60
+      - event_hit_rate_h20
+      - post_event_max_drawdown_h20
+      - risk_block_precision
+      - coverage_ratio
+    guards:
+      data_source_required: true
+      require_announce_date: true
+      require_effective_date_or_event_date: true
+      require_active_until_for_risk_events: true
+      min_event_count: 50
+      min_coverage_ratio: 0.70
+      ic_is_secondary: true
+      cannot_use_unannounced_report_period: true
+
   fundamental_quality:
     cadence: weekly
     editable_space: configs/autoresearch/fundamental_space.yaml
     factor_type: cross_sectional
+    activation_status: shadow
+    required_data_domains:
+      - fundamental_quality
     families:
       - value
       - quality
@@ -95,6 +227,7 @@ lanes:
     cadence: daily
     editable_space: configs/autoresearch/regime_space.yaml
     factor_type: allocator
+    activation_status: active
     families:
       - index_trend
       - breadth
@@ -111,15 +244,20 @@ lanes:
 portfolio_combination:
   mode: family_first
   rule: "Build family scores first, then combine family representatives."
+  weight_basis: post_activation_target_weights
+  activation_filter: active_lanes_only
   default_family_caps:
     max_single_family_weight: 0.35
     max_single_factor_weight: 0.20
   initial_family_weights:
-    divergence: 0.30
-    risk_structure: 0.25
-    pattern_event: 0.20
-    liquidity_microstructure: 0.15
-    fundamental_quality: 0.10
+    expression_price_volume: 0.22
+    pattern_event: 0.16
+    emotion_atmosphere: 0.18
+    liquidity_microstructure: 0.14
+    risk_structure: 0.14
+    fundamental_quality: 0.08
+    shareholder_capital: 0.04
+    regime_overlay: 0.04
   reserve_policy:
     reserve_factors_in_main_score: false
     reserve_factors_shadow_scored: true
@@ -135,5 +273,7 @@ expert_review:
     - factor_family_concentration
     - unexplained_single_name_risk
     - liquidity_and_tradability
+    - emotion_overheat_or_panic
     - market_regime_conflict
     - suspicious_factor_misfire
+    - stock_card_evidence_gap
