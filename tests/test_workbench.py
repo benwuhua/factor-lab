@@ -14,6 +14,7 @@ from qlib_factor_lab.workbench import (
     build_pretrade_review,
     build_research_pipeline_status,
     build_workbench_freshness,
+    find_latest_run_dir,
     get_candidate_diagnostics,
     get_candidate_artifacts,
     load_autoresearch_queue,
@@ -131,6 +132,20 @@ class WorkbenchTests(unittest.TestCase):
 
         self.assertEqual(snapshot.approved_factor_count, 2)
         self.assertEqual(snapshot.latest_target_portfolio.name, "target_portfolio_20260424.csv")
+
+    def test_latest_run_dir_ignores_workbench_task_monitor_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            research_run = root / "runs/20260423"
+            task_run = root / "runs/workbench_tasks"
+            research_run.mkdir(parents=True)
+            task_run.mkdir(parents=True)
+            os.utime(research_run, (datetime(2026, 4, 23, 8, 30).timestamp(), datetime(2026, 4, 23, 8, 30).timestamp()))
+            os.utime(task_run, (datetime(2026, 4, 25, 20, 0).timestamp(), datetime(2026, 4, 25, 20, 0).timestamp()))
+
+            latest = find_latest_run_dir(root)
+
+        self.assertEqual(latest, research_run)
 
     def test_freshness_marks_existing_recent_artifacts_ready_and_missing_as_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

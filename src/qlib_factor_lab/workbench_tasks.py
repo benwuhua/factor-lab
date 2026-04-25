@@ -112,8 +112,26 @@ def latest_workbench_task_runs(root: str | Path, limit: int = 8) -> list[dict[st
     for path in manifests[:limit]:
         data = _read_manifest(path)
         data["run_dir"] = str(path.parent)
+        data["log_tail"] = tail_workbench_task_log(path.parent)
         rows.append(data)
     return rows
+
+
+def summarize_workbench_task_runs(rows: list[dict[str, Any]]) -> dict[str, int]:
+    summary = {status: 0 for status in ["queued", "running", "succeeded", "failed"]}
+    for row in rows:
+        status = str(row.get("status", "") or "")
+        if status in summary:
+            summary[status] += 1
+    return summary
+
+
+def tail_workbench_task_log(run_dir: str | Path, lines: int = 8) -> str:
+    log_path = Path(run_dir) / "task.log"
+    if not log_path.exists():
+        return ""
+    content = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return "\n".join(content[-lines:])
 
 
 def task_manifest_path(run_dir: str | Path) -> Path:

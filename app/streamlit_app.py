@@ -33,7 +33,7 @@ from qlib_factor_lab.workbench import (
     parse_expert_review_result,
     summarize_autoresearch_queue,
 )
-from qlib_factor_lab.workbench_tasks import latest_workbench_task_runs, launch_workbench_task
+from qlib_factor_lab.workbench_tasks import latest_workbench_task_runs, launch_workbench_task, summarize_workbench_task_runs
 
 
 st.set_page_config(page_title="Factor Lab Workbench", layout="wide")
@@ -694,6 +694,7 @@ def _render_workflow_task_buttons(rows: list[dict[str, object]], key_prefix: str
     task_rows = [row for row in rows if row.get("task_id")]
     if not task_rows:
         return
+    st.markdown('<div class="task-button-row">', unsafe_allow_html=True)
     cols = st.columns(min(len(task_rows), 4))
     for index, row in enumerate(task_rows):
         task_id = str(row["task_id"])
@@ -703,12 +704,40 @@ def _render_workflow_task_buttons(rows: list[dict[str, object]], key_prefix: str
                 record = launch_workbench_task(ROOT, task_id)
                 st.success(f"已启动后台任务: {task_id}")
                 st.caption(f"manifest: {record.manifest_path}")
+    st.markdown("</div>", unsafe_allow_html=True)
+    _render_task_monitor(key_prefix)
+
+
+@st.fragment(run_every="10s")
+def _render_task_monitor(key_prefix: str) -> None:
     recent = latest_workbench_task_runs(ROOT, limit=5)
-    if recent:
-        with st.expander("最近后台任务", expanded=False):
-            display = pd.DataFrame(recent)
-            keep = [column for column in ["created_at", "task_id", "status", "returncode", "run_dir"] if column in display.columns]
-            st.dataframe(display.loc[:, keep], use_container_width=True, hide_index=True)
+    if not recent:
+        return
+    summary = summarize_workbench_task_runs(recent)
+    st.markdown(_task_status_cards_html(summary), unsafe_allow_html=True)
+    running_count = summary.get("queued", 0) + summary.get("running", 0)
+    if running_count:
+        st.progress(min(running_count / max(len(recent), 1), 1.0), text=f"{running_count} 个后台任务仍在运行或排队")
+    if st.button("刷新任务状态", key=f"refresh-tasks-{key_prefix}", use_container_width=True):
+        st.rerun(scope="fragment")
+    with st.expander("最近后台任务", expanded=bool(running_count)):
+        display = pd.DataFrame(recent)
+        keep = [column for column in ["created_at", "task_id", "status", "returncode", "run_dir"] if column in display.columns]
+        st.dataframe(display.loc[:, keep], use_container_width=True, hide_index=True)
+        latest = recent[0]
+        if latest.get("log_tail"):
+            st.caption(f"latest log: {latest.get('task_id')}")
+            st.code(str(latest["log_tail"]), language="text")
+
+
+def _task_status_cards_html(summary: dict[str, int]) -> str:
+    items = []
+    for status in ["queued", "running", "succeeded", "failed"]:
+        klass = "bad" if status == "failed" and summary.get(status, 0) else "active" if status in {"queued", "running"} and summary.get(status, 0) else ""
+        items.append(
+            f'<div class="task-status {klass}"><label>{_html(status)}</label><strong>{_html(summary.get(status, 0))}</strong></div>'
+        )
+    return f'<section class="task-status-grid">{"".join(items)}</section>'
 
 
 def _provider_rows() -> list[dict[str, object]]:
@@ -738,11 +767,10 @@ def _provider_rows() -> list[dict[str, object]]:
 
 
 def _quality_rows(snapshot) -> list[dict[str, object]]:
-    latest_target = snapshot.latest_target_portfolio.name if snapshot.latest_target_portfolio else "target_portfolio_*.csv"
     return [
         {"step": "01 ENV", "title": "检查 provider 环境", "command": "make check-env", "status": "ready", "action": "Run", "task_id": "check-env"},
         {"step": "02 SIGNAL", "title": "生成当日信号", "command": "make daily-signal", "status": "ready", "action": "Run", "task_id": "daily-signal"},
-        {"step": "03 QUALITY", "title": "检查信号质量", "command": f"make check-data-quality SIGNAL_CSV={latest_target}", "status": "guarded", "action": "Gate", "task_id": "check-data-quality"},
+        {"step": "03 QUALITY", "title": "检查信号质量", "command": "make check-data-quality", "status": "guarded", "action": "Gate", "task_id": "check-data-quality"},
     ]
 
 
@@ -1194,6 +1222,43 @@ def _style() -> None:
             padding: 6px 8px;
             font-size: 11px;
             font-weight: 760;
+          }
+          .task-button-row {
+            display: block;
+            margin: -4px 0 12px;
+          }
+          .task-status-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin: 8px 0 12px;
+          }
+          .task-status {
+            border: 1px solid var(--fl-line);
+            border-radius: 8px;
+            background: #f8f9f6;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+          }
+          .task-status label {
+            color: var(--fl-muted);
+            font-size: 12px;
+            white-space: nowrap;
+          }
+          .task-status strong {
+            font-size: 18px;
+            color: var(--fl-ink);
+          }
+          .task-status.active {
+            border-color: #9ec9b7;
+            background: #ecf5f0;
+          }
+          .task-status.bad {
+            border-color: #e1b2a9;
+            background: #f8e8e4;
           }
           .section-header { padding: 18px 18px 0; }
           .detail-topbar {

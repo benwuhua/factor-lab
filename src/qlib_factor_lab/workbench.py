@@ -102,7 +102,11 @@ def find_latest_target_portfolio(root: str | Path = ".") -> Path | None:
 
 def find_latest_run_dir(root: str | Path = ".") -> Path | None:
     root_path = Path(root)
-    candidates = [path for path in (root_path / "runs").glob("*") if path.is_dir()]
+    candidates = [
+        path
+        for path in (root_path / "runs").glob("*")
+        if path.is_dir() and path.name != "workbench_tasks"
+    ]
     return _latest_path(candidates)
 
 

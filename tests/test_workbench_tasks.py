@@ -4,7 +4,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from qlib_factor_lab.workbench_tasks import WORKBENCH_TASKS, launch_workbench_task, task_manifest_path
+from qlib_factor_lab.workbench_tasks import (
+    WORKBENCH_TASKS,
+    latest_workbench_task_runs,
+    launch_workbench_task,
+    summarize_workbench_task_runs,
+    task_manifest_path,
+    tail_workbench_task_log,
+)
 
 
 class WorkbenchTaskTests(unittest.TestCase):
@@ -38,6 +45,34 @@ class WorkbenchTaskTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(KeyError):
                 launch_workbench_task(tmp, "rm-rf")
+
+    def test_summarize_workbench_task_runs_counts_statuses(self):
+        rows = [{"status": "queued"}, {"status": "running"}, {"status": "running"}, {"status": "failed"}]
+
+        summary = summarize_workbench_task_runs(rows)
+
+        self.assertEqual(summary["queued"], 1)
+        self.assertEqual(summary["running"], 2)
+        self.assertEqual(summary["succeeded"], 0)
+        self.assertEqual(summary["failed"], 1)
+
+    def test_latest_runs_and_tail_log_include_monitoring_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs/workbench_tasks/20260425_090000_check-env"
+            run.mkdir(parents=True)
+            task_manifest_path(run).write_text(
+                json.dumps({"task_id": "check-env", "status": "succeeded", "returncode": 0}),
+                encoding="utf-8",
+            )
+            (run / "task.log").write_text("\n".join([f"line-{index}" for index in range(8)]), encoding="utf-8")
+
+            rows = latest_workbench_task_runs(root)
+            tail = tail_workbench_task_log(run, lines=3)
+
+        self.assertEqual(rows[0]["task_id"], "check-env")
+        self.assertIn("line-7", rows[0]["log_tail"])
+        self.assertEqual(tail, "line-5\nline-6\nline-7")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 import unittest
 
-from app.streamlit_app import _detail_card_html, _page_topbar_html, _short_text, _workflow_card_grid_html
+from app.streamlit_app import _detail_card_html, _page_topbar_html, _short_text, _task_status_cards_html, _workflow_card_grid_html
 
 
 class StreamlitAppUiTests(unittest.TestCase):
@@ -52,6 +52,13 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("固定数据边界", html)
         self.assertIn("<code>configs/provider_current.yaml</code>", html)
         self.assertIn("locked", html)
+
+    def test_task_status_cards_html_highlights_running_and_failed_counts(self):
+        html = _task_status_cards_html({"queued": 1, "running": 2, "succeeded": 3, "failed": 4})
+
+        self.assertIn('class="task-status-grid"', html)
+        self.assertIn("<label>running</label><strong>2</strong>", html)
+        self.assertIn("<label>failed</label><strong>4</strong>", html)
 
 
 if __name__ == "__main__":
