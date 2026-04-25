@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from qlib_factor_lab.workbench import (
+    build_execution_gate_card,
     build_portfolio_gate_explanation,
     build_gate_review_items,
     build_pretrade_review,
@@ -17,6 +18,7 @@ from qlib_factor_lab.workbench import (
     get_candidate_artifacts,
     load_autoresearch_queue,
     load_workbench_snapshot,
+    parse_expert_review_result,
     summarize_autoresearch_queue,
 )
 
@@ -187,6 +189,57 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(by_check.loc["limit_or_suspended", "status"], "reject")
         self.assertEqual(by_check.loc["event_blocked", "status"], "reject")
         self.assertEqual(by_check.loc["announcement_watch", "status"], "caution")
+
+    def test_execution_gate_card_rejects_hard_blocks_and_cautions_soft_blocks(self):
+        pretrade = pd.DataFrame(
+            [
+                {"check": "liquidity_floor", "status": "caution", "detail": "AAA"},
+                {"check": "limit_or_suspended", "status": "pass", "detail": ""},
+            ]
+        )
+        expert = {"decision": "pass", "status": "completed"}
+
+        caution = build_execution_gate_card("pass", pretrade, expert)
+        self.assertEqual(caution["decision"], "caution")
+        self.assertEqual(caution["action"], "require_manual_confirmation")
+        self.assertIn("liquidity_floor", caution["reasons"][0])
+
+        blocked = build_execution_gate_card(
+            "pass",
+            pd.DataFrame([{"check": "event_blocked", "status": "reject", "detail": "BBB"}]),
+            expert,
+        )
+        self.assertEqual(blocked["decision"], "reject")
+        self.assertEqual(blocked["action"], "block_paper_execution")
+
+    def test_parse_expert_review_result_extracts_decision_summary_and_watchlist(self):
+        text = """# Expert Review Result
+
+- status: completed
+- decision: caution
+- error:
+
+## Output
+
+结论：`caution`，不建议直接无脑下单。
+
+**2. 需要人工看图或基本面复核的“因子误伤”候选**
+
+- `SH600580`：排名 19，score 已经接近尾部。
+- `SZ002568`：20 日成交额最低。
+
+**3. 下单前最值得拦截的风险**
+
+第一是因子拥挤和逻辑单一。
+"""
+
+        result = parse_expert_review_result(text)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["decision"], "caution")
+        self.assertIn("不建议直接无脑下单", result["summary"])
+        self.assertEqual(result["watchlist"], ["SH600580", "SZ002568"])
+        self.assertIn("第一是因子拥挤", result["risk_notes"])
 
     def test_research_pipeline_status_links_research_expert_gate_and_paper(self):
         with tempfile.TemporaryDirectory() as tmp:

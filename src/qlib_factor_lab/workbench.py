@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import re
 
 import pandas as pd
 import yaml
@@ -251,6 +252,85 @@ def build_pretrade_review(portfolio: pd.DataFrame, *, min_amount_20d: float = 10
     return pd.DataFrame(rows, columns=["check", "status", "count", "detail", "review_focus"])
 
 
+def build_execution_gate_card(
+    gate_decision: str,
+    pretrade_review: pd.DataFrame,
+    expert_review: dict[str, Any] | None,
+) -> dict[str, Any]:
+    reasons = []
+    gate_status = _normalized_decision(gate_decision)
+    expert_status = _normalized_decision((expert_review or {}).get("decision", "missing"))
+    pretrade_statuses = (
+        pretrade_review["status"].fillna("").astype(str).map(_normalized_decision).tolist()
+        if not pretrade_review.empty and "status" in pretrade_review.columns
+        else []
+    )
+
+    if gate_status == "reject":
+        reasons.append("portfolio_gate: reject")
+    if expert_status == "reject":
+        reasons.append("expert_review: reject")
+    reasons.extend(_pretrade_reasons(pretrade_review, "reject"))
+    if reasons:
+        return {
+            "decision": "reject",
+            "action": "block_paper_execution",
+            "headline": "阻断纸面执行",
+            "reasons": reasons,
+        }
+
+    caution_reasons = []
+    if gate_status == "caution":
+        caution_reasons.append("portfolio_gate: caution")
+    if expert_status in {"caution", "missing", "review"}:
+        caution_reasons.append(f"expert_review: {expert_status}")
+    caution_reasons.extend(_pretrade_reasons(pretrade_review, "caution"))
+    if "caution" in pretrade_statuses or caution_reasons:
+        return {
+            "decision": "caution",
+            "action": "require_manual_confirmation",
+            "headline": "需要人工确认后进入纸面执行",
+            "reasons": caution_reasons,
+        }
+
+    return {
+        "decision": "pass",
+        "action": "allow_paper_execution",
+        "headline": "允许进入纸面执行",
+        "reasons": [],
+    }
+
+
+def load_execution_gate_card(root: str | Path = ".") -> dict[str, Any]:
+    root_path = Path(root)
+    latest = find_latest_target_portfolio(root_path)
+    portfolio = pd.read_csv(latest) if latest is not None and latest.exists() else pd.DataFrame()
+    gate = build_portfolio_gate_explanation(
+        portfolio,
+        risk_config=load_risk_config_dict(root_path),
+        factor_family_map=load_factor_family_map_safe(root_path),
+    )
+    latest_run = find_latest_run_dir(root_path)
+    expert_path = latest_run / "expert_review_result.md" if latest_run is not None else None
+    expert = parse_expert_review_result(expert_path) if expert_path is not None else parse_expert_review_result("")
+    return build_execution_gate_card(gate.decision, build_pretrade_review(portfolio), expert)
+
+
+def parse_expert_review_result(source: str | Path | None) -> dict[str, Any]:
+    text = _expert_text(source)
+    metadata = _expert_metadata(text)
+    output = _section_after(text, "## Output")
+    return {
+        "status": metadata.get("status", "missing" if not text.strip() else ""),
+        "decision": _normalized_decision(metadata.get("decision", "")),
+        "error": metadata.get("error", ""),
+        "summary": _expert_summary(output),
+        "watchlist": _expert_watchlist(output),
+        "risk_notes": _expert_risk_notes(output),
+        "raw_output": output.strip(),
+    }
+
+
 def build_research_pipeline_status(root: str | Path = ".") -> pd.DataFrame:
     root_path = Path(root)
     queue = load_autoresearch_queue(root_path)
@@ -273,7 +353,7 @@ def build_research_pipeline_status(root: str | Path = ".") -> pd.DataFrame:
         },
         {
             "stage": "expert_review",
-            "status": _expert_decision(expert_path),
+            "status": parse_expert_review_result(expert_path)["decision"] if expert_path is not None else "missing",
             "detail": "LLM 专家复核结果",
             "path": str(expert_path or ""),
         },
@@ -458,11 +538,7 @@ def _autoresearch_stage_detail(queue: pd.DataFrame) -> str:
 def _expert_decision(path: Path | None) -> str:
     if path is None or not path.exists():
         return "missing"
-    text = path.read_text(encoding="utf-8")
-    for decision in ["reject", "caution", "pass", "approve", "approved"]:
-        if f"decision: {decision}" in text or f"decision：{decision}" in text:
-            return "pass" if decision in {"approve", "approved"} else decision
-    return "review"
+    return parse_expert_review_result(path)["decision"] or "review"
 
 
 def _candidate_eval_frame(raw_eval: pd.DataFrame, neutral_eval: pd.DataFrame) -> pd.DataFrame:
@@ -527,3 +603,93 @@ def _number(value: Any) -> float:
 
 def _blank(value: Any) -> bool:
     return pd.isna(value) or str(value).strip() == ""
+
+
+def _pretrade_reasons(pretrade_review: pd.DataFrame, status: str) -> list[str]:
+    if pretrade_review.empty or "status" not in pretrade_review.columns:
+        return []
+    output = []
+    matched = pretrade_review.loc[pretrade_review["status"].astype(str).map(_normalized_decision) == status]
+    for _, row in matched.iterrows():
+        detail = str(row.get("detail", "")).strip()
+        reason = str(row.get("check", "")).strip()
+        output.append(f"{reason}: {detail}" if detail else reason)
+    return output
+
+
+def _normalized_decision(value: Any) -> str:
+    text = str(value or "").strip().lower().replace("`", "")
+    if text in {"approve", "approved", "ok", "ready"}:
+        return "pass"
+    if text in {"reject", "caution", "pass", "review", "missing"}:
+        return text
+    return text or "missing"
+
+
+def _expert_text(source: str | Path | None) -> str:
+    if source is None:
+        return ""
+    if isinstance(source, Path):
+        return source.read_text(encoding="utf-8") if source.exists() else ""
+    text = str(source)
+    possible_path = Path(text)
+    if "\n" not in text and possible_path.exists():
+        return possible_path.read_text(encoding="utf-8")
+    return text
+
+
+def _expert_metadata(text: str) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    for line in text.splitlines():
+        match = re.match(r"^\s*-\s*([A-Za-z_]+)\s*[:：]\s*(.*)\s*$", line)
+        if match:
+            metadata[match.group(1).strip().lower()] = match.group(2).strip().strip("`")
+    return metadata
+
+
+def _section_after(text: str, marker: str) -> str:
+    if marker not in text:
+        return text
+    return text.split(marker, 1)[1]
+
+
+def _expert_summary(output: str) -> str:
+    for line in output.splitlines():
+        cleaned = _clean_markdown(line)
+        if cleaned:
+            return cleaned
+    return ""
+
+
+def _expert_watchlist(output: str) -> list[str]:
+    seen = set()
+    instruments = []
+    for match in re.finditer(r"\b(?:SH|SZ|BJ)\d{6}\b", output):
+        instrument = match.group(0)
+        if instrument not in seen:
+            instruments.append(instrument)
+            seen.add(instrument)
+    return instruments
+
+
+def _expert_risk_notes(output: str) -> str:
+    lines = output.splitlines()
+    collecting = False
+    notes = []
+    for line in lines:
+        cleaned = _clean_markdown(line)
+        if "下单前最值得拦截" in cleaned:
+            collecting = True
+            continue
+        if collecting and (line.strip().startswith("**") or line.strip().startswith("##")):
+            break
+        if collecting and cleaned:
+            notes.append(cleaned)
+    return " ".join(notes).strip()
+
+
+def _clean_markdown(line: str) -> str:
+    cleaned = line.strip().replace("`", "")
+    cleaned = re.sub(r"^\s*[-*]\s+", "", cleaned)
+    cleaned = cleaned.replace("**", "")
+    return cleaned.strip()

@@ -19,14 +19,17 @@ from qlib_factor_lab.workbench import (
     build_pretrade_review,
     build_research_pipeline_status,
     classify_gate_decision,
+    find_latest_run_dir,
     find_latest_target_portfolio,
     get_candidate_diagnostics,
     get_candidate_artifacts,
+    load_execution_gate_card,
     load_autoresearch_queue,
     load_factor_family_map_safe,
     load_portfolio_gate_explanation,
     load_risk_config_dict,
     load_workbench_snapshot,
+    parse_expert_review_result,
     summarize_autoresearch_queue,
 )
 
@@ -72,6 +75,8 @@ def render_dashboard() -> None:
     cols[2].metric("Portfolio Gate", gate.decision.upper())
     cols[3].metric("Latest Target", target_name)
     cols[4].metric("Paper Bundle", "Ready" if snapshot.latest_run_dir else "No run")
+
+    render_execution_gate_card(load_execution_gate_card(ROOT))
 
     st.subheader("流水线操作台")
     st.caption("第一版为只读操作台：展示建议命令和产物状态，不直接从 UI 执行本地任务。")
@@ -131,6 +136,21 @@ def render_portfolio_gate() -> None:
     status = gate.decision.upper()
     st.metric("Gate Decision", status)
     st.caption(f"目标组合: {latest}")
+    render_execution_gate_card(load_execution_gate_card(ROOT))
+
+    expert = _latest_expert_review()
+    st.subheader("专家复核结构化摘要")
+    expert_cols = st.columns(3)
+    expert_cols[0].metric("status", expert["status"])
+    expert_cols[1].metric("decision", expert["decision"])
+    expert_cols[2].metric("watchlist", len(expert["watchlist"]))
+    if expert["summary"]:
+        st.write(expert["summary"])
+    if expert["risk_notes"]:
+        st.caption(expert["risk_notes"])
+    if expert["watchlist"]:
+        st.dataframe(pd.DataFrame({"instrument": expert["watchlist"]}), use_container_width=True, hide_index=True)
+
     st.subheader("为什么被 caution / reject")
     st.dataframe(_gate_frame(gate.checks), use_container_width=True, hide_index=True)
     review_items = build_gate_review_items(gate.checks)
@@ -261,11 +281,36 @@ def _gate_frame(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def render_execution_gate_card(card: dict) -> None:
+    st.subheader("纸面执行总判定")
+    cols = st.columns(3)
+    cols[0].metric("decision", str(card.get("decision", "")).upper())
+    cols[1].metric("action", str(card.get("action", "")))
+    cols[2].metric("reason_count", len(card.get("reasons", [])))
+    headline = str(card.get("headline", ""))
+    if card.get("decision") == "reject":
+        st.error(headline)
+    elif card.get("decision") == "caution":
+        st.warning(headline)
+    else:
+        st.success(headline)
+    reasons = card.get("reasons", [])
+    if reasons:
+        st.dataframe(pd.DataFrame({"reason": reasons}), use_container_width=True, hide_index=True)
+
+
 def _decision_level(check: str, status: str) -> str:
     if status == "pass":
         return "pass"
     synthetic = pd.DataFrame([{"check": check, "status": status}])
     return classify_gate_decision(synthetic)
+
+
+def _latest_expert_review() -> dict:
+    latest_run = find_latest_run_dir(ROOT)
+    if latest_run is None:
+        return parse_expert_review_result("")
+    return parse_expert_review_result(latest_run / "expert_review_result.md")
 
 
 def _style() -> None:
