@@ -9,6 +9,7 @@ from qlib_factor_lab.workbench_tasks import (
     latest_workbench_task_runs,
     launch_workbench_task,
     load_workbench_task_detail,
+    rerun_workbench_task,
     summarize_workbench_task_runs,
     task_manifest_path,
     tail_workbench_task_log,
@@ -92,6 +93,26 @@ class WorkbenchTaskTests(unittest.TestCase):
         self.assertEqual(detail["log"], "alpha\nbeta\ngamma\n")
         self.assertEqual(detail["log_line_count"], 3)
         self.assertEqual(Path(detail["run_dir"]).name, "20260425_090000_check-env")
+
+    def test_rerun_workbench_task_uses_task_id_from_existing_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "scripts").mkdir()
+            (root / "scripts/run_workbench_task.py").write_text("print('stub')", encoding="utf-8")
+            run = root / "runs/workbench_tasks/20260425_090000_check-env"
+            run.mkdir(parents=True)
+            task_manifest_path(run).write_text(
+                json.dumps({"task_id": "check-env", "status": "succeeded", "returncode": 0}),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.workbench_tasks.subprocess.Popen") as popen:
+                record = rerun_workbench_task(root, run)
+
+            self.assertEqual(record.task_id, "check-env")
+            self.assertNotEqual(record.run_dir, run)
+            self.assertEqual(json.loads(record.manifest_path.read_text(encoding="utf-8"))["command"], ["make", "check-env"])
+            popen.assert_called_once()
 
 
 if __name__ == "__main__":

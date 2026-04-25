@@ -81,6 +81,14 @@ def launch_workbench_task(root: str | Path, task_id: str) -> WorkbenchTaskRecord
     return WorkbenchTaskRecord(task_id=task_id, run_dir=run_dir, manifest_path=manifest_path, log_path=log_path)
 
 
+def rerun_workbench_task(root: str | Path, run_dir: str | Path) -> WorkbenchTaskRecord:
+    manifest = _read_manifest(task_manifest_path(Path(run_dir)))
+    task_id = str(manifest.get("task_id", ""))
+    if task_id not in WORKBENCH_TASKS:
+        raise KeyError(task_id)
+    return launch_workbench_task(root, task_id)
+
+
 def run_workbench_task(root: str | Path, task_id: str, run_dir: str | Path) -> int:
     root_path = Path(root)
     task = WORKBENCH_TASKS[task_id]

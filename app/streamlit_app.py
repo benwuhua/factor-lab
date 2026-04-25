@@ -37,6 +37,7 @@ from qlib_factor_lab.workbench_tasks import (
     latest_workbench_task_runs,
     launch_workbench_task,
     load_workbench_task_detail,
+    rerun_workbench_task,
     summarize_workbench_task_runs,
 )
 
@@ -748,6 +749,13 @@ def _render_task_monitor(key_prefix: str) -> None:
             with right:
                 st.caption(f"full log · {detail['log_line_count']} lines")
                 st.code(detail["log"] or "log not written yet", language="text")
+            manifest = detail.get("manifest", {})
+            task_id = str(manifest.get("task_id", ""))
+            if task_id:
+                if st.button(_rerun_task_button_label(manifest), key=f"rerun-task-{key_prefix}", use_container_width=True):
+                    record = rerun_workbench_task(ROOT, str(selected_run.get("run_dir", "")))
+                    st.success(f"已重跑后台任务: {record.task_id}")
+                    st.caption(f"manifest: {record.manifest_path}")
 
 
 def _task_status_cards_html(summary: dict[str, int]) -> str:
@@ -766,6 +774,10 @@ def _task_run_option_label(row: dict[str, object]) -> str:
     returncode = row.get("returncode")
     code = "pending" if returncode is None else f"rc={returncode}"
     return f"{run_name} · {status} · {code}"
+
+
+def _rerun_task_button_label(manifest: dict[str, object]) -> str:
+    return f"重跑同类任务 · {manifest.get('task_id', 'unknown')}"
 
 
 def _provider_rows() -> list[dict[str, object]]:

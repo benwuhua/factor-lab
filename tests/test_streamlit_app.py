@@ -3,6 +3,7 @@ import unittest
 from app.streamlit_app import (
     _detail_card_html,
     _page_topbar_html,
+    _rerun_task_button_label,
     _short_text,
     _task_run_option_label,
     _task_status_cards_html,
@@ -77,6 +78,11 @@ class StreamlitAppUiTests(unittest.TestCase):
         )
 
         self.assertEqual(label, "20260425_090000_check-env · succeeded · rc=0")
+
+    def test_rerun_task_button_label_uses_selected_manifest_task_id(self):
+        label = _rerun_task_button_label({"task_id": "check-env"})
+
+        self.assertEqual(label, "重跑同类任务 · check-env")
 
 
 if __name__ == "__main__":
