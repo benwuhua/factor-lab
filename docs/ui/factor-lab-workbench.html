@@ -244,12 +244,12 @@
 
     .ops-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 12px;
     }
 
     .op-card {
-      min-height: 142px;
+      min-height: 128px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #f8f9f6;
@@ -263,13 +263,14 @@
     .op-card::after {
       content: "";
       position: absolute;
-      right: -9px;
+      right: -11px;
       top: 50%;
-      width: 8px;
+      width: 10px;
       height: 1px;
       background: var(--line);
     }
 
+    .op-card:nth-child(3)::after,
     .op-card:last-child::after {
       display: none;
     }
@@ -294,6 +295,7 @@
       font-size: 11px;
       line-height: 1.45;
       overflow-wrap: anywhere;
+      min-height: 44px;
     }
 
     .op-footer {
@@ -321,7 +323,7 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-columns: 1fr;
       gap: 18px;
       min-height: 0;
     }
@@ -528,14 +530,19 @@
       .metrics {
         grid-template-columns: repeat(3, minmax(130px, 1fr));
       }
+    }
 
-      .ops-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+    @media (min-width: 1560px) {
+      .workspace {
+        grid-template-columns: 1.1fr 0.9fr;
       }
 
-      .op-card:nth-child(3)::after,
-      .op-card:last-child::after {
-        display: none;
+      .ops-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+
+      .op-card:nth-child(3)::after {
+        display: block;
       }
     }
 
