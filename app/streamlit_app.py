@@ -524,6 +524,11 @@ def render_evidence_library() -> None:
 
     main_col, rail_col = st.columns([3.1, 1.05], gap="large")
     with main_col:
+        evidence_rows = _evidence_library_rows()
+        st.markdown(_section_header_html("证据库动作", "research context refresh"), unsafe_allow_html=True)
+        st.markdown(_workflow_card_grid_html(evidence_rows), unsafe_allow_html=True)
+        _render_workflow_task_buttons(evidence_rows, "evidence-library")
+
         st.markdown(_section_header_html("事件证据过滤", "instrument, type, severity"), unsafe_allow_html=True)
         if detail.empty:
             st.info("还没有 data/company_events.csv。先运行研究上下文数据构建任务。")
@@ -1021,6 +1026,35 @@ def _paper_execution_rows() -> list[dict[str, object]]:
         {"step": "01 ORDERS", "title": "生成纸面订单", "command": "make paper-orders", "status": "ready", "action": "Stage", "task_id": "paper-orders"},
         {"step": "02 RECON", "title": "账户对账", "command": "make reconcile-account", "status": "ready", "action": "Check", "task_id": "reconcile-account"},
         {"step": "03 BATCH", "title": "滚动纸面批测", "command": "make paper-batch", "status": "optional", "action": "Run", "task_id": "paper-batch"},
+    ]
+
+
+def _evidence_library_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "step": "01 CONTEXT",
+            "title": "刷新证据库",
+            "command": "make research-context",
+            "status": "ready",
+            "action": "Run",
+            "task_id": "research-context",
+        },
+        {
+            "step": "02 GATE",
+            "title": "重建组合门禁",
+            "command": "make target-portfolio",
+            "status": "guarded",
+            "action": "Run",
+            "task_id": "target-portfolio",
+        },
+        {
+            "step": "03 ATTR",
+            "title": "刷新暴露归因",
+            "command": "make exposure-attribution",
+            "status": "ready",
+            "action": "Review",
+            "task_id": "exposure-attribution",
+        },
     ]
 
 

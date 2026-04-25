@@ -4,6 +4,7 @@ from app.streamlit_app import (
     _autoresearch_progress_cards_html,
     _detail_card_html,
     _evidence_cards_html,
+    _evidence_library_rows,
     _event_library_cards_html,
     _page_topbar_html,
     _rerun_task_button_label,
@@ -136,6 +137,13 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("Events", html)
         self.assertIn("<strong>20</strong>", html)
         self.assertIn("Block Events", html)
+
+    def test_evidence_library_rows_launch_research_context(self):
+        rows = _evidence_library_rows()
+
+        self.assertEqual(rows[0]["task_id"], "research-context")
+        self.assertEqual(rows[0]["command"], "make research-context")
+        self.assertIn("刷新证据库", rows[0]["title"])
 
 
 if __name__ == "__main__":

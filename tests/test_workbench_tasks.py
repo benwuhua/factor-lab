@@ -25,6 +25,13 @@ class WorkbenchTaskTests(unittest.TestCase):
             self.assertEqual(task.command[0], "make")
             self.assertNotIn(";", " ".join(task.command))
 
+    def test_task_registry_includes_research_context_refresh(self):
+        task = WORKBENCH_TASKS["research-context"]
+
+        self.assertEqual(task.command, ("make", "research-context"))
+        self.assertIn("security_master", task.description)
+        self.assertIn("company_events", task.description)
+
     def test_launch_workbench_task_writes_manifest_and_starts_runner(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

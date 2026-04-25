@@ -37,8 +37,11 @@ ORDERS_CSV ?= runs/$(RUN_DATE)/orders.csv
 FILLS_CSV ?= runs/$(RUN_DATE)/fills.csv
 HISTORICAL_DAYS ?= 30
 EXECUTION_CALENDAR_OUTPUT ?= reports/execution_calendar_$(RUN_DATE).csv
+RESEARCH_CONTEXT_AS_OF ?= $(RUN_DATE)
+RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
+RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 
-.PHONY: help install test workbench check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench check-env research-context candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -47,6 +50,7 @@ help:
 	@printf "  make test             Run unit tests\n"
 	@printf "  make workbench        Start the local Streamlit research workbench\n"
 	@printf "  make check-env        Check local Qlib provider environment\n"
+	@printf "  make research-context Refresh security master and company event evidence\n"
 	@printf "  make candidates       Generate candidate factor table for CSI500 config\n"
 	@printf "  make mine-csi500      Run 5/20 day candidate mining on CSI500 config\n"
 	@printf "  make mine-csi300      Run 5/20 day candidate mining on CSI300 config\n"
@@ -81,6 +85,7 @@ help:
 	@printf "  make execution-calendar RUN_DATE=20260420\n"
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
+	@printf "  make research-context RUN_DATE=20260420\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv\n"
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
@@ -103,6 +108,12 @@ workbench:
 
 check-env:
 	$(PYTHON) scripts/check_env.py --provider-config $(CSI500_PROVIDER)
+
+research-context:
+	$(PYTHON) scripts/build_research_context_data.py \
+		--as-of-date $(RESEARCH_CONTEXT_AS_OF) \
+		--notice-start $(RESEARCH_CONTEXT_NOTICE_START) \
+		--notice-end $(RESEARCH_CONTEXT_NOTICE_END)
 
 candidates:
 	$(PYTHON) scripts/mine_factors.py \
