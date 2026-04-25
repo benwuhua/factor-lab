@@ -9,6 +9,9 @@ metric: rank_ic_mean
 neutralization:
   raw: true
   size_proxy: true
+purification:
+  steps: [mad, zscore]
+  mad_n: 3.0
 minimum_observations: 10000
 artifact_root: reports/autoresearch/runs
 ledger_path: reports/autoresearch/expression_results.tsv

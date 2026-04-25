@@ -3,6 +3,10 @@ risk:
   min_positions: 10
   min_signal_coverage: 0.2
   max_turnover: 1.0
+  max_industry_weight: 0.35
+  min_factor_family_count: 2
+  max_factor_family_concentration: 0.85
+  factor_family_map_path: reports/approved_factors.yaml
 
 output:
   report: reports/portfolio_risk_{run_yyyymmdd}.md

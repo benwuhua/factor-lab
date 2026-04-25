@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Factor Lab AI 投研工作台 UI 图</title>
+  <style>
+    :root {
+      --bg: #f4f2ec;
+      --ink: #1d2320;
+      --muted: #66706a;
+      --line: #cfd5cf;
+      --panel: #ffffff;
+      --panel-2: #eef2ef;
+      --green: #1f7a5a;
+      --teal: #0f6f73;
+      --blue: #2f5d8c;
+      --red: #a84332;
+      --amber: #9b6a1f;
+      --shadow: 0 18px 50px rgba(32, 43, 39, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 240px 1fr 320px;
+    }
+
+    .sidebar {
+      background: #18211e;
+      color: #edf2ee;
+      padding: 28px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .brand {
+      display: grid;
+      gap: 6px;
+    }
+
+    .brand strong {
+      font-size: 22px;
+      font-weight: 750;
+    }
+
+    .brand span {
+      color: #aebbb4;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .nav {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav button {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: #dce4df;
+      text-align: left;
+      padding: 12px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav button.active {
+      background: #26342f;
+      color: #ffffff;
+      box-shadow: inset 3px 0 0 #55b08a;
+    }
+
+    .system-status {
+      margin-top: auto;
+      display: grid;
+      gap: 12px;
+      color: #c6d1ca;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      padding-top: 10px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #57bd8f;
+      display: inline-block;
+    }
+
+    main {
+      padding: 26px;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 18px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.2;
+      font-weight: 780;
+    }
+
+    .subtitle {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 780px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .control {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 8px 28px rgba(32, 43, 39, 0.07);
+    }
+
+    .metric label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .metric strong {
+      font-size: 24px;
+      font-weight: 760;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      min-height: 0;
+    }
+
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .section-header {
+      padding: 18px 18px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .section-header span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .flow {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: 116px 1fr;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .lane {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      padding-top: 14px;
+      text-transform: uppercase;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .step {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 13px;
+      background: var(--panel-2);
+      min-height: 108px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .step b {
+      font-size: 14px;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .badge {
+      width: fit-content;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 750;
+      background: #dce8e2;
+      color: var(--green);
+    }
+
+    .badge.warn {
+      background: #f3e5c8;
+      color: var(--amber);
+    }
+
+    .badge.block {
+      background: #f2d8d2;
+      color: var(--red);
+    }
+
+    .tables {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th {
+      color: var(--muted);
+      text-align: left;
+      padding: 9px 8px;
+      border-bottom: 1px solid var(--line);
+      font-weight: 700;
+    }
+
+    td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #e6e9e5;
+      vertical-align: middle;
+    }
+
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .right-rail {
+      background: #edf0ec;
+      border-left: 1px solid var(--line);
+      padding: 26px 20px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .rail-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .rail-panel h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .gate {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      font-size: 13px;
+      align-items: center;
+    }
+
+    .gate span {
+      color: var(--muted);
+    }
+
+    .decision {
+      padding: 12px;
+      border-radius: 8px;
+      background: #f2e7ce;
+      border: 1px solid #dfc891;
+      color: #5e4216;
+      line-height: 1.45;
+      font-size: 13px;
+    }
+
+    .terminal {
+      background: #17201d;
+      color: #d8e5de;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      overflow: hidden;
+    }
+
+    .link {
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    @media (max-width: 1180px) {
+      .shell {
+        grid-template-columns: 210px 1fr;
+      }
+
+      .right-rail {
+        grid-column: 1 / -1;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .metrics {
+        grid-template-columns: repeat(3, minmax(130px, 1fr));
+      }
+    }
+
+    @media (max-width: 820px) {
+      .shell {
+        display: block;
+      }
+
+      .sidebar {
+        min-height: auto;
+      }
+
+      main {
+        padding: 18px;
+      }
+
+      .topbar,
+      .workspace,
+      .right-rail {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .metrics,
+      .steps {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <strong>Factor Lab</strong>
+        <span>AI 辅助 A 股因子投研工作台<br>从候选因子到组合复核</span>
+      </div>
+      <nav class="nav" aria-label="主流程">
+        <button class="active"><span>01</span><span>总览仪表盘</span></button>
+        <button><span>02</span><span>数据治理</span></button>
+        <button><span>03</span><span>因子研究</span></button>
+        <button><span>04</span><span>自动挖掘</span></button>
+        <button><span>05</span><span>组合门禁</span></button>
+        <button><span>06</span><span>专家复核</span></button>
+        <button><span>07</span><span>纸面执行</span></button>
+      </nav>
+      <div class="system-status">
+        <div class="status-row"><span><i class="dot"></i> CSI300</span><strong>Ready</strong></div>
+        <div class="status-row"><span><i class="dot"></i> CSI500</span><strong>Ready</strong></div>
+        <div class="status-row"><span>Run date</span><strong>2026-04-25</strong></div>
+      </div>
+    </aside>
+
+    <main>
+      <section class="topbar">
+        <div>
+          <h1>投研业务流总览</h1>
+          <div class="subtitle">固定沪深300和中证500数据边界，使用受控 autoresearch 扩展候选因子，通过净化、评价、暴露归因、风险门禁和专家复核后进入纸面执行。</div>
+        </div>
+        <div class="controls">
+          <button class="control">沪深300</button>
+          <button class="control">中证500</button>
+          <button class="control">5D / 20D</button>
+          <button class="control">Export</button>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="关键指标">
+        <div class="metric"><label>Approved Factors</label><strong>6</strong></div>
+        <div class="metric"><label>Autoresearch Status</label><strong>Review</strong></div>
+        <div class="metric"><label>Purification</label><strong>MAD + Z</strong></div>
+        <div class="metric"><label>Portfolio Gate</label><strong>Caution</strong></div>
+        <div class="metric"><label>Paper Bundle</label><strong>Ready</strong></div>
+      </section>
+
+      <section class="workspace">
+        <div class="section">
+          <div class="section-header">
+            <h2>端到端流程地图</h2>
+            <span>from data to paper execution</span>
+          </div>
+          <div class="flow">
+            <div class="flow-row">
+              <div class="lane">Data</div>
+              <div class="steps">
+                <div class="step"><span class="badge">locked</span><b>数据池</b><p>CSI300 / CSI500 provider，行情、成交额、换手、证券主数据。</p></div>
+                <div class="step"><span class="badge">audit</span><b>公告事件</b><p>公司事件、问询函、监管风险、ST 与停牌状态进入风险上下文。</p></div>
+                <div class="step"><span class="badge">quality</span><b>数据质量</b><p>覆盖率、字段完整性、交易日一致性，失败则停止组合生成。</p></div>
+              </div>
+            </div>
+            <div class="flow-row">
+              <div class="lane">Research</div>
+              <div class="steps">
+                <div class="step"><span class="badge">registry</span><b>因子池</b><p>手工因子、JoinQuant 迁移因子、盘形事件因子统一进 registry。</p></div>
+                <div class="step"><span class="badge">agent</span><b>自动挖掘</b><p>Codex CLI 只改候选表达式，contract 固定 provider、horizon、净化和评估器。</p></div>
+                <div class="step"><span class="badge">purify</span><b>因子净化</b><p>MAD 去极值、z-score、rank 标准化、size proxy 中性化。</p></div>
+              </div>
+            </div>
+            <div class="flow-row">
+              <div class="lane">Decision</div>
+              <div class="steps">
+                <div class="step"><span class="badge">score</span><b>单因子评价</b><p>IC、Rank IC、分层收益、多空收益、换手和年度稳定性。</p></div>
+                <div class="step"><span class="badge warn">gate</span><b>组合门禁</b><p>行业集中度、因子族数量、单一因子族贡献集中度、事件风险。</p></div>
+                <div class="step"><span class="badge warn">committee</span><b>专家复核</b><p>LLM 投委会前置审查，reject 阻断，caution 降仓或人工确认。</p></div>
+              </div>
+            </div>
+            <div class="flow-row">
+              <div class="lane">Execution</div>
+              <div class="steps">
+                <div class="step"><span class="badge">target</span><b>目标组合</b><p>生成 target_portfolio，保留 top factor driver 和风险解释。</p></div>
+                <div class="step"><span class="badge">paper</span><b>纸面订单</b><p>订单、模拟成交、手续费、涨跌停与停牌拒单。</p></div>
+                <div class="step"><span class="badge">review</span><b>对账复盘</b><p>positions_expected、reconciliation、paper batch 复盘指标。</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <h2>当日研究队列</h2>
+            <span>evidence first</span>
+          </div>
+          <div class="tables">
+            <table>
+              <thead><tr><th>模块</th><th>产物</th><th class="num">状态</th></tr></thead>
+              <tbody>
+                <tr><td>Autoresearch</td><td><span class="link">expression_results.tsv</span></td><td class="num">review</td></tr>
+                <tr><td>Factor Eval</td><td><span class="link">raw / neutralized eval</span></td><td class="num">ready</td></tr>
+                <tr><td>Factor Selection</td><td><span class="link">approved_factors.yaml</span></td><td class="num">governed</td></tr>
+                <tr><td>Signal</td><td><span class="link">signals_latest.csv</span></td><td class="num">built</td></tr>
+                <tr><td>Portfolio</td><td><span class="link">target_portfolio.csv</span></td><td class="num">caution</td></tr>
+              </tbody>
+            </table>
+            <table>
+              <thead><tr><th>暴露检查</th><th class="num">当前值</th><th class="num">阈值</th></tr></thead>
+              <tbody>
+                <tr><td>最大行业权重</td><td class="num">0.32</td><td class="num">0.35</td></tr>
+                <tr><td>因子族数量</td><td class="num">3</td><td class="num">2</td></tr>
+                <tr><td>最大因子族贡献</td><td class="num">0.71</td><td class="num">0.85</td></tr>
+                <tr><td>事件阻断标的</td><td class="num">0</td><td class="num">0</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="right-rail">
+      <section class="rail-panel">
+        <h3>Portfolio Gate</h3>
+        <div class="gate"><span>单票权重</span><b>Pass</b></div>
+        <div class="gate"><span>行业集中</span><b>Pass</b></div>
+        <div class="gate"><span>因子族集中</span><b>Caution</b></div>
+        <div class="gate"><span>公告事件</span><b>Pass</b></div>
+      </section>
+
+      <section class="rail-panel">
+        <h3>Expert Review</h3>
+        <div class="decision">当前建议进入人工确认。组合不是被阻断，而是需要解释为何动量和反转暴露同时升高。</div>
+      </section>
+
+      <section class="rail-panel">
+        <h3>CLI Handoff</h3>
+        <div class="terminal">make autoresearch-codex-loop<br>make select-factors<br>make daily-signal<br>make target-portfolio<br>make exposure-attribution</div>
+      </section>
+    </aside>
+  </div>
+</body>
+</html>

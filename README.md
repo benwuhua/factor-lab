@@ -162,6 +162,8 @@ Optional neutralization:
 python scripts/eval_factor.py \
   --provider-config configs/provider_current.yaml \
   --factor ret_20 \
+  --purify-step mad \
+  --purify-step zscore \
   --neutralize-size-proxy \
   --plot \
   --plot-horizon 5
@@ -171,6 +173,7 @@ The public Qlib CN sample data has no industry or market-cap fields. The project
 
 - `--neutralize-size-proxy`: cross-sectional neutralization with `log(close * volume)` as a size/liquidity proxy.
 - `--industry-map path/to/industry.csv`: optional custom industry map with `instrument,industry` columns.
+- `--purify-step mad|zscore|rank`: optional daily cross-sectional purification before IC/quantile evaluation. The flag can be repeated.
 
 ### Factor Purification and Exposure Attribution
 
@@ -186,6 +189,12 @@ make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv
 ```
 
 The report reads `reports/approved_factors.yaml` when available so factor drivers such as `top_factor_1` and `top_factor_2` can be grouped by approved factor family. Outputs are written under `reports/exposure_attribution/`.
+
+The portfolio risk gate can also enforce exposure maturity checks from `configs/risk.yaml`:
+
+- `max_industry_weight`: blocks portfolios too concentrated in one industry.
+- `min_factor_family_count`: blocks portfolios driven by too few factor families.
+- `max_factor_family_concentration`: blocks portfolios where one factor family contributes too much of the absolute driver contribution.
 
 ## Candidate Mining
 
@@ -213,7 +222,7 @@ The result table includes IC, Rank IC, quintile mean returns, long-short return,
 
 ## Autoresearch
 
-The first controlled autoresearch loop is expression-factor only. It lets an agent edit one candidate YAML while the provider, horizons, neutralization, ledger, and artifact paths stay locked by contract:
+The first controlled autoresearch loop is expression-factor only. It lets an agent edit one candidate YAML while the provider, horizons, purification, neutralization, ledger, and artifact paths stay locked by contract:
 
 ```bash
 make autoresearch-expression
@@ -227,7 +236,7 @@ configs/autoresearch/expression_space.yaml
 configs/autoresearch/candidates/example_expression.yaml
 ```
 
-The loop prints a compact summary block, writes raw and size-proxy-neutralized evaluation artifacts, and appends a local ledger under `reports/autoresearch/`. Generated run outputs are ignored by Git.
+The loop prints a compact summary block, applies the contract's factor purification steps, writes raw and size-proxy-neutralized evaluation artifacts, and appends a local ledger under `reports/autoresearch/`. Generated run outputs are ignored by Git.
 
 Summarize the local expression ledger by status:
 

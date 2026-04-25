@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .config import ProjectConfig
+from .factor_purification import purify_factor_frame
 from .factor_registry import FactorDef
 from .neutralization import add_size_proxy, attach_industry, load_industry_map, neutralize_signal
 from .qlib_bootstrap import init_qlib
@@ -18,6 +19,8 @@ class EvalConfig:
     horizons: tuple[int, ...] = (1, 5, 10, 20)
     neutralize_size: bool = False
     industry_map_path: Path | None = None
+    purification_steps: tuple[str, ...] = ()
+    purification_mad_n: float = 3.0
 
 
 def load_instruments(config: ProjectConfig):
@@ -57,7 +60,7 @@ def evaluate_factor(
     frame = fetch_factor_frame(config, factor, include_volume=eval_config.neutralize_size)
     results: list[dict[str, float | int | str]] = []
     for horizon in eval_config.horizons:
-        scored = with_directional_signal(frame, factor)
+        scored = prepare_factor_signal(frame, factor, eval_config)
         signal_col = "signal"
         exposure_cols = []
         group_col = None
@@ -82,6 +85,8 @@ def evaluate_factor(
         turnover = _estimate_top_quantile_turnover(scored, signal_col, eval_config.quantiles)
         quantile_summary = compute_quantile_return_summary(scored, signal_col, "future_ret", eval_config.quantiles)
         neutralization = []
+        if eval_config.purification_steps:
+            neutralization.append(f"purify:{'+'.join(eval_config.purification_steps)}")
         if eval_config.neutralize_size:
             neutralization.append("size_proxy")
         if eval_config.industry_map_path is not None:
@@ -109,6 +114,22 @@ def evaluate_factor(
 def with_directional_signal(frame: pd.DataFrame, factor: FactorDef) -> pd.DataFrame:
     scored = frame.copy()
     scored["signal"] = scored[factor.name] * factor.direction
+    return scored
+
+
+def prepare_factor_signal(frame: pd.DataFrame, factor: FactorDef, eval_config: EvalConfig = EvalConfig()) -> pd.DataFrame:
+    scored = with_directional_signal(frame, factor)
+    scored["purification"] = "none"
+    if not eval_config.purification_steps:
+        return scored
+    scored = purify_factor_frame(
+        scored,
+        "signal",
+        steps=eval_config.purification_steps,
+        output_col="signal",
+        mad_n=eval_config.purification_mad_n,
+    )
+    scored["purification"] = "+".join(eval_config.purification_steps)
     return scored
 
 

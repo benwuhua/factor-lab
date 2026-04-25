@@ -29,7 +29,7 @@ from .orders import build_order_suggestions, load_order_config, write_orders
 from .paper_broker import load_paper_fill_config, simulate_paper_fills, write_fills
 from .portfolio import build_target_portfolio, load_portfolio_config, write_portfolio_summary, write_target_portfolio
 from .reconcile import load_reconcile_config, reconcile_positions, write_reconciliation_report
-from .risk import check_portfolio_risk, load_risk_config, write_risk_report
+from .risk import check_portfolio_risk, load_configured_factor_family_map, load_risk_config, write_risk_report
 from .security_master import enrich_with_security_master, load_security_master
 from .signal import (
     build_daily_signal,
@@ -176,11 +176,13 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         )
         return DailyPipelineResult(run_date, run_dir, "expert_review_blocked", False, manifest_path, artifacts)
 
+    risk_config = load_risk_config(_resolve(root_path, inputs.risk_config_path))
     risk_report = check_portfolio_risk(
         portfolio,
         tradable_signal,
-        load_risk_config(_resolve(root_path, inputs.risk_config_path)),
+        risk_config,
         current_positions=current_positions,
+        factor_family_map=load_configured_factor_family_map(risk_config, root=root_path),
     )
     risk_path = write_risk_report(risk_report, run_dir / "risk_report.md")
     artifacts["risk_report"] = str(risk_path)

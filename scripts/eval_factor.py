@@ -21,6 +21,14 @@ def main() -> int:
     parser.add_argument("--output", default=None, help="CSV output path.")
     parser.add_argument("--neutralize-size-proxy", action="store_true", help="Neutralize by log(close * volume).")
     parser.add_argument("--industry-map", default=None, help="CSV with instrument,industry columns for industry neutralization.")
+    parser.add_argument(
+        "--purify-step",
+        action="append",
+        choices=("mad", "zscore", "rank"),
+        default=[],
+        help="Apply a daily cross-sectional purification step before evaluation. Can be repeated.",
+    )
+    parser.add_argument("--purification-mad-n", type=float, default=3.0, help="MAD cap width for --purify-step mad.")
     parser.add_argument("--plot", action="store_true", help="Write a quantile return PNG next to the CSV report.")
     parser.add_argument("--plot-horizon", type=int, default=5, help="Horizon row to plot when --plot is set.")
     args = parser.parse_args()
@@ -35,6 +43,8 @@ def main() -> int:
         EvalConfig(
             neutralize_size=args.neutralize_size_proxy,
             industry_map_path=args.industry_map,
+            purification_steps=tuple(args.purify_step),
+            purification_mad_n=args.purification_mad_n,
         ),
     )
     output = args.output or root / "reports" / f"factor_{args.factor}.csv"

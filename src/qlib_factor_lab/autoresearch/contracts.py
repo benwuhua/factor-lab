@@ -19,6 +19,8 @@ class ExpressionContract:
     metric: str
     write_raw: bool
     neutralize_size_proxy: bool
+    purification_steps: tuple[str, ...]
+    purification_mad_n: float
     minimum_observations: int
     artifact_root: Path
     ledger_path: Path
@@ -50,6 +52,11 @@ def load_expression_contract(path: str | Path) -> ExpressionContract:
     neutralization = data["neutralization"]
     if not isinstance(neutralization, dict):
         raise ValueError("neutralization must be a mapping")
+    purification = data.get("purification", {})
+    if purification is None:
+        purification = {}
+    if not isinstance(purification, dict):
+        raise ValueError("purification must be a mapping")
 
     return ExpressionContract(
         name=str(data["name"]),
@@ -62,6 +69,8 @@ def load_expression_contract(path: str | Path) -> ExpressionContract:
         metric=str(data["metric"]),
         write_raw=bool(neutralization.get("raw", True)),
         neutralize_size_proxy=bool(neutralization.get("size_proxy", True)),
+        purification_steps=_parse_purification_steps(purification.get("steps", [])),
+        purification_mad_n=float(purification.get("mad_n", 3.0)),
         minimum_observations=int(data["minimum_observations"]),
         artifact_root=Path(str(data["artifact_root"])),
         ledger_path=Path(str(data["ledger_path"])),
@@ -77,3 +86,18 @@ def _parse_horizons(value: Any) -> tuple[int, ...]:
             raise ValueError("horizons must be positive integers")
         horizons.append(item)
     return tuple(horizons)
+
+
+def _parse_purification_steps(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise ValueError("purification.steps must be a list")
+    allowed = {"mad", "zscore", "rank"}
+    steps = []
+    for item in value:
+        step = str(item).strip().lower()
+        if step not in allowed:
+            raise ValueError(f"unsupported purification step: {item}")
+        steps.append(step)
+    return tuple(steps)

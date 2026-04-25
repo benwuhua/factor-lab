@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from .config import load_yaml
+from .exposure_attribution import build_exposure_attribution, load_factor_family_map
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,10 @@ class RiskConfig:
     min_positions: int = 10
     min_signal_coverage: float = 0.2
     max_turnover: float | None = None
+    max_industry_weight: float | None = None
+    min_factor_family_count: int | None = None
+    max_factor_family_concentration: float | None = None
+    factor_family_map_path: Path | None = None
     report_output_path: Path = Path("reports/portfolio_risk_{run_yyyymmdd}.md")
 
 
@@ -35,11 +40,21 @@ def load_risk_config(path: str | Path) -> RiskConfig:
     raw = data.get("risk", data)
     output = data.get("output", {})
     max_turnover = raw.get("max_turnover")
+    max_industry_weight = raw.get("max_industry_weight")
+    min_factor_family_count = raw.get("min_factor_family_count")
+    max_factor_family_concentration = raw.get("max_factor_family_concentration")
+    factor_family_map_path = raw.get("factor_family_map_path")
     return RiskConfig(
         max_single_weight=float(raw.get("max_single_weight", 0.1)),
         min_positions=int(raw.get("min_positions", 10)),
         min_signal_coverage=float(raw.get("min_signal_coverage", 0.2)),
         max_turnover=float(max_turnover) if max_turnover is not None else None,
+        max_industry_weight=float(max_industry_weight) if max_industry_weight is not None else None,
+        min_factor_family_count=int(min_factor_family_count) if min_factor_family_count is not None else None,
+        max_factor_family_concentration=(
+            float(max_factor_family_concentration) if max_factor_family_concentration is not None else None
+        ),
+        factor_family_map_path=Path(str(factor_family_map_path)) if factor_family_map_path else None,
         report_output_path=Path(output.get("report", "reports/portfolio_risk_{run_yyyymmdd}.md")),
     )
 
@@ -49,6 +64,7 @@ def check_portfolio_risk(
     signal: pd.DataFrame,
     config: RiskConfig = RiskConfig(),
     current_positions: pd.DataFrame | None = None,
+    factor_family_map: dict[str, str] | None = None,
 ) -> RiskReport:
     rows = []
     max_weight = float(portfolio["target_weight"].max()) if not portfolio.empty and "target_weight" in portfolio else 0.0
@@ -78,6 +94,7 @@ def check_portfolio_risk(
             "; ".join(blocked_detail),
         )
     )
+    rows.extend(_exposure_maturity_rows(portfolio, config, factor_family_map or {}))
     return RiskReport(tuple(rows))
 
 
@@ -137,6 +154,88 @@ def _event_blocked_detail(portfolio: pd.DataFrame) -> list[str]:
             summary = _clean_event_detail(row.get("max_event_severity"))
         details.append(f"{row['instrument']}: {summary}")
     return details
+
+
+def load_configured_factor_family_map(config: RiskConfig, root: str | Path = ".") -> dict[str, str]:
+    if config.factor_family_map_path is None:
+        return {}
+    path = config.factor_family_map_path
+    resolved = path if path.is_absolute() else Path(root) / path
+    if not resolved.exists():
+        return {}
+    return load_factor_family_map(resolved)
+
+
+def _exposure_maturity_rows(
+    portfolio: pd.DataFrame,
+    config: RiskConfig,
+    factor_family_map: dict[str, str],
+) -> list[dict[str, Any]]:
+    checks_enabled = any(
+        value is not None
+        for value in (
+            config.max_industry_weight,
+            config.min_factor_family_count,
+            config.max_factor_family_concentration,
+        )
+    )
+    if not checks_enabled:
+        return []
+
+    attribution = build_exposure_attribution(portfolio, family_map=factor_family_map)
+    rows: list[dict[str, Any]] = []
+    if config.max_industry_weight is not None:
+        max_industry_weight = float(attribution.industry["weight"].max()) if not attribution.industry.empty else 0.0
+        top_industry = _top_label(attribution.industry, "industry", "weight")
+        rows.append(
+            _row(
+                "max_industry_weight",
+                max_industry_weight <= config.max_industry_weight,
+                max_industry_weight,
+                config.max_industry_weight,
+                top_industry,
+            )
+        )
+    if config.min_factor_family_count is not None:
+        family_count = int((attribution.family["weighted_contribution"].abs() > 0).sum()) if not attribution.family.empty else 0
+        rows.append(
+            _row(
+                "min_factor_family_count",
+                family_count >= config.min_factor_family_count,
+                family_count,
+                config.min_factor_family_count,
+                "",
+            )
+        )
+    if config.max_factor_family_concentration is not None:
+        concentration = _family_concentration(attribution.family)
+        top_family = _top_label(attribution.family, "family", "abs_weighted_contribution")
+        rows.append(
+            _row(
+                "max_factor_family_concentration",
+                concentration <= config.max_factor_family_concentration,
+                concentration,
+                config.max_factor_family_concentration,
+                top_family,
+            )
+        )
+    return rows
+
+
+def _family_concentration(family: pd.DataFrame) -> float:
+    if family.empty or "abs_weighted_contribution" not in family.columns:
+        return 0.0
+    total = float(family["abs_weighted_contribution"].sum())
+    if total <= 0:
+        return 0.0
+    return float(family["abs_weighted_contribution"].max() / total)
+
+
+def _top_label(frame: pd.DataFrame, label_col: str, value_col: str) -> str:
+    if frame.empty or label_col not in frame.columns or value_col not in frame.columns:
+        return ""
+    row = frame.sort_values(value_col, ascending=False).iloc[0]
+    return f"{row[label_col]}={float(row[value_col]):.6g}"
 
 
 def _truthy_bool(value: Any) -> bool:

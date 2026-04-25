@@ -17,7 +17,12 @@ from qlib_factor_lab.portfolio import (
     write_portfolio_summary,
     write_target_portfolio,
 )
-from qlib_factor_lab.risk import check_portfolio_risk, load_risk_config, write_risk_report
+from qlib_factor_lab.risk import (
+    check_portfolio_risk,
+    load_configured_factor_family_map,
+    load_risk_config,
+    write_risk_report,
+)
 from qlib_factor_lab.tradability import apply_tradability_filter, load_trading_config
 
 
@@ -46,11 +51,18 @@ def main() -> int:
     trading_config = load_trading_config(_resolve(root, args.trading_config))
     portfolio_config = load_portfolio_config(_resolve(root, args.portfolio_config))
     risk_config = load_risk_config(_resolve(root, args.risk_config))
+    factor_family_map = load_configured_factor_family_map(risk_config, root=root)
     current_positions = pd.read_csv(_resolve(root, args.current_positions_csv)) if args.current_positions_csv else None
 
     tradable_signal = apply_tradability_filter(signal, trading_config)
     portfolio = build_target_portfolio(tradable_signal, portfolio_config, current_positions=current_positions)
-    risk_report = check_portfolio_risk(portfolio, tradable_signal, risk_config, current_positions=current_positions)
+    risk_report = check_portfolio_risk(
+        portfolio,
+        tradable_signal,
+        risk_config,
+        current_positions=current_positions,
+        factor_family_map=factor_family_map,
+    )
 
     target_path = write_target_portfolio(
         portfolio,

@@ -54,6 +54,8 @@ configs/autoresearch/candidates/example_expression.yaml
 
 The loop writes generated artifacts under `reports/autoresearch/` and appends `expression_results.tsv`. These outputs are local research memory and are ignored by Git.
 
+The default CSI500 autoresearch contract applies `mad -> zscore` purification before raw and size-proxy-neutralized evaluation, so candidates are compared after a consistent outlier-control pass.
+
 Summarize the local ledger:
 
 ```bash

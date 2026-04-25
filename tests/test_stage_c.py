@@ -109,6 +109,37 @@ class StageCTests(unittest.TestCase):
         self.assertIn("max_single_weight", set(failed["check"]))
         self.assertIn("min_positions", set(failed["check"]))
 
+    def test_risk_checks_report_exposure_maturity_failures(self):
+        portfolio = pd.DataFrame(
+            {
+                "date": ["2026-04-23", "2026-04-23"],
+                "instrument": ["AAA", "BBB"],
+                "target_weight": [0.4, 0.4],
+                "industry": ["tech", "tech"],
+                "top_factor_1": ["core_alpha", "core_alpha"],
+                "top_factor_1_contribution": [2.0, 1.0],
+            }
+        )
+
+        report = check_portfolio_risk(
+            portfolio,
+            self._signal(),
+            RiskConfig(
+                max_single_weight=0.5,
+                min_positions=2,
+                min_signal_coverage=0.2,
+                max_industry_weight=0.6,
+                min_factor_family_count=2,
+                max_factor_family_concentration=0.7,
+            ),
+            factor_family_map={"core_alpha": "momentum"},
+        )
+
+        failed = report.to_frame().query("status == 'fail'")
+        self.assertIn("max_industry_weight", set(failed["check"]))
+        self.assertIn("min_factor_family_count", set(failed["check"]))
+        self.assertIn("max_factor_family_concentration", set(failed["check"]))
+
     def test_build_target_portfolio_cli_writes_outputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -211,12 +211,68 @@ class AutoresearchOracleTests(unittest.TestCase):
             self.assertTrue(pd.isna(payload["neutral_rank_ic_mean_h20"]))
             self.assertEqual(payload["secondary_metric"], 0.03)
 
+    def test_run_expression_oracle_passes_contract_purification_to_evaluations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            contract_path = self._write_contract(root, purification={"steps": ["mad", "rank"], "mad_n": 2.5})
+            space_path = root / "space.yaml"
+            space_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "fields": ["close"],
+                        "windows": [5, 20],
+                        "operators": ["Ref"],
+                        "families": ["momentum"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            candidate_path = root / "candidate.yaml"
+            candidate_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "name": "mom",
+                        "family": "momentum",
+                        "expression": "Ref($close, 5) / Ref($close, 20) - 1",
+                        "direction": 1,
+                        "description": "Momentum.",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.oracle.load_project_config") as load_config:
+                with patch("qlib_factor_lab.autoresearch.oracle.evaluate_factor") as evaluate:
+                    load_config.return_value = ProjectConfig(
+                        provider_uri=Path("data"),
+                        region="cn",
+                        market="csi500_current",
+                        benchmark="SH000905",
+                        freq="day",
+                        start_time="2015-01-01",
+                        end_time="2026-04-20",
+                    )
+                    evaluate.return_value = self._eval_frame("none", 0.02, 0.03)
+
+                    payload, _ = run_expression_oracle(
+                        contract_path=contract_path,
+                        space_path=space_path,
+                        candidate_path=candidate_path,
+                        project_root=root,
+                    )
+
+            eval_configs = [call.args[2] for call in evaluate.call_args_list]
+            self.assertEqual({config.purification_steps for config in eval_configs}, {("mad", "rank")})
+            self.assertEqual({config.purification_mad_n for config in eval_configs}, {2.5})
+            self.assertEqual(payload["purification"], "mad+rank")
+
     def _write_contract(
         self,
         root: Path,
         minimum_observations: int = 1000,
         raw: bool = True,
         size_proxy: bool = True,
+        purification=None,
     ) -> Path:
         path = root / "contract.yaml"
         path.write_text(
@@ -231,6 +287,7 @@ class AutoresearchOracleTests(unittest.TestCase):
                     "horizons": [5, 20],
                     "metric": "rank_ic_mean",
                     "neutralization": {"raw": raw, "size_proxy": size_proxy},
+                    **({"purification": purification} if purification is not None else {}),
                     "minimum_observations": minimum_observations,
                     "artifact_root": "reports/autoresearch/runs",
                     "ledger_path": "reports/autoresearch/expression_results.tsv",

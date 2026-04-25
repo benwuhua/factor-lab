@@ -52,6 +52,7 @@ def build_expression_summary_payload(
         "universe": universe,
         "horizons": ",".join(str(horizon) for horizon in horizons),
         "complexity_score": round(float(complexity_score), 6),
+        "purification": "",
         "status": status,
         "decision_reason": decision_reason,
         "artifact_dir": str(artifact_dir),
@@ -131,11 +132,18 @@ def run_expression_oracle(
         initialized = False
         raw_eval = pd.DataFrame()
         neutralized_eval = pd.DataFrame()
+        purification_steps = contract.purification_steps
+        purification_mad_n = contract.purification_mad_n
         if contract.write_raw:
             raw_eval = evaluate_factor(
                 project_config,
                 factor,
-                EvalConfig(horizons=contract.horizons, neutralize_size=False),
+                EvalConfig(
+                    horizons=contract.horizons,
+                    neutralize_size=False,
+                    purification_steps=purification_steps,
+                    purification_mad_n=purification_mad_n,
+                ),
                 initialize=True,
             )
             initialized = True
@@ -144,7 +152,12 @@ def run_expression_oracle(
             neutralized_eval = evaluate_factor(
                 project_config,
                 factor,
-                EvalConfig(horizons=contract.horizons, neutralize_size=True),
+                EvalConfig(
+                    horizons=contract.horizons,
+                    neutralize_size=True,
+                    purification_steps=purification_steps,
+                    purification_mad_n=purification_mad_n,
+                ),
                 initialize=not initialized,
             )
             write_eval_report(neutralized_eval, artifact_dir / "neutralized_eval.csv")
@@ -163,6 +176,7 @@ def run_expression_oracle(
             complexity_score=compute_complexity_score(candidate.expression),
             artifact_dir=artifact_dir,
         )
+        payload["purification"] = "+".join(contract.purification_steps)
         status, reason = determine_expression_status(payload, contract)
         payload["status"] = status
         payload["decision_reason"] = reason
@@ -289,6 +303,7 @@ def _build_crash_payload(
         "universe": contract.universe,
         "horizons": ",".join(str(horizon) for horizon in contract.horizons),
         "complexity_score": float("nan"),
+        "purification": "+".join(contract.purification_steps),
         "status": "crash",
         "decision_reason": str(exc),
         "artifact_dir": str(artifact_dir),
