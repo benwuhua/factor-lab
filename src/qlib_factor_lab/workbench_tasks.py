@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import json
+import os
 import subprocess
 import sys
 from typing import Any
@@ -40,8 +41,20 @@ WORKBENCH_TASKS: dict[str, WorkbenchTask] = {
     "paper-batch": WorkbenchTask("paper-batch", "滚动纸面批测", ("make", "paper-batch"), "对历史 target portfolio 做滚动纸面执行复盘。"),
 }
 
+ALLOWED_TASK_ENV_OVERRIDES = {
+    "RUN_DATE",
+    "RESEARCH_CONTEXT_AS_OF",
+    "RESEARCH_CONTEXT_NOTICE_START",
+    "RESEARCH_CONTEXT_NOTICE_END",
+    "RESEARCH_CONTEXT_UNIVERSES",
+}
 
-def launch_workbench_task(root: str | Path, task_id: str) -> WorkbenchTaskRecord:
+
+def launch_workbench_task(
+    root: str | Path,
+    task_id: str,
+    env_overrides: dict[str, str] | None = None,
+) -> WorkbenchTaskRecord:
     root_path = Path(root)
     task = WORKBENCH_TASKS[task_id]
     run_dir = _new_run_dir(root_path, task_id)
@@ -59,6 +72,7 @@ def launch_workbench_task(root: str | Path, task_id: str) -> WorkbenchTaskRecord
             "started_at": "",
             "finished_at": "",
             "returncode": None,
+            "env_overrides": _sanitize_env_overrides(env_overrides),
             "log_path": str(log_path),
         },
     )
@@ -87,7 +101,7 @@ def rerun_workbench_task(root: str | Path, run_dir: str | Path) -> WorkbenchTask
     task_id = str(manifest.get("task_id", ""))
     if task_id not in WORKBENCH_TASKS:
         raise KeyError(task_id)
-    return launch_workbench_task(root, task_id)
+    return launch_workbench_task(root, task_id, env_overrides=manifest.get("env_overrides", {}))
 
 
 def run_workbench_task(root: str | Path, task_id: str, run_dir: str | Path) -> int:
@@ -99,8 +113,10 @@ def run_workbench_task(root: str | Path, task_id: str, run_dir: str | Path) -> i
     manifest = _read_manifest(manifest_path)
     manifest.update({"status": "running", "started_at": datetime.now().isoformat(timespec="seconds")})
     _write_manifest(manifest_path, manifest)
+    process_env = os.environ.copy()
+    process_env.update(_sanitize_env_overrides(manifest.get("env_overrides", {})))
     with log_path.open("w", encoding="utf-8") as log:
-        process = subprocess.run(task.command, cwd=root_path, stdout=log, stderr=subprocess.STDOUT, text=True)
+        process = subprocess.run(task.command, cwd=root_path, stdout=log, stderr=subprocess.STDOUT, text=True, env=process_env)
     manifest.update(
         {
             "status": "succeeded" if process.returncode == 0 else "failed",
@@ -170,3 +186,13 @@ def _read_manifest(path: Path) -> dict[str, Any]:
 
 def _write_manifest(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _sanitize_env_overrides(env_overrides: dict[str, Any] | None) -> dict[str, str]:
+    if not env_overrides:
+        return {}
+    sanitized: dict[str, str] = {}
+    for key, value in env_overrides.items():
+        if key in ALLOWED_TASK_ENV_OVERRIDES and value is not None:
+            sanitized[key] = str(value)
+    return sanitized

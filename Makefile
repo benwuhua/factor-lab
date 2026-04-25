@@ -40,6 +40,7 @@ EXECUTION_CALENDAR_OUTPUT ?= reports/execution_calendar_$(RUN_DATE).csv
 RESEARCH_CONTEXT_AS_OF ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
+RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
 
 .PHONY: help install test workbench check-env research-context candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
@@ -113,7 +114,8 @@ research-context:
 	$(PYTHON) scripts/build_research_context_data.py \
 		--as-of-date $(RESEARCH_CONTEXT_AS_OF) \
 		--notice-start $(RESEARCH_CONTEXT_NOTICE_START) \
-		--notice-end $(RESEARCH_CONTEXT_NOTICE_END)
+		--notice-end $(RESEARCH_CONTEXT_NOTICE_END) \
+		--universes $(RESEARCH_CONTEXT_UNIVERSES)
 
 candidates:
 	$(PYTHON) scripts/mine_factors.py \

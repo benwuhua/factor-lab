@@ -10,6 +10,7 @@ from qlib_factor_lab.workbench_tasks import (
     launch_workbench_task,
     load_workbench_task_detail,
     rerun_workbench_task,
+    run_workbench_task,
     summarize_workbench_task_runs,
     task_manifest_path,
     tail_workbench_task_log,
@@ -49,6 +50,36 @@ class WorkbenchTaskTests(unittest.TestCase):
             args = popen.call_args.args[0]
             self.assertTrue(any(str(arg).endswith("scripts/run_workbench_task.py") for arg in args))
             self.assertIn("--task-id", args)
+
+    def test_launch_workbench_task_persists_allowlisted_env_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "scripts").mkdir()
+            (root / "scripts/run_workbench_task.py").write_text("print('stub')", encoding="utf-8")
+
+            with patch("qlib_factor_lab.workbench_tasks.subprocess.Popen"):
+                record = launch_workbench_task(
+                    root,
+                    "research-context",
+                    env_overrides={
+                        "RUN_DATE": "20260425",
+                        "RESEARCH_CONTEXT_NOTICE_START": "20260401",
+                        "RESEARCH_CONTEXT_NOTICE_END": "20260425",
+                        "RESEARCH_CONTEXT_UNIVERSES": "csi300 csi500",
+                        "UNSAFE": "ignored",
+                    },
+                )
+
+            manifest = json.loads(task_manifest_path(record.run_dir).read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["env_overrides"],
+                {
+                    "RUN_DATE": "20260425",
+                    "RESEARCH_CONTEXT_NOTICE_START": "20260401",
+                    "RESEARCH_CONTEXT_NOTICE_END": "20260425",
+                    "RESEARCH_CONTEXT_UNIVERSES": "csi300 csi500",
+                },
+            )
 
     def test_launch_workbench_task_rejects_unknown_task_id(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -120,6 +151,32 @@ class WorkbenchTaskTests(unittest.TestCase):
             self.assertNotEqual(record.run_dir, run)
             self.assertEqual(json.loads(record.manifest_path.read_text(encoding="utf-8"))["command"], ["make", "check-env"])
             popen.assert_called_once()
+
+    def test_run_workbench_task_applies_manifest_env_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs/workbench_tasks/20260425_090000_research-context"
+            run.mkdir(parents=True)
+            task_manifest_path(run).write_text(
+                json.dumps(
+                    {
+                        "task_id": "research-context",
+                        "status": "queued",
+                        "env_overrides": {"RESEARCH_CONTEXT_UNIVERSES": "csi300"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.workbench_tasks.subprocess.run") as run_process:
+                run_process.return_value.returncode = 0
+                code = run_workbench_task(root, "research-context", run)
+
+            self.assertEqual(code, 0)
+            process_env = run_process.call_args.kwargs["env"]
+            self.assertEqual(process_env["RESEARCH_CONTEXT_UNIVERSES"], "csi300")
+            manifest = json.loads(task_manifest_path(run).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "succeeded")
 
 
 if __name__ == "__main__":

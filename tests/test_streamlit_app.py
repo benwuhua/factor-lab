@@ -4,9 +4,12 @@ from app.streamlit_app import (
     _autoresearch_progress_cards_html,
     _detail_card_html,
     _evidence_cards_html,
+    _evidence_health_cards_html,
     _evidence_library_rows,
     _event_library_cards_html,
     _page_topbar_html,
+    _research_context_env_overrides,
+    _resolve_nav_page,
     _rerun_task_button_label,
     _short_text,
     _task_run_option_label,
@@ -144,6 +147,46 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertEqual(rows[0]["task_id"], "research-context")
         self.assertEqual(rows[0]["command"], "make research-context")
         self.assertIn("刷新证据库", rows[0]["title"])
+
+    def test_evidence_health_cards_html_shows_coverage_percentages(self):
+        html = _evidence_health_cards_html(
+            {
+                "master_instruments": 800,
+                "event_instruments": 120,
+                "master_universe_coverage_pct": 100.0,
+                "event_coverage_pct": 15.0,
+                "source_url_coverage_pct": 92.5,
+                "latest_event_date": "2026-04-25",
+            }
+        )
+
+        self.assertIn("Master Coverage", html)
+        self.assertIn("<strong>100.0%</strong>", html)
+        self.assertIn("Event Coverage", html)
+        self.assertIn("<strong>15.0%</strong>", html)
+        self.assertIn("Source Coverage", html)
+        self.assertIn("2026-04-25", html)
+
+    def test_research_context_env_overrides_normalize_dates_and_universes(self):
+        env = _research_context_env_overrides(
+            as_of_date="2026-04-25",
+            notice_start="2026-04-01",
+            notice_end="2026-04-25",
+            universes=["csi500", "all"],
+        )
+
+        self.assertEqual(env["RUN_DATE"], "20260425")
+        self.assertEqual(env["RESEARCH_CONTEXT_AS_OF"], "20260425")
+        self.assertEqual(env["RESEARCH_CONTEXT_NOTICE_START"], "20260401")
+        self.assertEqual(env["RESEARCH_CONTEXT_NOTICE_END"], "20260425")
+        self.assertEqual(env["RESEARCH_CONTEXT_UNIVERSES"], "csi500")
+
+    def test_resolve_nav_page_supports_deep_link_shortcuts(self):
+        pages = ["01 总览仪表盘", "08 证据库"]
+
+        self.assertEqual(_resolve_nav_page("08", pages), "08 证据库")
+        self.assertEqual(_resolve_nav_page("08 证据库", pages), "08 证据库")
+        self.assertEqual(_resolve_nav_page("missing", pages), "01 总览仪表盘")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from qlib_factor_lab.workbench import (
     build_execution_gate_card,
     build_event_evidence_library,
     build_portfolio_gate_explanation,
+    build_research_context_health,
     build_gate_review_items,
     build_pretrade_review,
     build_research_evidence_summary,
@@ -326,6 +327,33 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(library["event_types"].set_index("event_type").loc["disciplinary_action", "count"], 1)
         self.assertEqual(library["severity"].set_index("severity").loc["block", "count"], 1)
         self.assertEqual(list(library["detail"]["instrument"]), ["BBB", "AAA"])
+
+    def test_research_context_health_reports_master_event_and_source_coverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame(
+                [
+                    {"instrument": "AAA", "research_universes": "csi300"},
+                    {"instrument": "BBB", "research_universes": "csi500"},
+                    {"instrument": "CCC", "research_universes": "csi500"},
+                ]
+            ).to_csv(root / "data/security_master.csv", index=False)
+            pd.DataFrame(
+                [
+                    {"instrument": "AAA", "source_url": "https://example.test/a", "event_date": "2026-04-24"},
+                    {"instrument": "BBB", "source_url": "", "event_date": "2026-04-25"},
+                ]
+            ).to_csv(root / "data/company_events.csv", index=False)
+
+            health = build_research_context_health(root)
+
+        self.assertEqual(health["cards"]["master_instruments"], 3)
+        self.assertEqual(health["cards"]["event_instruments"], 2)
+        self.assertEqual(health["cards"]["master_universe_coverage_pct"], 100.0)
+        self.assertEqual(health["cards"]["event_coverage_pct"], 66.7)
+        self.assertEqual(health["cards"]["source_url_coverage_pct"], 50.0)
+        self.assertEqual(health["cards"]["latest_event_date"], "2026-04-25")
 
     def test_execution_gate_card_rejects_hard_blocks_and_cautions_soft_blocks(self):
         pretrade = pd.DataFrame(

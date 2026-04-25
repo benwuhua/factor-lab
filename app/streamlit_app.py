@@ -9,6 +9,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+APP_ICON = ROOT / "app/assets/factor_lab_icon.png"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -20,6 +21,7 @@ from qlib_factor_lab.workbench import (
     build_gate_review_items,
     build_portfolio_gate_explanation,
     build_pretrade_review,
+    build_research_context_health,
     build_research_evidence_summary,
     build_research_pipeline_status,
     classify_gate_decision,
@@ -45,18 +47,25 @@ from qlib_factor_lab.workbench_tasks import (
 )
 
 
-st.set_page_config(page_title="Factor Lab Workbench", layout="wide")
+st.set_page_config(page_title="Factor Lab Workbench", page_icon=str(APP_ICON), layout="wide", initial_sidebar_state="expanded")
 
 
 def main() -> None:
     _style()
+    pages = ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行", "08 证据库"]
+    default_page = _resolve_nav_page(st.query_params.get("page", ""), pages)
+    if APP_ICON.exists():
+        st.sidebar.image(str(APP_ICON), width=64)
     st.sidebar.title("Factor Lab")
     st.sidebar.caption("AI 辅助 A 股因子投研工作台\n从候选因子到组合复核")
     page = st.sidebar.radio(
         "导航",
-        ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行", "08 证据库"],
+        pages,
+        index=pages.index(default_page),
         label_visibility="collapsed",
     )
+    if st.query_params.get("page") != page:
+        st.query_params["page"] = page
     st.sidebar.divider()
     st.sidebar.caption("数据边界")
     st.sidebar.write("CSI300 / CSI500")
@@ -507,6 +516,7 @@ def render_paper_execution() -> None:
 
 def render_evidence_library() -> None:
     library = build_event_evidence_library(ROOT)
+    health = build_research_context_health(ROOT)
     detail = library["detail"]
     event_types = library["event_types"]
     severity = library["severity"]
@@ -520,6 +530,7 @@ def render_evidence_library() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(_event_library_cards_html(library["cards"]), unsafe_allow_html=True)
+    st.markdown(_evidence_health_cards_html(health["cards"]), unsafe_allow_html=True)
     st.caption(f"events path: {library.get('events_path', '') or 'n/a'}")
 
     main_col, rail_col = st.columns([3.1, 1.05], gap="large")
@@ -527,7 +538,8 @@ def render_evidence_library() -> None:
         evidence_rows = _evidence_library_rows()
         st.markdown(_section_header_html("证据库动作", "research context refresh"), unsafe_allow_html=True)
         st.markdown(_workflow_card_grid_html(evidence_rows), unsafe_allow_html=True)
-        _render_workflow_task_buttons(evidence_rows, "evidence-library")
+        _render_research_context_controls()
+        _render_workflow_task_buttons(evidence_rows[1:], "evidence-library")
 
         st.markdown(_section_header_html("事件证据过滤", "instrument, type, severity"), unsafe_allow_html=True)
         if detail.empty:
@@ -810,6 +822,16 @@ def _status_counts(frame: pd.DataFrame) -> dict[str, int]:
     return {str(key): int(value) for key, value in frame["status"].fillna("").astype(str).value_counts().items()}
 
 
+def _resolve_nav_page(raw_page: object, pages: list[str]) -> str:
+    raw = str(raw_page or "").strip()
+    if raw in pages:
+        return raw
+    for page in pages:
+        if raw and (page.startswith(raw) or raw in page):
+            return page
+    return pages[0]
+
+
 def _short_text(value: object, limit: int) -> str:
     text = str(value)
     return text if len(text) <= limit else f"{text[: max(limit - 3, 1)]}..."
@@ -845,6 +867,35 @@ def _render_workflow_task_buttons(rows: list[dict[str, object]], key_prefix: str
                 st.caption(f"manifest: {record.manifest_path}")
     st.markdown("</div>", unsafe_allow_html=True)
     _render_task_monitor(key_prefix)
+
+
+def _render_research_context_controls() -> None:
+    default_end = pd.Timestamp.today().date()
+    default_start = (pd.Timestamp.today() - pd.Timedelta(days=14)).date()
+    with st.container(border=True):
+        st.caption("刷新参数")
+        cols = st.columns([1, 1, 1.2])
+        with cols[0]:
+            notice_start = st.date_input("公告开始", value=default_start, key="research-context-start")
+        with cols[1]:
+            notice_end = st.date_input("公告结束", value=default_end, key="research-context-end")
+        with cols[2]:
+            universes = st.multiselect(
+                "候选池",
+                options=["csi300", "csi500"],
+                default=["csi300", "csi500"],
+                key="research-context-universes",
+            )
+        env_overrides = _research_context_env_overrides(
+            as_of_date=notice_end,
+            notice_start=notice_start,
+            notice_end=notice_end,
+            universes=universes,
+        )
+        if st.button("Run · 刷新证据库", key="task-evidence-library-research-context-param", use_container_width=True):
+            record = launch_workbench_task(ROOT, "research-context", env_overrides=env_overrides)
+            st.success("已启动后台任务: research-context")
+            st.caption(f"manifest: {record.manifest_path}")
 
 
 @st.fragment(run_every="10s")
@@ -935,6 +986,21 @@ def _evidence_cards_html(cards: dict[str, object]) -> str:
         for label, value in items
     )
     return f'<section class="evidence-grid">{html}</section>'
+
+
+def _evidence_health_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("Master Coverage", f'{cards.get("master_universe_coverage_pct", 0.0):.1f}%', f'{cards.get("master_instruments", 0)} instruments'),
+        ("Event Coverage", f'{cards.get("event_coverage_pct", 0.0):.1f}%', f'{cards.get("event_instruments", 0)} instruments'),
+        ("Source Coverage", f'{cards.get("source_url_coverage_pct", 0.0):.1f}%', f'latest {cards.get("latest_event_date", "") or "n/a"}'),
+    ]
+    html = "".join(
+        '<div class="evidence-card">'
+        f"<label>{_html(label)}</label><strong>{_html(value)}</strong><span>{_html(note)}</span>"
+        "</div>"
+        for label, value, note in items
+    )
+    return f'<section class="evidence-grid evidence-health-grid">{html}</section>'
 
 
 def _event_library_cards_html(cards: dict[str, object]) -> str:
@@ -1056,6 +1122,28 @@ def _evidence_library_rows() -> list[dict[str, object]]:
             "task_id": "exposure-attribution",
         },
     ]
+
+
+def _research_context_env_overrides(
+    *,
+    as_of_date: object,
+    notice_start: object,
+    notice_end: object,
+    universes: list[str],
+) -> dict[str, str]:
+    selected_universes = [universe for universe in universes if universe in {"csi300", "csi500"}]
+    if not selected_universes:
+        selected_universes = ["csi300", "csi500"]
+    as_of = pd.Timestamp(as_of_date).strftime("%Y%m%d")
+    start = pd.Timestamp(notice_start).strftime("%Y%m%d")
+    end = pd.Timestamp(notice_end).strftime("%Y%m%d")
+    return {
+        "RUN_DATE": end,
+        "RESEARCH_CONTEXT_AS_OF": as_of,
+        "RESEARCH_CONTEXT_NOTICE_START": start,
+        "RESEARCH_CONTEXT_NOTICE_END": end,
+        "RESEARCH_CONTEXT_UNIVERSES": " ".join(selected_universes),
+    }
 
 
 def _approved_factor_rows() -> pd.DataFrame:
@@ -1263,7 +1351,6 @@ def _style() -> None:
           }
           .stApp { background: var(--fl-bg); color: var(--fl-ink); }
           header[data-testid="stHeader"] { background: transparent; }
-          div[data-testid="stToolbar"] { display: none; }
           .block-container {
             max-width: 1320px;
             padding-top: 2rem;
@@ -1300,6 +1387,14 @@ def _style() -> None:
           section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
             color: #aebbb4;
             line-height: 1.5;
+          }
+          section[data-testid="stSidebar"] [data-testid="stImage"] {
+            margin: 18px 0 14px;
+          }
+          section[data-testid="stSidebar"] [data-testid="stImage"] img {
+            border-radius: 16px;
+            border: 1px solid rgba(237, 242, 238, 0.28);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
           }
           div[data-testid="stMetric"] {
             background: var(--fl-panel);
@@ -1552,6 +1647,9 @@ def _style() -> None:
             gap: 10px;
             margin: 0 0 16px;
           }
+          .evidence-health-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
           .evidence-card {
             border: 1px solid var(--fl-line);
             border-radius: 8px;
@@ -1568,6 +1666,11 @@ def _style() -> None:
           .evidence-card strong {
             font-size: 22px;
             line-height: 1.15;
+          }
+          .evidence-card span {
+            color: #59645e;
+            font-size: 12px;
+            overflow-wrap: anywhere;
           }
           .section-header { padding: 18px 18px 0; }
           .detail-topbar {

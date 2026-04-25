@@ -385,6 +385,38 @@ def build_event_evidence_library(
     }
 
 
+def build_research_context_health(
+    root: str | Path = ".",
+    security_master_path: str | Path = "data/security_master.csv",
+    company_events_path: str | Path = "data/company_events.csv",
+) -> dict[str, Any]:
+    root_path = Path(root)
+    master = _read_csv_or_empty(_resolve(root_path, security_master_path))
+    events = _read_csv_or_empty(_resolve(root_path, company_events_path))
+    master_instruments = set(_nonblank_strings(master.get("instrument", pd.Series(dtype=str))))
+    event_instruments = set(_nonblank_strings(events.get("instrument", pd.Series(dtype=str))))
+    source_urls = _nonblank_strings(events.get("source_url", pd.Series(dtype=str)))
+    event_dates = pd.to_datetime(events.get("event_date", pd.Series(dtype=str)), errors="coerce")
+    universe_labels = _research_universe_labels(master)
+    required_universes = {"csi300", "csi500"}
+    latest_event_date = ""
+    if not event_dates.dropna().empty:
+        latest_event_date = event_dates.dropna().max().strftime("%Y-%m-%d")
+
+    return {
+        "cards": {
+            "master_instruments": int(len(master_instruments)),
+            "event_instruments": int(len(event_instruments)),
+            "master_universe_coverage_pct": _pct(len(universe_labels & required_universes), len(required_universes)),
+            "event_coverage_pct": _pct(len(event_instruments), len(master_instruments)),
+            "source_url_coverage_pct": _pct(len(source_urls), len(events)),
+            "latest_event_date": latest_event_date,
+        },
+        "master_path": str(_resolve(root_path, security_master_path)),
+        "events_path": str(_resolve(root_path, company_events_path)),
+    }
+
+
 def build_execution_gate_card(
     gate_decision: str,
     pretrade_review: pd.DataFrame,
@@ -703,6 +735,34 @@ def _count_unique_split_values(values: pd.Series) -> int:
     for value in values:
         items.update(_split_semicolon_values(value))
     return len(items)
+
+
+def _read_csv_or_empty(path: Path) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path)
+
+
+def _nonblank_strings(values: pd.Series) -> list[str]:
+    if values is None or values.empty:
+        return []
+    text = values.fillna("").astype(str).str.strip()
+    return text[text != ""].tolist()
+
+
+def _research_universe_labels(master: pd.DataFrame) -> set[str]:
+    labels: set[str] = set()
+    if master.empty or "research_universes" not in master.columns:
+        return labels
+    for value in master["research_universes"]:
+        labels.update(item.strip() for item in re.split(r"[,;]", str(value)) if item.strip())
+    return labels
+
+
+def _pct(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return 0.0
+    return round(float(numerator) / float(denominator) * 100.0, 1)
 
 
 def _split_semicolon_values(value: Any) -> list[str]:
