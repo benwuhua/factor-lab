@@ -1,6 +1,7 @@
 import unittest
 
 from app.streamlit_app import (
+    _autoresearch_progress_cards_html,
     _detail_card_html,
     _page_topbar_html,
     _rerun_task_button_label,
@@ -83,6 +84,25 @@ class StreamlitAppUiTests(unittest.TestCase):
         label = _rerun_task_button_label({"task_id": "check-env"})
 
         self.assertEqual(label, "重跑同类任务 · check-env")
+
+    def test_autoresearch_progress_cards_html_shows_active_loop_and_latest_candidate(self):
+        html = _autoresearch_progress_cards_html(
+            {
+                "loop_status": "running",
+                "loop_task_id": "autoresearch-codex-loop",
+                "candidate_count": 12,
+                "review_count": 2,
+                "discard_count": 9,
+                "crash_count": 1,
+                "latest_candidate": "alpha_new",
+                "is_active": True,
+            }
+        )
+
+        self.assertIn('class="autoresearch-progress-grid"', html)
+        self.assertIn("running", html)
+        self.assertIn("alpha_new", html)
+        self.assertIn("active", html)
 
 
 if __name__ == "__main__":

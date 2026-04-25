@@ -73,6 +73,63 @@ def summarize_autoresearch_queue(queue: pd.DataFrame) -> dict[str, int]:
     return counts
 
 
+def build_autoresearch_progress(
+    *,
+    queue: pd.DataFrame | None = None,
+    task_runs: list[dict[str, Any]] | None = None,
+    recent_limit: int = 5,
+) -> dict[str, Any]:
+    queue_frame = queue.copy() if queue is not None else pd.DataFrame()
+    summary = summarize_autoresearch_queue(queue_frame)
+    loop_tasks = [
+        row
+        for row in (task_runs or [])
+        if str(row.get("task_id", "")) in {"autoresearch-codex-loop", "autoresearch-review"}
+    ]
+    latest_task = loop_tasks[0] if loop_tasks else {}
+    recent_candidates = _recent_autoresearch_candidates(queue_frame, recent_limit)
+    latest_candidate = recent_candidates[0] if recent_candidates else {}
+    loop_status = str(latest_task.get("status", "idle") or "idle")
+    return {
+        "loop_status": loop_status,
+        "loop_task_id": latest_task.get("task_id", "n/a"),
+        "loop_run_dir": latest_task.get("run_dir", ""),
+        "loop_created_at": latest_task.get("created_at", ""),
+        "is_active": loop_status in {"queued", "running"},
+        "candidate_count": int(len(queue_frame)),
+        "review_count": summary.get("review", 0),
+        "discard_count": summary.get("discard_candidate", 0),
+        "crash_count": summary.get("crash", 0),
+        "latest_candidate": latest_candidate.get("candidate_name", "n/a"),
+        "latest_candidate_status": latest_candidate.get("status", "n/a"),
+        "latest_primary_metric": latest_candidate.get("primary_metric", float("nan")),
+        "recent_candidates": recent_candidates,
+    }
+
+
+def _recent_autoresearch_candidates(queue: pd.DataFrame, limit: int) -> list[dict[str, Any]]:
+    if queue.empty:
+        return []
+    frame = queue.copy()
+    if "timestamp" in frame.columns:
+        frame["_timestamp_sort"] = pd.to_datetime(frame["timestamp"], errors="coerce")
+        frame = frame.sort_values("_timestamp_sort", ascending=False, na_position="last")
+    columns = [
+        column
+        for column in [
+            "timestamp",
+            "candidate_name",
+            "status",
+            "primary_metric",
+            "neutral_rank_ic_mean_h20",
+            "complexity_score",
+            "artifact_dir",
+        ]
+        if column in frame.columns
+    ]
+    return frame.loc[:, columns].head(limit).to_dict(orient="records")
+
+
 def load_workbench_snapshot(root: str | Path = ".") -> WorkbenchSnapshot:
     root_path = Path(root)
     queue = load_autoresearch_queue(root_path)

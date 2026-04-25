@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from qlib_factor_lab.workbench import (
+    build_autoresearch_progress,
     build_execution_gate_card,
     build_portfolio_gate_explanation,
     build_gate_review_items,
@@ -62,6 +63,52 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(summary["review"], 1)
         self.assertEqual(summary["discard_candidate"], 1)
         self.assertEqual(summary["crash"], 0)
+
+    def test_autoresearch_progress_combines_latest_loop_task_and_recent_candidates(self):
+        queue = pd.DataFrame(
+            [
+                {
+                    "timestamp": "2026-04-25T08:10:00",
+                    "candidate_name": "alpha_new",
+                    "status": "review",
+                    "primary_metric": 0.041,
+                    "neutral_rank_ic_mean_h20": 0.03,
+                    "complexity_score": 0.22,
+                },
+                {
+                    "timestamp": "2026-04-25T08:00:00",
+                    "candidate_name": "alpha_old",
+                    "status": "discard_candidate",
+                    "primary_metric": -0.01,
+                    "neutral_rank_ic_mean_h20": -0.02,
+                    "complexity_score": 0.2,
+                },
+            ]
+        )
+        tasks = [
+            {
+                "task_id": "autoresearch-codex-loop",
+                "status": "running",
+                "created_at": "2026-04-25T08:05:00",
+                "run_dir": "runs/workbench_tasks/20260425_080500_autoresearch-codex-loop",
+            },
+            {
+                "task_id": "check-env",
+                "status": "succeeded",
+                "created_at": "2026-04-25T07:00:00",
+            },
+        ]
+
+        progress = build_autoresearch_progress(queue=queue, task_runs=tasks)
+
+        self.assertEqual(progress["loop_status"], "running")
+        self.assertEqual(progress["loop_task_id"], "autoresearch-codex-loop")
+        self.assertEqual(progress["candidate_count"], 2)
+        self.assertEqual(progress["review_count"], 1)
+        self.assertEqual(progress["discard_count"], 1)
+        self.assertEqual(progress["latest_candidate"], "alpha_new")
+        self.assertEqual(progress["recent_candidates"][0]["candidate_name"], "alpha_new")
+        self.assertTrue(progress["is_active"])
 
     def test_portfolio_gate_explanation_marks_exposure_failures_as_caution(self):
         portfolio = pd.DataFrame(

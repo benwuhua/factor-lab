@@ -15,6 +15,7 @@ if str(SRC) not in sys.path:
 import streamlit as st
 
 from qlib_factor_lab.workbench import (
+    build_autoresearch_progress,
     build_gate_review_items,
     build_portfolio_gate_explanation,
     build_pretrade_review,
@@ -488,6 +489,8 @@ def render_autoresearch_queue() -> None:
         unsafe_allow_html=True,
     )
     queue = load_autoresearch_queue(ROOT)
+    task_runs = latest_workbench_task_runs(ROOT, limit=12)
+    progress = build_autoresearch_progress(queue=queue, task_runs=task_runs)
     if queue.empty:
         st.warning("还没有 expression_results.tsv。先运行 make autoresearch-expression 或 autoresearch-codex-loop。")
         return
@@ -519,6 +522,12 @@ def render_autoresearch_queue() -> None:
         st.markdown(_section_header_html("自动挖掘动作", "controlled research loop"), unsafe_allow_html=True)
         st.markdown(_workflow_card_grid_html(auto_rows), unsafe_allow_html=True)
         _render_workflow_task_buttons(auto_rows, "autoresearch")
+
+        st.markdown(_section_header_html("Nightly 进度", "loop status and recent candidates"), unsafe_allow_html=True)
+        st.markdown(_autoresearch_progress_cards_html(progress), unsafe_allow_html=True)
+        recent_candidates = pd.DataFrame(progress["recent_candidates"])
+        if not recent_candidates.empty:
+            st.dataframe(recent_candidates, use_container_width=True, hide_index=True)
 
         st.markdown(_section_header_html("研究队列", "nightly ledger"), unsafe_allow_html=True)
         display_cols = [
@@ -575,7 +584,7 @@ def render_autoresearch_queue() -> None:
                     with st.expander("candidate.yaml"):
                         st.code(artifacts["candidate"], language="yaml")
     with rail_col:
-        _autoresearch_detail_rail(summary, selected, selected_artifact)
+        _autoresearch_detail_rail(summary, selected, selected_artifact, progress)
 
 
 def _page_topbar_html(title: str, subtitle: str, controls: list[str]) -> str:
@@ -645,9 +654,19 @@ def _portfolio_detail_rail(latest: Path, gate, expert: dict, pretrade: pd.DataFr
     )
 
 
-def _autoresearch_detail_rail(summary: dict[str, int], selected: str, selected_artifact: str) -> None:
+def _autoresearch_detail_rail(summary: dict[str, int], selected: str, selected_artifact: str, progress: dict[str, object] | None = None) -> None:
+    progress = progress or {}
     st.markdown(
         '<aside class="right-rail detail-rail">'
+        + _detail_card_html(
+            "Nightly Loop",
+            [
+                ("status", progress.get("loop_status", "idle")),
+                ("task", _short_text(progress.get("loop_task_id", "n/a"), 16)),
+                ("active", "yes" if progress.get("is_active") else "no"),
+            ],
+            note="这里读取后台任务 manifest 和 expression ledger，不直接修改候选空间。",
+        )
         + _detail_card_html(
             "Queue Status",
             [
@@ -766,6 +785,27 @@ def _task_status_cards_html(summary: dict[str, int]) -> str:
             f'<div class="task-status {klass}"><label>{_html(status)}</label><strong>{_html(summary.get(status, 0))}</strong></div>'
         )
     return f'<section class="task-status-grid">{"".join(items)}</section>'
+
+
+def _autoresearch_progress_cards_html(progress: dict[str, object]) -> str:
+    loop_class = "active" if progress.get("is_active") else ""
+    cards = [
+        ("Loop", progress.get("loop_status", "idle"), progress.get("loop_task_id", "n/a"), loop_class),
+        ("Candidates", progress.get("candidate_count", 0), f"latest: {progress.get('latest_candidate', 'n/a')}", ""),
+        (
+            "Review / Discard",
+            f"{progress.get('review_count', 0)} / {progress.get('discard_count', 0)}",
+            f"crash: {progress.get('crash_count', 0)}",
+            "",
+        ),
+    ]
+    html = "".join(
+        '<div class="autoresearch-progress-card {klass}">'
+        f"<label>{_html(label)}</label><strong>{_html(value)}</strong><span>{_html(note)}</span>"
+        "</div>".format(klass=klass)
+        for label, value, note, klass in cards
+    )
+    return f'<section class="autoresearch-progress-grid">{html}</section>'
 
 
 def _task_run_option_label(row: dict[str, object]) -> str:
@@ -1299,6 +1339,40 @@ def _style() -> None:
           .task-status.bad {
             border-color: #e1b2a9;
             background: #f8e8e4;
+          }
+          .autoresearch-progress-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 0 0 16px;
+          }
+          .autoresearch-progress-card {
+            border: 1px solid var(--fl-line);
+            border-radius: 8px;
+            background: var(--fl-panel);
+            box-shadow: 0 8px 28px rgba(32, 43, 39, 0.06);
+            padding: 14px;
+            display: grid;
+            gap: 8px;
+            min-width: 0;
+          }
+          .autoresearch-progress-card.active {
+            border-color: #8fc4af;
+            background: #edf6f1;
+          }
+          .autoresearch-progress-card label {
+            color: var(--fl-muted);
+            font-size: 12px;
+          }
+          .autoresearch-progress-card strong {
+            font-size: 22px;
+            line-height: 1.12;
+            overflow-wrap: anywhere;
+          }
+          .autoresearch-progress-card span {
+            color: #59645e;
+            font-size: 12px;
+            overflow-wrap: anywhere;
           }
           .section-header { padding: 18px 18px 0; }
           .detail-topbar {
