@@ -28,6 +28,8 @@ EXECUTION_CONFIG ?= configs/execution.yaml
 CURRENT_POSITIONS ?= state/current_positions.csv
 RUN_DATE ?= 20260420
 TARGET_PORTFOLIO ?= reports/target_portfolio_$(RUN_DATE).csv
+EXPOSURE_INPUT ?= $(TARGET_PORTFOLIO)
+EXPOSURE_OUTPUT_DIR ?= reports/exposure_attribution
 EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
 ACTUAL_POSITIONS ?= runs/$(RUN_DATE)/positions_actual.csv
 TARGET_GLOB ?= reports/paper_batch_targets/target_portfolio_*.csv
@@ -36,7 +38,7 @@ FILLS_CSV ?= runs/$(RUN_DATE)/fills.csv
 HISTORICAL_DAYS ?= 30
 EXECUTION_CALENDAR_OUTPUT ?= reports/execution_calendar_$(RUN_DATE).csv
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -58,6 +60,7 @@ help:
 	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
 	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
 	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
+	@printf "  make exposure-attribution  Explain factor-family, industry, and style exposures\n"
 	@printf "  make paper-orders    Generate paper orders/fills from target portfolio\n"
 	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
 	@printf "  make paper-batch     Run rolling paper batch over target portfolios\n"
@@ -77,6 +80,7 @@ help:
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
+	@printf "  make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv\n"
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
 	@printf "  make paper-batch TARGET_GLOB='reports/paper_batch_targets/target_portfolio_*.csv'\n"
 	@printf "  make historical-paper-batch HISTORICAL_DAYS=30\n"
@@ -192,6 +196,12 @@ target-portfolio:
 		--trading-config $(TRADING_CONFIG) \
 		--portfolio-config $(PORTFOLIO_CONFIG) \
 		--risk-config $(RISK_CONFIG)
+
+exposure-attribution:
+	$(PYTHON) scripts/build_exposure_attribution.py \
+		--input-csv $(EXPOSURE_INPUT) \
+		--approved-factors reports/approved_factors.yaml \
+		--output-dir $(EXPOSURE_OUTPUT_DIR)
 
 paper-orders:
 	$(PYTHON) scripts/generate_orders.py \

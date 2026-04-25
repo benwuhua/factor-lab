@@ -172,6 +172,21 @@ The public Qlib CN sample data has no industry or market-cap fields. The project
 - `--neutralize-size-proxy`: cross-sectional neutralization with `log(close * volume)` as a size/liquidity proxy.
 - `--industry-map path/to/industry.csv`: optional custom industry map with `instrument,industry` columns.
 
+### Factor Purification and Exposure Attribution
+
+The project includes a lightweight AlphaPurify-inspired layer without adding AlphaPurify as a dependency:
+
+- `qlib_factor_lab.factor_purification`: MAD winsorization, z-score standardization, rank standardization, and OLS residual neutralization by daily cross-section.
+- `qlib_factor_lab.exposure_attribution`: factor-family, industry, and style exposure reports for a daily signal or target portfolio.
+
+Build an attribution report after generating a target portfolio:
+
+```bash
+make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv
+```
+
+The report reads `reports/approved_factors.yaml` when available so factor drivers such as `top_factor_1` and `top_factor_2` can be grouped by approved factor family. Outputs are written under `reports/exposure_attribution/`.
+
 ## Candidate Mining
 
 Candidate templates live in:
