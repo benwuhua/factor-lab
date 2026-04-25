@@ -56,12 +56,21 @@ COMPANY_EVENT_COLUMNS = [
     "active_until",
 ]
 
+FIXED_RESEARCH_UNIVERSES = ("csi300", "csi500")
+
 
 @dataclass(frozen=True)
 class UniverseSpec:
     name: str
     benchmark: str
     symbols: list[str]
+
+
+def validate_research_universe(universe: str) -> str:
+    normalized = str(universe).strip().lower()
+    if normalized not in FIXED_RESEARCH_UNIVERSES:
+        raise ValueError("factor-lab data layer only supports csi300 and csi500")
+    return normalized
 
 
 def today_for_daily_data(now: dt.date | None = None) -> str:
@@ -192,6 +201,35 @@ def normalize_akshare_notices(raw: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=COMPANY_EVENT_COLUMNS)
 
 
+def filter_frame_to_universes(frame: pd.DataFrame, universe_symbols: dict[str, Iterable[str]]) -> pd.DataFrame:
+    if frame is None or frame.empty:
+        return frame.copy()
+    if "instrument" not in frame.columns:
+        raise ValueError("frame must include instrument column for universe filtering")
+    membership: dict[str, list[str]] = {}
+    for universe, symbols in universe_symbols.items():
+        normalized = validate_research_universe(universe)
+        for symbol in symbols:
+            membership.setdefault(str(symbol).upper(), []).append(normalized)
+    allowed = set(membership)
+    output = frame[frame["instrument"].astype(str).str.upper().isin(allowed)].copy()
+    output["research_universes"] = output["instrument"].astype(str).str.upper().map(
+        lambda instrument: ",".join(sorted(set(membership.get(instrument, []))))
+    )
+    return output.reset_index(drop=True)
+
+
+def load_universe_symbols_csv(path: str | Path) -> dict[str, list[str]]:
+    frame = pd.read_csv(path)
+    if "universe" not in frame.columns or "instrument" not in frame.columns:
+        raise ValueError("universe symbols CSV must include universe and instrument columns")
+    universes: dict[str, list[str]] = {}
+    for universe, group in frame.groupby("universe"):
+        normalized = validate_research_universe(str(universe))
+        universes[normalized] = sorted(set(group["instrument"].astype(str).str.upper()))
+    return universes
+
+
 def classify_notice_event(title: str, category: str = "") -> tuple[str, str]:
     text = f"{title} {category}"
     if any(word in text for word in ["纪律处分", "处罚", "行政处罚"]):
@@ -318,11 +356,8 @@ def _get_akshare():
 
 
 def fetch_universe_symbols(universe: str, fallback_qlib_dir: str | Path | None = None) -> UniverseSpec:
-    universe = universe.lower()
-    benchmark = {"csi300": "SH000300", "csi500": "SH000905", "csi800": "SH000906", "all": "SH000985"}.get(
-        universe,
-        "SH000905",
-    )
+    universe = validate_research_universe(universe)
+    benchmark = {"csi300": "SH000300", "csi500": "SH000905"}[universe]
     try:
         ak = _get_akshare()
         if universe == "csi300":
@@ -330,13 +365,6 @@ def fetch_universe_symbols(universe: str, fallback_qlib_dir: str | Path | None =
             symbols = [qlib_symbol_from_code(code) for code in _extract_symbol_column(raw)]
         elif universe == "csi500":
             raw = ak.index_stock_cons_csindex(symbol="000905")
-            symbols = [qlib_symbol_from_code(code) for code in _extract_symbol_column(raw)]
-        elif universe == "csi800":
-            raw300 = ak.index_stock_cons_csindex(symbol="000300")
-            raw500 = ak.index_stock_cons_csindex(symbol="000905")
-            symbols = [qlib_symbol_from_code(code) for code in pd.concat([_extract_symbol_column(raw300), _extract_symbol_column(raw500)])]
-        elif universe == "all":
-            raw = ak.stock_info_a_code_name()
             symbols = [qlib_symbol_from_code(code) for code in _extract_symbol_column(raw)]
         else:
             raise ValueError(f"unsupported universe: {universe}")
@@ -349,10 +377,7 @@ def fetch_universe_symbols(universe: str, fallback_qlib_dir: str | Path | None =
 
     if fallback_qlib_dir is None:
         raise RuntimeError(f"failed to fetch universe from AkShare: {universe}")
-    fallback_market = "all" if universe == "all" else universe.replace("csi800", "csi500")
-    symbols = load_symbols_from_existing_qlib(fallback_qlib_dir, fallback_market)
-    if universe == "csi800":
-        symbols = sorted(set(symbols) | set(load_symbols_from_existing_qlib(fallback_qlib_dir, "csi300")))
+    symbols = load_symbols_from_existing_qlib(fallback_qlib_dir, universe)
     if not symbols:
         raise RuntimeError(f"failed to fetch universe and no fallback symbols found for {universe}")
     return UniverseSpec(f"{universe}_current", benchmark, symbols)

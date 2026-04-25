@@ -9,6 +9,8 @@ import yaml
 
 from qlib_factor_lab.akshare_data import (
     build_dump_bin_command,
+    filter_frame_to_universes,
+    fetch_universe_symbols,
     normalize_akshare_notices,
     normalize_security_master_snapshot,
     normalize_akshare_history,
@@ -107,6 +109,24 @@ class AkShareDataTests(unittest.TestCase):
             self.assertEqual(target.name, "csi500_current.txt")
             self.assertEqual(target.read_text(encoding="utf-8"), "SH600000\t2015-01-01\t2026-04-20\n")
 
+    def test_fetch_universe_symbols_rejects_non_fixed_universe(self):
+        with self.assertRaisesRegex(ValueError, "only supports csi300 and csi500"):
+            fetch_universe_symbols("all")
+
+    def test_filter_frame_to_universes_keeps_only_csi300_and_csi500_symbols(self):
+        frame = pd.DataFrame(
+            {
+                "instrument": ["SH600000", "SZ300750", "SH600999"],
+                "value": [1, 2, 3],
+            }
+        )
+        universe_symbols = {"csi300": ["SH600000"], "csi500": ["SZ300750"]}
+
+        result = filter_frame_to_universes(frame, universe_symbols)
+
+        self.assertEqual(result["instrument"].tolist(), ["SH600000", "SZ300750"])
+        self.assertEqual(result["research_universes"].tolist(), ["csi300", "csi500"])
+
     def test_normalize_security_master_snapshot_maps_current_a_share_metadata(self):
         raw = pd.DataFrame(
             {
@@ -150,11 +170,13 @@ class AkShareDataTests(unittest.TestCase):
             (root / "raw").mkdir()
             raw_master = root / "raw/security.csv"
             raw_notices = root / "raw/notices.csv"
+            raw_universes = root / "raw/universes.csv"
             raw_master.write_text("代码,名称\n600000,浦发银行\n", encoding="utf-8")
             raw_notices.write_text(
-                "代码,公告标题,公告日期,公告类型,网址\n600000,关于收到监管函的公告,2026-04-20,监管,https://example.test/r\n",
+                "代码,公告标题,公告日期,公告类型,网址\n600000,关于收到监管函的公告,2026-04-20,监管,https://example.test/r\n000001,年度报告,2026-04-20,定期报告,\n",
                 encoding="utf-8",
             )
+            raw_universes.write_text("universe,instrument\ncsi300,SH600000\ncsi500,SZ300750\n", encoding="utf-8")
             repo = Path(__file__).resolve().parents[1]
 
             result = subprocess.run(
@@ -171,6 +193,8 @@ class AkShareDataTests(unittest.TestCase):
                     "data/security_master.csv",
                     "--company-events-output",
                     "data/company_events.csv",
+                    "--universe-symbols-csv",
+                    "raw/universes.csv",
                     "--as-of-date",
                     "2026-04-24",
                 ],
@@ -182,6 +206,9 @@ class AkShareDataTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((root / "data/security_master.csv").exists())
             self.assertTrue((root / "data/company_events.csv").exists())
+            master = pd.read_csv(root / "data/security_master.csv")
+            self.assertEqual(master["instrument"].tolist(), ["SH600000"])
+            self.assertEqual(master["research_universes"].tolist(), ["csi300"])
             events = pd.read_csv(root / "data/company_events.csv")
             self.assertEqual(events.loc[0, "event_type"], "regulatory_inquiry")
             self.assertIn("wrote:", result.stdout)

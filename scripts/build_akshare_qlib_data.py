@@ -21,7 +21,7 @@ from qlib_factor_lab.akshare_data import (
 def main() -> int:
     root = project_root()
     parser = argparse.ArgumentParser(description="Build a current CN daily Qlib dataset from AkShare.")
-    parser.add_argument("--universe", default="csi500", choices=["csi300", "csi500", "csi800", "all"])
+    parser.add_argument("--universe", default="csi500", choices=["csi300", "csi500"])
     parser.add_argument("--start", default="20150101", help="Start date in YYYYMMDD format.")
     parser.add_argument("--end", default=today_for_daily_data().replace("-", ""), help="End date in YYYYMMDD format.")
     parser.add_argument("--source-dir", default=str(root / "data/akshare/source"))
