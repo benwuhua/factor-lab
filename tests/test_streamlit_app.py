@@ -3,6 +3,7 @@ import unittest
 from app.streamlit_app import (
     _autoresearch_progress_cards_html,
     _detail_card_html,
+    _evidence_cards_html,
     _page_topbar_html,
     _rerun_task_button_label,
     _short_text,
@@ -103,6 +104,22 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("running", html)
         self.assertIn("alpha_new", html)
         self.assertIn("active", html)
+
+    def test_evidence_cards_html_shows_event_and_source_counts(self):
+        html = _evidence_cards_html(
+            {
+                "positions": 12,
+                "event_watch": 3,
+                "event_block": 1,
+                "master_missing": 2,
+                "source_urls": 4,
+            }
+        )
+
+        self.assertIn('class="evidence-grid"', html)
+        self.assertIn("Event Watch", html)
+        self.assertIn("<strong>3</strong>", html)
+        self.assertIn("Source URLs", html)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from qlib_factor_lab.workbench import (
     build_portfolio_gate_explanation,
     build_gate_review_items,
     build_pretrade_review,
+    build_research_evidence_summary,
     build_research_pipeline_status,
     build_workbench_freshness,
     find_latest_run_dir,
@@ -251,6 +252,33 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(by_check.loc["limit_or_suspended", "status"], "reject")
         self.assertEqual(by_check.loc["event_blocked", "status"], "reject")
         self.assertEqual(by_check.loc["announcement_watch", "status"], "caution")
+
+    def test_research_evidence_summary_counts_event_and_master_evidence(self):
+        portfolio = pd.DataFrame(
+            {
+                "instrument": ["AAA", "BBB", "CCC"],
+                "event_count": [2, 1, 0],
+                "event_blocked": [True, False, False],
+                "max_event_severity": ["block", "watch", ""],
+                "active_event_types": ["disciplinary_action; regulatory_inquiry", "earnings_watch", ""],
+                "event_risk_summary": ["AAA sanction", "BBB earnings watch", ""],
+                "event_source_urls": ["https://example.test/a; https://example.test/b", "https://example.test/c", ""],
+                "announcement_flag": [True, False, False],
+                "security_master_missing": [False, True, False],
+                "risk_flags": ["event_blocked", "security_master_missing", ""],
+            }
+        )
+
+        summary = build_research_evidence_summary(portfolio)
+
+        self.assertEqual(summary["cards"]["positions"], 3)
+        self.assertEqual(summary["cards"]["event_watch"], 2)
+        self.assertEqual(summary["cards"]["event_block"], 1)
+        self.assertEqual(summary["cards"]["master_missing"], 1)
+        self.assertEqual(summary["cards"]["source_urls"], 3)
+        self.assertEqual(summary["event_types"].set_index("event_type").loc["disciplinary_action", "count"], 1)
+        self.assertEqual(summary["event_types"].set_index("event_type").loc["earnings_watch", "count"], 1)
+        self.assertEqual(list(summary["detail"]["instrument"]), ["AAA", "BBB"])
 
     def test_execution_gate_card_rejects_hard_blocks_and_cautions_soft_blocks(self):
         pretrade = pd.DataFrame(

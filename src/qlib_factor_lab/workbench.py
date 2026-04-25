@@ -313,6 +313,53 @@ def build_pretrade_review(portfolio: pd.DataFrame, *, min_amount_20d: float = 10
     return pd.DataFrame(rows, columns=["check", "status", "count", "detail", "review_focus"])
 
 
+def build_research_evidence_summary(portfolio: pd.DataFrame) -> dict[str, Any]:
+    frame = portfolio.copy() if portfolio is not None else pd.DataFrame()
+    detail_columns = [
+        "instrument",
+        "event_count",
+        "event_blocked",
+        "max_event_severity",
+        "active_event_types",
+        "event_risk_summary",
+        "event_source_urls",
+        "announcement_flag",
+        "security_master_missing",
+        "risk_flags",
+    ]
+    for column in detail_columns:
+        if column not in frame.columns:
+            frame[column] = pd.NA
+
+    event_watch_mask = frame.apply(
+        lambda row: _number(row.get("event_count")) > 0
+        or not _blank(row.get("event_risk_summary"))
+        or not _blank(row.get("active_event_types")),
+        axis=1,
+    )
+    event_block_mask = frame["event_blocked"].map(_truthy)
+    master_missing_mask = frame["security_master_missing"].map(_truthy)
+    announcement_mask = frame["announcement_flag"].map(_truthy)
+    source_urls = _count_unique_split_values(frame["event_source_urls"])
+
+    detail_mask = event_watch_mask | event_block_mask | master_missing_mask | announcement_mask
+    detail = frame.loc[detail_mask, detail_columns].reset_index(drop=True)
+    event_types = _event_type_counts(frame["active_event_types"])
+
+    return {
+        "cards": {
+            "positions": int(len(frame)),
+            "event_watch": int(event_watch_mask.sum()),
+            "event_block": int(event_block_mask.sum()),
+            "announcement_watch": int(announcement_mask.sum()),
+            "master_missing": int(master_missing_mask.sum()),
+            "source_urls": int(source_urls),
+        },
+        "event_types": event_types,
+        "detail": detail,
+    }
+
+
 def build_execution_gate_card(
     gate_decision: str,
     pretrade_review: pd.DataFrame,
@@ -578,6 +625,28 @@ def _risk_flag_instruments(portfolio: pd.DataFrame, hard_flags: set[str]) -> lis
         if flags & hard_flags:
             output.append(str(row.get("instrument", "")))
     return [item for item in output if item]
+
+
+def _event_type_counts(values: pd.Series) -> pd.DataFrame:
+    counts: dict[str, int] = {}
+    for value in values:
+        for item in _split_semicolon_values(value):
+            counts[item] = counts.get(item, 0) + 1
+    rows = [{"event_type": key, "count": value} for key, value in sorted(counts.items(), key=lambda item: (-item[1], item[0]))]
+    return pd.DataFrame(rows, columns=["event_type", "count"])
+
+
+def _count_unique_split_values(values: pd.Series) -> int:
+    items = set()
+    for value in values:
+        items.update(_split_semicolon_values(value))
+    return len(items)
+
+
+def _split_semicolon_values(value: Any) -> list[str]:
+    if _blank(value):
+        return []
+    return [item.strip() for item in str(value).replace(",", ";").split(";") if item.strip()]
 
 
 def _autoresearch_stage_status(queue: pd.DataFrame) -> str:

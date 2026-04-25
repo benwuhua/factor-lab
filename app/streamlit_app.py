@@ -19,6 +19,7 @@ from qlib_factor_lab.workbench import (
     build_gate_review_items,
     build_portfolio_gate_explanation,
     build_pretrade_review,
+    build_research_evidence_summary,
     build_research_pipeline_status,
     classify_gate_decision,
     find_latest_run_dir,
@@ -303,6 +304,7 @@ def render_portfolio_gate() -> None:
     )
     expert = _latest_expert_review()
     pretrade = build_pretrade_review(portfolio)
+    evidence = build_research_evidence_summary(portfolio)
     execution_card = load_execution_gate_card(ROOT)
     review_items = build_gate_review_items(gate.checks)
     pretrade_blocks = int((pretrade["status"].astype(str) == "reject").sum()) if not pretrade.empty else 0
@@ -359,6 +361,27 @@ def render_portfolio_gate() -> None:
             unsafe_allow_html=True,
         )
         st.dataframe(pretrade, use_container_width=True, hide_index=True)
+
+        st.markdown(
+            _section_header_html("投研证据层", "events, announcements, master data"),
+            unsafe_allow_html=True,
+        )
+        st.markdown(_evidence_cards_html(evidence["cards"]), unsafe_allow_html=True)
+        event_types = evidence["event_types"]
+        evidence_detail = evidence["detail"]
+        evidence_cols = st.columns([0.85, 1.15])
+        with evidence_cols[0]:
+            st.subheader("事件类型分布")
+            if event_types.empty:
+                st.info("当前组合没有事件类型证据。")
+            else:
+                st.dataframe(event_types, use_container_width=True, hide_index=True)
+        with evidence_cols[1]:
+            st.subheader("需人工查看的证据")
+            if evidence_detail.empty:
+                st.success("当前组合没有公告/事件/主数据异常证据。")
+            else:
+                st.dataframe(evidence_detail, use_container_width=True, hide_index=True)
 
         chart_cols = st.columns(2)
         with chart_cols[0]:
@@ -806,6 +829,21 @@ def _autoresearch_progress_cards_html(progress: dict[str, object]) -> str:
         for label, value, note, klass in cards
     )
     return f'<section class="autoresearch-progress-grid">{html}</section>'
+
+
+def _evidence_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("Positions", cards.get("positions", 0)),
+        ("Event Watch", cards.get("event_watch", 0)),
+        ("Event Block", cards.get("event_block", 0)),
+        ("Master Missing", cards.get("master_missing", 0)),
+        ("Source URLs", cards.get("source_urls", 0)),
+    ]
+    html = "".join(
+        f'<div class="evidence-card"><label>{_html(label)}</label><strong>{_html(value)}</strong></div>'
+        for label, value in items
+    )
+    return f'<section class="evidence-grid">{html}</section>'
 
 
 def _task_run_option_label(row: dict[str, object]) -> str:
@@ -1373,6 +1411,29 @@ def _style() -> None:
             color: #59645e;
             font-size: 12px;
             overflow-wrap: anywhere;
+          }
+          .evidence-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            margin: 0 0 16px;
+          }
+          .evidence-card {
+            border: 1px solid var(--fl-line);
+            border-radius: 8px;
+            background: #f8f9f6;
+            padding: 12px;
+            display: grid;
+            gap: 8px;
+            min-width: 0;
+          }
+          .evidence-card label {
+            color: var(--fl-muted);
+            font-size: 12px;
+          }
+          .evidence-card strong {
+            font-size: 22px;
+            line-height: 1.15;
           }
           .section-header { padding: 18px 18px 0; }
           .detail-topbar {
