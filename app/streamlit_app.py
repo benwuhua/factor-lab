@@ -14,9 +14,11 @@ if str(SRC) not in sys.path:
 import streamlit as st
 
 from qlib_factor_lab.workbench import (
+    build_gate_review_items,
     build_portfolio_gate_explanation,
     classify_gate_decision,
     find_latest_target_portfolio,
+    get_candidate_artifacts,
     load_autoresearch_queue,
     load_factor_family_map_safe,
     load_portfolio_gate_explanation,
@@ -82,6 +84,17 @@ def render_dashboard() -> None:
     )
     st.dataframe(command_rows, use_container_width=True, hide_index=True)
 
+    st.subheader("产物新鲜度")
+    st.caption("用红黄绿灯判断当前工作台读到的是不是最近一轮研究产物。")
+    freshness = pd.DataFrame(snapshot.freshness)
+    if not freshness.empty:
+        freshness["灯号"] = freshness["status"].map({"ready": "green", "stale": "yellow", "missing": "red"}).fillna("gray")
+        st.dataframe(
+            freshness.loc[:, ["灯号", "label", "status", "age_hours", "path"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+
     left, right = st.columns([1.15, 0.85])
     with left:
         st.subheader("Portfolio Gate 快照")
@@ -113,6 +126,13 @@ def render_portfolio_gate() -> None:
     st.caption(f"目标组合: {latest}")
     st.subheader("为什么被 caution / reject")
     st.dataframe(_gate_frame(gate.checks), use_container_width=True, hide_index=True)
+    review_items = build_gate_review_items(gate.checks)
+    if review_items.empty:
+        st.success("当前 gate 没有失败项。")
+    else:
+        st.subheader("前置复核动作")
+        st.caption("caution 项可以降仓或人工确认；reject 项默认阻断组合进入纸面执行。")
+        st.dataframe(review_items, use_container_width=True, hide_index=True)
 
     chart_cols = st.columns(2)
     with chart_cols[0]:
@@ -181,17 +201,31 @@ def render_autoresearch_queue() -> None:
     ]
     st.dataframe(filtered.loc[:, [column for column in display_cols if column in filtered.columns]], use_container_width=True)
 
-    top = filtered.head(1)
-    if not top.empty:
-        artifact = ROOT / str(top.iloc[0].get("artifact_dir", ""))
-        summary_path = artifact / "summary.txt"
-        candidate_path = artifact / "candidate.yaml"
-        st.subheader("最近候选详情")
-        if summary_path.exists():
-            st.code(summary_path.read_text(encoding="utf-8"), language="yaml")
-        if candidate_path.exists():
-            with st.expander("candidate.yaml"):
-                st.code(candidate_path.read_text(encoding="utf-8"), language="yaml")
+    st.subheader("候选对比")
+    chart_frame = filtered.dropna(subset=["primary_metric", "complexity_score"])
+    if chart_frame.empty:
+        st.info("当前筛选结果缺少可绘制的 primary_metric / complexity_score。")
+    else:
+        st.scatter_chart(
+            chart_frame,
+            x="complexity_score",
+            y="primary_metric",
+            color="status",
+            size=80,
+        )
+
+    if not filtered.empty:
+        options = filtered["candidate_name"].fillna("").astype(str).tolist()
+        selected = st.selectbox("候选详情", options=options)
+        selected_row = filtered.loc[filtered["candidate_name"].astype(str) == selected].head(1)
+        if not selected_row.empty:
+            artifacts = get_candidate_artifacts(ROOT, selected_row.iloc[0].get("artifact_dir", ""))
+            st.caption(f"artifact: {artifacts['artifact_dir']}")
+            if artifacts["summary"]:
+                st.code(artifacts["summary"], language="yaml")
+            if artifacts["candidate"]:
+                with st.expander("candidate.yaml"):
+                    st.code(artifacts["candidate"], language="yaml")
 
 
 def _gate_frame(frame: pd.DataFrame) -> pd.DataFrame:

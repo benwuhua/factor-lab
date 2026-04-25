@@ -31,6 +31,7 @@ class WorkbenchSnapshot:
     latest_target_portfolio: Path | None
     latest_run_dir: Path | None
     autoresearch_status_counts: dict[str, int]
+    freshness: list[dict[str, Any]]
 
 
 def load_autoresearch_queue(root: str | Path = ".", ledger_path: str | Path = AUTORESEARCH_LEDGER) -> pd.DataFrame:
@@ -78,6 +79,7 @@ def load_workbench_snapshot(root: str | Path = ".") -> WorkbenchSnapshot:
         latest_target_portfolio=find_latest_target_portfolio(root_path),
         latest_run_dir=find_latest_run_dir(root_path),
         autoresearch_status_counts=summarize_autoresearch_queue(queue),
+        freshness=build_workbench_freshness(root_path),
     )
 
 
@@ -172,6 +174,46 @@ def classify_gate_decision(checks: pd.DataFrame) -> str:
     return "reject"
 
 
+def build_gate_review_items(checks: pd.DataFrame) -> pd.DataFrame:
+    columns = ["check", "decision_level", "value", "limit", "review_focus"]
+    if checks.empty or "status" not in checks.columns:
+        return pd.DataFrame(columns=columns)
+    failed = checks.loc[checks["status"] == "fail"].copy()
+    if failed.empty:
+        return pd.DataFrame(columns=columns)
+    failed["decision_level"] = failed.apply(lambda row: classify_gate_decision(pd.DataFrame([row])), axis=1)
+    failed["review_focus"] = failed["check"].astype(str).map(_review_focus_for_check).fillna("人工复核该约束是否合理。")
+    keep = [column for column in columns if column in failed.columns]
+    return failed.loc[:, keep].reset_index(drop=True)
+
+
+def build_workbench_freshness(root: str | Path = ".", *, now: pd.Timestamp | None = None) -> list[dict[str, Any]]:
+    root_path = Path(root)
+    current = pd.Timestamp.now() if now is None else pd.Timestamp(now)
+    artifacts = [
+        ("autoresearch_ledger", root_path / AUTORESEARCH_LEDGER, 36.0, "Nightly 研究队列"),
+        ("approved_factors", root_path / APPROVED_FACTORS, 24 * 14.0, "可用因子清单"),
+        ("target_portfolio", find_latest_target_portfolio(root_path), 36.0, "目标组合"),
+        ("latest_run", find_latest_run_dir(root_path), 36.0, "最近纸面执行包"),
+    ]
+    return [
+        _freshness_row(name, path, max_age_hours=max_age_hours, label=label, now=current)
+        for name, path, max_age_hours, label in artifacts
+    ]
+
+
+def get_candidate_artifacts(root: str | Path, artifact_dir: str | Path | None) -> dict[str, Any]:
+    root_path = Path(root)
+    artifact_path = _resolve(root_path, artifact_dir or "")
+    summary_path = artifact_path / "summary.txt"
+    candidate_path = artifact_path / "candidate.yaml"
+    return {
+        "artifact_dir": artifact_path,
+        "summary": summary_path.read_text(encoding="utf-8") if summary_path.exists() else "",
+        "candidate": candidate_path.read_text(encoding="utf-8") if candidate_path.exists() else "",
+    }
+
+
 def _risk_config(raw: dict[str, Any] | RiskConfig) -> RiskConfig:
     if isinstance(raw, RiskConfig):
         return raw
@@ -208,3 +250,44 @@ def _latest_path(paths: list[Path]) -> Path | None:
 def _resolve(root: Path, path: str | Path) -> Path:
     candidate = Path(path)
     return candidate if candidate.is_absolute() else root / candidate
+
+
+def _freshness_row(
+    artifact: str,
+    path: Path | None,
+    *,
+    max_age_hours: float,
+    label: str,
+    now: pd.Timestamp,
+) -> dict[str, Any]:
+    if path is None or not path.exists():
+        return {
+            "artifact": artifact,
+            "label": label,
+            "status": "missing",
+            "age_hours": None,
+            "path": "",
+        }
+    modified = pd.Timestamp(path.stat().st_mtime, unit="s")
+    age_hours = round(max((now - modified).total_seconds(), 0) / 3600, 1)
+    status = "ready" if age_hours <= max_age_hours else "stale"
+    return {
+        "artifact": artifact,
+        "label": label,
+        "status": status,
+        "age_hours": age_hours,
+        "path": str(path),
+    }
+
+
+def _review_focus_for_check(check: str) -> str:
+    focus = {
+        "max_industry_weight": "降低行业集中，或要求人工确认该行业主题暴露是有意为之。",
+        "min_factor_family_count": "增加不同因子家族的来源，避免组合只押单一量价逻辑。",
+        "max_factor_family_concentration": "降低主导因子家族权重，检查组合是否只是单因子变体。",
+        "max_single_weight": "降低单票权重，避免个股流动性和事件风险放大。",
+        "min_positions": "增加持仓数量，避免样本太窄导致组合不可解释。",
+        "min_signal_coverage": "检查信号覆盖率，避免用缺失数据生成组合。",
+        "max_turnover": "降低换手或拉长调仓周期，检查交易成本敏感性。",
+    }
+    return focus.get(check, "人工复核该约束是否合理。")
