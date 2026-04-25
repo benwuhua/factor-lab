@@ -38,13 +38,14 @@ FILLS_CSV ?= runs/$(RUN_DATE)/fills.csv
 HISTORICAL_DAYS ?= 30
 EXECUTION_CALENDAR_OUTPUT ?= reports/execution_calendar_$(RUN_DATE).csv
 
-.PHONY: help install test check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench check-env candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
 	@printf "\n"
 	@printf "  make install          Create .venv and install project dependencies\n"
 	@printf "  make test             Run unit tests\n"
+	@printf "  make workbench        Start the local Streamlit research workbench\n"
 	@printf "  make check-env        Check local Qlib provider environment\n"
 	@printf "  make candidates       Generate candidate factor table for CSI500 config\n"
 	@printf "  make mine-csi500      Run 5/20 day candidate mining on CSI500 config\n"
@@ -70,6 +71,7 @@ help:
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
 	@printf "\n"
 	@printf "Examples:\n"
+	@printf "  make workbench\n"
 	@printf "  make event-csi300 FACTOR=arbr_26\n"
 	@printf "  make summarize-event FACTOR=arbr_26 SUMMARY=reports/factor_arbr_26_event_backtest_summary_csi300.csv\n"
 	@printf "  make autoresearch-expression AUTORESEARCH_CANDIDATE=configs/autoresearch/candidates/example_expression.yaml\n"
@@ -95,6 +97,9 @@ install:
 
 test:
 	PYTHONPATH=src $(PYTHON) -m unittest discover -s tests
+
+workbench:
+	$(PYTHON) scripts/run_workbench.py
 
 check-env:
 	$(PYTHON) scripts/check_env.py --provider-config $(CSI500_PROVIDER)

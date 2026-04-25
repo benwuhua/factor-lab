@@ -64,6 +64,14 @@ Run the unit tests:
 make test
 ```
 
+Start the local Streamlit research workbench:
+
+```bash
+make workbench
+```
+
+The workbench is a read-only local UI. It reads existing artifacts such as autoresearch ledgers, approved factors, target portfolios, risk reports, and exposure attribution outputs. It does not execute trading or research commands from the browser.
+
 Check the local Qlib environment after data has been downloaded or built:
 
 ```bash
