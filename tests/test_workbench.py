@@ -10,6 +10,7 @@ import yaml
 from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
     build_execution_gate_card,
+    build_event_evidence_library,
     build_portfolio_gate_explanation,
     build_gate_review_items,
     build_pretrade_review,
@@ -279,6 +280,52 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(summary["event_types"].set_index("event_type").loc["disciplinary_action", "count"], 1)
         self.assertEqual(summary["event_types"].set_index("event_type").loc["earnings_watch", "count"], 1)
         self.assertEqual(list(summary["detail"]["instrument"]), ["AAA", "BBB"])
+
+    def test_event_evidence_library_loads_events_and_summarizes_types(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "configs").mkdir()
+            (root / "data").mkdir()
+            (root / "configs/event_risk.yaml").write_text(
+                yaml.safe_dump({"event_risk": {"events_path": "data/company_events.csv"}}),
+                encoding="utf-8",
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "event_id": "e1",
+                        "instrument": "AAA",
+                        "event_type": "disciplinary_action",
+                        "event_date": "2026-04-20",
+                        "source": "exchange",
+                        "source_url": "https://example.test/e1",
+                        "title": "Sanction",
+                        "severity": "block",
+                        "summary": "formal sanction",
+                    },
+                    {
+                        "event_id": "e2",
+                        "instrument": "BBB",
+                        "event_type": "earnings_watch",
+                        "event_date": "2026-04-21",
+                        "source": "announcement",
+                        "source_url": "https://example.test/e2",
+                        "title": "Earnings watch",
+                        "severity": "watch",
+                        "summary": "earnings warning",
+                    },
+                ]
+            ).to_csv(root / "data/company_events.csv", index=False)
+
+            library = build_event_evidence_library(root)
+
+        self.assertEqual(library["cards"]["events"], 2)
+        self.assertEqual(library["cards"]["instruments"], 2)
+        self.assertEqual(library["cards"]["block_events"], 1)
+        self.assertEqual(library["cards"]["source_urls"], 2)
+        self.assertEqual(library["event_types"].set_index("event_type").loc["disciplinary_action", "count"], 1)
+        self.assertEqual(library["severity"].set_index("severity").loc["block", "count"], 1)
+        self.assertEqual(list(library["detail"]["instrument"]), ["BBB", "AAA"])
 
     def test_execution_gate_card_rejects_hard_blocks_and_cautions_soft_blocks(self):
         pretrade = pd.DataFrame(

@@ -9,12 +9,14 @@ import pandas as pd
 import yaml
 
 from .exposure_attribution import build_exposure_attribution, load_factor_family_map
+from .company_events import COMPANY_EVENT_COLUMNS, load_company_events, load_event_risk_config
 from .risk import RiskConfig, check_portfolio_risk
 
 
 AUTORESEARCH_LEDGER = Path("reports/autoresearch/expression_results.tsv")
 APPROVED_FACTORS = Path("reports/approved_factors.yaml")
 RISK_CONFIG = Path("configs/risk.yaml")
+EVENT_RISK_CONFIG = Path("configs/event_risk.yaml")
 AUTORESEARCH_REVIEW_ANALYSIS = Path("reports/autoresearch")
 
 
@@ -360,6 +362,29 @@ def build_research_evidence_summary(portfolio: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def build_event_evidence_library(
+    root: str | Path = ".",
+    event_risk_config_path: str | Path = EVENT_RISK_CONFIG,
+) -> dict[str, Any]:
+    root_path = Path(root)
+    config = load_event_risk_config(_resolve(root_path, event_risk_config_path))
+    events_path = _resolve_optional(root_path, config.events_path)
+    events = load_company_events(events_path)
+    detail = _event_evidence_detail(events)
+    return {
+        "cards": {
+            "events": int(len(events)),
+            "instruments": int(events["instrument"].dropna().astype(str).nunique()) if "instrument" in events.columns else 0,
+            "block_events": int((events.get("severity", pd.Series(dtype=str)).fillna("").astype(str) == "block").sum()),
+            "source_urls": _count_unique_split_values(events.get("source_url", pd.Series(dtype=str))),
+        },
+        "event_types": _value_counts_frame(events, "event_type"),
+        "severity": _value_counts_frame(events, "severity"),
+        "detail": detail,
+        "events_path": str(events_path) if events_path is not None else "",
+    }
+
+
 def build_execution_gate_card(
     gate_decision: str,
     pretrade_review: pd.DataFrame,
@@ -531,6 +556,12 @@ def _resolve(root: Path, path: str | Path) -> Path:
     return candidate if candidate.is_absolute() else root / candidate
 
 
+def _resolve_optional(root: Path, path: str | Path | None) -> Path | None:
+    if path is None:
+        return None
+    return _resolve(root, path)
+
+
 def _freshness_row(
     artifact: str,
     path: Path | None,
@@ -634,6 +665,37 @@ def _event_type_counts(values: pd.Series) -> pd.DataFrame:
             counts[item] = counts.get(item, 0) + 1
     rows = [{"event_type": key, "count": value} for key, value in sorted(counts.items(), key=lambda item: (-item[1], item[0]))]
     return pd.DataFrame(rows, columns=["event_type", "count"])
+
+
+def _value_counts_frame(frame: pd.DataFrame, column: str) -> pd.DataFrame:
+    if frame.empty or column not in frame.columns:
+        return pd.DataFrame(columns=[column, "count"])
+    values = frame[column].fillna("").astype(str).str.strip()
+    values = values[values != ""]
+    if values.empty:
+        return pd.DataFrame(columns=[column, "count"])
+    counts = values.value_counts().rename_axis(column).reset_index(name="count")
+    return counts
+
+
+def _event_evidence_detail(events: pd.DataFrame) -> pd.DataFrame:
+    frame = events.copy()
+    for column in COMPANY_EVENT_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = pd.NA
+    columns = [
+        "event_date",
+        "instrument",
+        "event_type",
+        "severity",
+        "title",
+        "summary",
+        "source",
+        "source_url",
+        "active_until",
+    ]
+    frame["_event_date_sort"] = pd.to_datetime(frame["event_date"], errors="coerce")
+    return frame.sort_values("_event_date_sort", ascending=False, na_position="last").loc[:, columns].reset_index(drop=True)
 
 
 def _count_unique_split_values(values: pd.Series) -> int:

@@ -4,6 +4,7 @@ from app.streamlit_app import (
     _autoresearch_progress_cards_html,
     _detail_card_html,
     _evidence_cards_html,
+    _event_library_cards_html,
     _page_topbar_html,
     _rerun_task_button_label,
     _short_text,
@@ -120,6 +121,21 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("Event Watch", html)
         self.assertIn("<strong>3</strong>", html)
         self.assertIn("Source URLs", html)
+
+    def test_event_library_cards_html_shows_library_counts(self):
+        html = _event_library_cards_html(
+            {
+                "events": 20,
+                "instruments": 12,
+                "block_events": 2,
+                "source_urls": 18,
+            }
+        )
+
+        self.assertIn('class="evidence-grid"', html)
+        self.assertIn("Events", html)
+        self.assertIn("<strong>20</strong>", html)
+        self.assertIn("Block Events", html)
 
 
 if __name__ == "__main__":

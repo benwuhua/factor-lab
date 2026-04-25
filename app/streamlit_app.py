@@ -16,6 +16,7 @@ import streamlit as st
 
 from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
+    build_event_evidence_library,
     build_gate_review_items,
     build_portfolio_gate_explanation,
     build_pretrade_review,
@@ -53,7 +54,7 @@ def main() -> None:
     st.sidebar.caption("AI 辅助 A 股因子投研工作台\n从候选因子到组合复核")
     page = st.sidebar.radio(
         "导航",
-        ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行"],
+        ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行", "08 证据库"],
         label_visibility="collapsed",
     )
     st.sidebar.divider()
@@ -72,6 +73,8 @@ def main() -> None:
         render_portfolio_gate()
     elif page == "07 纸面执行":
         render_paper_execution()
+    elif page == "08 证据库":
+        render_evidence_library()
     else:
         render_dashboard()
 
@@ -502,6 +505,89 @@ def render_paper_execution() -> None:
         )
 
 
+def render_evidence_library() -> None:
+    library = build_event_evidence_library(ROOT)
+    detail = library["detail"]
+    event_types = library["event_types"]
+    severity = library["severity"]
+
+    st.markdown(
+        _page_topbar_html(
+            "证据库",
+            "集中查看公告、监管、异动和证券主数据证据，为组合门禁和专家复核提供可追溯上下文。",
+            ["Events", "Severity", "Sources", "Export"],
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(_event_library_cards_html(library["cards"]), unsafe_allow_html=True)
+    st.caption(f"events path: {library.get('events_path', '') or 'n/a'}")
+
+    main_col, rail_col = st.columns([3.1, 1.05], gap="large")
+    with main_col:
+        st.markdown(_section_header_html("事件证据过滤", "instrument, type, severity"), unsafe_allow_html=True)
+        if detail.empty:
+            st.info("还没有 data/company_events.csv。先运行研究上下文数据构建任务。")
+        else:
+            filter_cols = st.columns(3)
+            with filter_cols[0]:
+                instruments = sorted(detail["instrument"].dropna().astype(str).unique().tolist())
+                selected_instruments = st.multiselect("股票代码", options=instruments, default=[])
+            with filter_cols[1]:
+                event_type_options = sorted(detail["event_type"].dropna().astype(str).unique().tolist())
+                selected_types = st.multiselect("事件类型", options=event_type_options, default=[])
+            with filter_cols[2]:
+                severity_options = sorted(detail["severity"].dropna().astype(str).unique().tolist())
+                selected_severity = st.multiselect("严重程度", options=severity_options, default=[])
+
+            filtered = detail.copy()
+            if selected_instruments:
+                filtered = filtered[filtered["instrument"].astype(str).isin(selected_instruments)]
+            if selected_types:
+                filtered = filtered[filtered["event_type"].astype(str).isin(selected_types)]
+            if selected_severity:
+                filtered = filtered[filtered["severity"].astype(str).isin(selected_severity)]
+            st.dataframe(filtered, use_container_width=True, hide_index=True)
+
+        chart_cols = st.columns(2)
+        with chart_cols[0]:
+            st.subheader("事件类型")
+            if event_types.empty:
+                st.info("暂无事件类型统计。")
+            else:
+                st.dataframe(event_types, use_container_width=True, hide_index=True)
+        with chart_cols[1]:
+            st.subheader("严重程度")
+            if severity.empty:
+                st.info("暂无严重程度统计。")
+            else:
+                st.dataframe(severity, use_container_width=True, hide_index=True)
+    with rail_col:
+        st.markdown(
+            '<aside class="right-rail detail-rail">'
+            + _detail_card_html(
+                "Evidence Store",
+                [
+                    ("events", library["cards"].get("events", 0)),
+                    ("names", library["cards"].get("instruments", 0)),
+                    ("block", library["cards"].get("block_events", 0)),
+                ],
+                note="证据库当前读取结构化 CSV，后续可接公告 PDF/RAG 切片。",
+            )
+            + _detail_card_html(
+                "Coverage",
+                [
+                    ("source_urls", library["cards"].get("source_urls", 0)),
+                    ("types", len(event_types)),
+                    ("severity", len(severity)),
+                ],
+                note="source_url 是后续证据追踪和人工复核的关键入口。",
+            )
+            + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">python scripts/build_research_context_data.py<br>make target-portfolio<br>make exposure-attribution</div></section>'
+            + "</aside>",
+            unsafe_allow_html=True,
+        )
+
+
 def render_autoresearch_queue() -> None:
     st.markdown(
         _page_topbar_html(
@@ -837,6 +923,20 @@ def _evidence_cards_html(cards: dict[str, object]) -> str:
         ("Event Watch", cards.get("event_watch", 0)),
         ("Event Block", cards.get("event_block", 0)),
         ("Master Missing", cards.get("master_missing", 0)),
+        ("Source URLs", cards.get("source_urls", 0)),
+    ]
+    html = "".join(
+        f'<div class="evidence-card"><label>{_html(label)}</label><strong>{_html(value)}</strong></div>'
+        for label, value in items
+    )
+    return f'<section class="evidence-grid">{html}</section>'
+
+
+def _event_library_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("Events", cards.get("events", 0)),
+        ("Instruments", cards.get("instruments", 0)),
+        ("Block Events", cards.get("block_events", 0)),
         ("Source URLs", cards.get("source_urls", 0)),
     ]
     html = "".join(
