@@ -118,7 +118,7 @@
     main {
       padding: 26px;
       display: grid;
-      grid-template-rows: auto auto 1fr;
+      grid-template-rows: auto auto auto 1fr;
       gap: 18px;
     }
 
@@ -184,6 +184,138 @@
 
     .metric strong {
       font-size: 24px;
+      font-weight: 760;
+    }
+
+    .pipeline-ops {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .ops-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .ops-header h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .ops-header p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .run-button {
+      appearance: none;
+      border: 1px solid #1c5f49;
+      background: var(--green);
+      color: #ffffff;
+      border-radius: 6px;
+      padding: 10px 13px 10px 32px;
+      font-size: 13px;
+      font-weight: 750;
+      position: relative;
+      white-space: nowrap;
+    }
+
+    .run-button::before {
+      content: "";
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid #ffffff;
+    }
+
+    .ops-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .op-card {
+      min-height: 142px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8f9f6;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 8px;
+      position: relative;
+    }
+
+    .op-card::after {
+      content: "";
+      position: absolute;
+      right: -9px;
+      top: 50%;
+      width: 8px;
+      height: 1px;
+      background: var(--line);
+    }
+
+    .op-card:last-child::after {
+      display: none;
+    }
+
+    .op-index {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+    }
+
+    .op-card b {
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .op-card code {
+      color: #415049;
+      background: #e9eee9;
+      border-radius: 5px;
+      padding: 7px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .op-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .op-status {
+      font-size: 11px;
+      font-weight: 760;
+      color: var(--green);
+    }
+
+    .op-action {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 11px;
       font-weight: 760;
     }
 
@@ -396,6 +528,15 @@
       .metrics {
         grid-template-columns: repeat(3, minmax(130px, 1fr));
       }
+
+      .ops-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .op-card:nth-child(3)::after,
+      .op-card:last-child::after {
+        display: none;
+      }
     }
 
     @media (max-width: 820px) {
@@ -419,8 +560,18 @@
       }
 
       .metrics,
-      .steps {
+      .steps,
+      .ops-grid {
         grid-template-columns: 1fr;
+      }
+
+      .ops-header {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .op-card::after {
+        display: none;
       }
 
       .flow-row {
@@ -472,6 +623,54 @@
         <div class="metric"><label>Purification</label><strong>MAD + Z</strong></div>
         <div class="metric"><label>Portfolio Gate</label><strong>Caution</strong></div>
         <div class="metric"><label>Paper Bundle</label><strong>Ready</strong></div>
+      </section>
+
+      <section class="pipeline-ops" aria-label="流水线操作台">
+        <div class="ops-header">
+          <div>
+            <h2>流水线操作台</h2>
+            <p>把研究、组合、复核和纸面执行放在同一条可审计链路里；每一步都生成本地证据和下一步输入。</p>
+          </div>
+          <button class="run-button">Run Daily Pipeline</button>
+        </div>
+        <div class="ops-grid">
+          <div class="op-card">
+            <span class="op-index">01 DATA</span>
+            <b>检查数据与交易日</b>
+            <code>make check-env</code>
+            <div class="op-footer"><span class="op-status">ready</span><button class="op-action">Run</button></div>
+          </div>
+          <div class="op-card">
+            <span class="op-index">02 RESEARCH</span>
+            <b>启动候选因子挖掘</b>
+            <code>make autoresearch-codex-loop</code>
+            <div class="op-footer"><span class="op-status">review</span><button class="op-action">Queue</button></div>
+          </div>
+          <div class="op-card">
+            <span class="op-index">03 GOVERN</span>
+            <b>生成 approved 因子</b>
+            <code>make select-factors</code>
+            <div class="op-footer"><span class="op-status">governed</span><button class="op-action">Open</button></div>
+          </div>
+          <div class="op-card">
+            <span class="op-index">04 SIGNAL</span>
+            <b>构建当日信号</b>
+            <code>make daily-signal</code>
+            <div class="op-footer"><span class="op-status">built</span><button class="op-action">Run</button></div>
+          </div>
+          <div class="op-card">
+            <span class="op-index">05 PORTFOLIO</span>
+            <b>组合与暴露门禁</b>
+            <code>make target-portfolio</code>
+            <div class="op-footer"><span class="op-status">caution</span><button class="op-action">Review</button></div>
+          </div>
+          <div class="op-card">
+            <span class="op-index">06 PAPER</span>
+            <b>纸面订单与对账</b>
+            <code>make paper-orders</code>
+            <div class="op-footer"><span class="op-status">ready</span><button class="op-action">Stage</button></div>
+          </div>
+        </div>
       </section>
 
       <section class="workspace">
