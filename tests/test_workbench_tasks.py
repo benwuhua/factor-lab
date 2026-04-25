@@ -8,6 +8,7 @@ from qlib_factor_lab.workbench_tasks import (
     WORKBENCH_TASKS,
     latest_workbench_task_runs,
     launch_workbench_task,
+    load_workbench_task_detail,
     summarize_workbench_task_runs,
     task_manifest_path,
     tail_workbench_task_log,
@@ -73,6 +74,24 @@ class WorkbenchTaskTests(unittest.TestCase):
         self.assertEqual(rows[0]["task_id"], "check-env")
         self.assertIn("line-7", rows[0]["log_tail"])
         self.assertEqual(tail, "line-5\nline-6\nline-7")
+
+    def test_load_workbench_task_detail_reads_manifest_and_full_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = Path(tmp) / "runs/workbench_tasks/20260425_090000_check-env"
+            run.mkdir(parents=True)
+            task_manifest_path(run).write_text(
+                json.dumps({"task_id": "check-env", "status": "succeeded", "returncode": 0}),
+                encoding="utf-8",
+            )
+            (run / "task.log").write_text("alpha\nbeta\ngamma\n", encoding="utf-8")
+
+            detail = load_workbench_task_detail(run)
+
+        self.assertEqual(detail["manifest"]["task_id"], "check-env")
+        self.assertEqual(detail["manifest"]["status"], "succeeded")
+        self.assertEqual(detail["log"], "alpha\nbeta\ngamma\n")
+        self.assertEqual(detail["log_line_count"], 3)
+        self.assertEqual(Path(detail["run_dir"]).name, "20260425_090000_check-env")
 
 
 if __name__ == "__main__":

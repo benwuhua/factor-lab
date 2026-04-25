@@ -33,7 +33,12 @@ from qlib_factor_lab.workbench import (
     parse_expert_review_result,
     summarize_autoresearch_queue,
 )
-from qlib_factor_lab.workbench_tasks import latest_workbench_task_runs, launch_workbench_task, summarize_workbench_task_runs
+from qlib_factor_lab.workbench_tasks import (
+    latest_workbench_task_runs,
+    launch_workbench_task,
+    load_workbench_task_detail,
+    summarize_workbench_task_runs,
+)
 
 
 st.set_page_config(page_title="Factor Lab Workbench", layout="wide")
@@ -728,6 +733,21 @@ def _render_task_monitor(key_prefix: str) -> None:
         if latest.get("log_tail"):
             st.caption(f"latest log: {latest.get('task_id')}")
             st.code(str(latest["log_tail"]), language="text")
+        selected_run = st.selectbox(
+            "查看任务详情",
+            recent,
+            format_func=_task_run_option_label,
+            key=f"task-detail-{key_prefix}",
+        )
+        if selected_run:
+            detail = load_workbench_task_detail(str(selected_run.get("run_dir", "")))
+            left, right = st.columns([0.9, 1.1])
+            with left:
+                st.caption("manifest")
+                st.json(detail["manifest"], expanded=False)
+            with right:
+                st.caption(f"full log · {detail['log_line_count']} lines")
+                st.code(detail["log"] or "log not written yet", language="text")
 
 
 def _task_status_cards_html(summary: dict[str, int]) -> str:
@@ -738,6 +758,14 @@ def _task_status_cards_html(summary: dict[str, int]) -> str:
             f'<div class="task-status {klass}"><label>{_html(status)}</label><strong>{_html(summary.get(status, 0))}</strong></div>'
         )
     return f'<section class="task-status-grid">{"".join(items)}</section>'
+
+
+def _task_run_option_label(row: dict[str, object]) -> str:
+    run_name = Path(str(row.get("run_dir", "n/a"))).name
+    status = str(row.get("status", "unknown") or "unknown")
+    returncode = row.get("returncode")
+    code = "pending" if returncode is None else f"rc={returncode}"
+    return f"{run_name} · {status} · {code}"
 
 
 def _provider_rows() -> list[dict[str, object]]:

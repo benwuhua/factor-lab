@@ -134,6 +134,18 @@ def tail_workbench_task_log(run_dir: str | Path, lines: int = 8) -> str:
     return "\n".join(content[-lines:])
 
 
+def load_workbench_task_detail(run_dir: str | Path) -> dict[str, Any]:
+    run_path = Path(run_dir)
+    log_path = run_path / "task.log"
+    log = log_path.read_text(encoding="utf-8", errors="replace") if log_path.exists() else ""
+    return {
+        "run_dir": str(run_path),
+        "manifest": _read_manifest(task_manifest_path(run_path)),
+        "log": log,
+        "log_line_count": len(log.splitlines()),
+    }
+
+
 def task_manifest_path(run_dir: str | Path) -> Path:
     return Path(run_dir) / "manifest.json"
 

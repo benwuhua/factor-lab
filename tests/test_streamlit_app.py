@@ -1,6 +1,13 @@
 import unittest
 
-from app.streamlit_app import _detail_card_html, _page_topbar_html, _short_text, _task_status_cards_html, _workflow_card_grid_html
+from app.streamlit_app import (
+    _detail_card_html,
+    _page_topbar_html,
+    _short_text,
+    _task_run_option_label,
+    _task_status_cards_html,
+    _workflow_card_grid_html,
+)
 
 
 class StreamlitAppUiTests(unittest.TestCase):
@@ -59,6 +66,17 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn('class="task-status-grid"', html)
         self.assertIn("<label>running</label><strong>2</strong>", html)
         self.assertIn("<label>failed</label><strong>4</strong>", html)
+
+    def test_task_run_option_label_shows_run_name_status_and_code(self):
+        label = _task_run_option_label(
+            {
+                "run_dir": "/tmp/runs/workbench_tasks/20260425_090000_check-env",
+                "status": "succeeded",
+                "returncode": 0,
+            }
+        )
+
+        self.assertEqual(label, "20260425_090000_check-env · succeeded · rc=0")
 
 
 if __name__ == "__main__":
