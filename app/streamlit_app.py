@@ -16,8 +16,11 @@ import streamlit as st
 from qlib_factor_lab.workbench import (
     build_gate_review_items,
     build_portfolio_gate_explanation,
+    build_pretrade_review,
+    build_research_pipeline_status,
     classify_gate_decision,
     find_latest_target_portfolio,
+    get_candidate_diagnostics,
     get_candidate_artifacts,
     load_autoresearch_queue,
     load_factor_family_map_safe,
@@ -84,6 +87,10 @@ def render_dashboard() -> None:
     )
     st.dataframe(command_rows, use_container_width=True, hide_index=True)
 
+    st.subheader("今日投研队列")
+    st.caption("把 nightly 研究、专家复核、portfolio gate 和纸面订单串成一个可追踪状态流。")
+    st.dataframe(build_research_pipeline_status(ROOT), use_container_width=True, hide_index=True)
+
     st.subheader("产物新鲜度")
     st.caption("用红黄绿灯判断当前工作台读到的是不是最近一轮研究产物。")
     freshness = pd.DataFrame(snapshot.freshness)
@@ -133,6 +140,11 @@ def render_portfolio_gate() -> None:
         st.subheader("前置复核动作")
         st.caption("caution 项可以降仓或人工确认；reject 项默认阻断组合进入纸面执行。")
         st.dataframe(review_items, use_container_width=True, hide_index=True)
+
+    st.subheader("交易前检查")
+    st.caption("覆盖公告/异动、涨跌停、停牌、流动性和硬性 risk flags。")
+    pretrade = build_pretrade_review(portfolio)
+    st.dataframe(pretrade, use_container_width=True, hide_index=True)
 
     chart_cols = st.columns(2)
     with chart_cols[0]:
@@ -219,8 +231,21 @@ def render_autoresearch_queue() -> None:
         selected = st.selectbox("候选详情", options=options)
         selected_row = filtered.loc[filtered["candidate_name"].astype(str) == selected].head(1)
         if not selected_row.empty:
-            artifacts = get_candidate_artifacts(ROOT, selected_row.iloc[0].get("artifact_dir", ""))
+            selected_artifact = selected_row.iloc[0].get("artifact_dir", "")
+            artifacts = get_candidate_artifacts(ROOT, selected_artifact)
+            diagnostics = get_candidate_diagnostics(ROOT, selected, selected_artifact)
             st.caption(f"artifact: {artifacts['artifact_dir']}")
+            if not diagnostics["eval"].empty:
+                st.subheader("IC / 收益摘要")
+                st.dataframe(diagnostics["eval"], use_container_width=True, hide_index=True)
+            if not diagnostics["yearly"].empty:
+                st.subheader("年度稳定性")
+                yearly = diagnostics["yearly"]
+                st.bar_chart(yearly.set_index("segment")["neutral_rank_ic_mean"])
+                st.dataframe(yearly, use_container_width=True, hide_index=True)
+            if not diagnostics["redundancy"].empty:
+                st.subheader("重复因子簇")
+                st.dataframe(diagnostics["redundancy"], use_container_width=True, hide_index=True)
             if artifacts["summary"]:
                 st.code(artifacts["summary"], language="yaml")
             if artifacts["candidate"]:

@@ -14,6 +14,7 @@ from .risk import RiskConfig, check_portfolio_risk
 AUTORESEARCH_LEDGER = Path("reports/autoresearch/expression_results.tsv")
 APPROVED_FACTORS = Path("reports/approved_factors.yaml")
 RISK_CONFIG = Path("configs/risk.yaml")
+AUTORESEARCH_REVIEW_ANALYSIS = Path("reports/autoresearch")
 
 
 @dataclass(frozen=True)
@@ -214,6 +215,96 @@ def get_candidate_artifacts(root: str | Path, artifact_dir: str | Path | None) -
     }
 
 
+def build_pretrade_review(portfolio: pd.DataFrame, *, min_amount_20d: float = 100_000_000) -> pd.DataFrame:
+    rows = [
+        _pretrade_row(
+            "liquidity_floor",
+            "caution",
+            _instruments_where(portfolio, "amount_20d", lambda value: _number(value) < min_amount_20d),
+            f"20日成交额低于 {min_amount_20d:.0f}",
+        ),
+        _pretrade_row(
+            "limit_or_suspended",
+            "reject",
+            _any_flagged_instruments(portfolio, ["limit_up", "limit_down", "suspended", "buy_blocked"]),
+            "涨跌停、停牌或买入阻断",
+        ),
+        _pretrade_row(
+            "event_blocked",
+            "reject",
+            _any_flagged_instruments(portfolio, ["event_blocked"]),
+            "公告/监管事件自动阻断",
+        ),
+        _pretrade_row(
+            "announcement_watch",
+            "caution",
+            _announcement_watch_instruments(portfolio),
+            "公告、异动、问询、财报窗口人工复核",
+        ),
+        _pretrade_row(
+            "hard_risk_flags",
+            "reject",
+            _risk_flag_instruments(portfolio, {"not_tradable", "limit_locked", "st_or_delisting"}),
+            "硬性风险标记",
+        ),
+    ]
+    return pd.DataFrame(rows, columns=["check", "status", "count", "detail", "review_focus"])
+
+
+def build_research_pipeline_status(root: str | Path = ".") -> pd.DataFrame:
+    root_path = Path(root)
+    queue = load_autoresearch_queue(root_path)
+    latest_run = find_latest_run_dir(root_path)
+    target_path = find_latest_target_portfolio(root_path)
+    target = pd.read_csv(target_path) if target_path is not None and target_path.exists() else pd.DataFrame()
+    gate = build_portfolio_gate_explanation(
+        target,
+        risk_config=load_risk_config_dict(root_path),
+        factor_family_map=load_factor_family_map_safe(root_path),
+    )
+    expert_path = latest_run / "expert_review_result.md" if latest_run is not None else None
+    paper_path = latest_run / "orders.csv" if latest_run is not None else None
+    rows = [
+        {
+            "stage": "autoresearch",
+            "status": _autoresearch_stage_status(queue),
+            "detail": _autoresearch_stage_detail(queue),
+            "path": str(root_path / AUTORESEARCH_LEDGER),
+        },
+        {
+            "stage": "expert_review",
+            "status": _expert_decision(expert_path),
+            "detail": "LLM 专家复核结果",
+            "path": str(expert_path or ""),
+        },
+        {
+            "stage": "portfolio_gate",
+            "status": gate.decision,
+            "detail": "组合风险、暴露和事件门禁",
+            "path": str(target_path or ""),
+        },
+        {
+            "stage": "paper_bundle",
+            "status": "ready" if paper_path is not None and paper_path.exists() else "missing",
+            "detail": "纸面订单包",
+            "path": str(paper_path or ""),
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
+def get_candidate_diagnostics(root: str | Path, candidate_name: str, artifact_dir: str | Path | None) -> dict[str, pd.DataFrame]:
+    root_path = Path(root)
+    artifact_path = _resolve(root_path, artifact_dir or "")
+    raw_eval = _read_csv_if_exists(artifact_path / "raw_eval.csv")
+    neutral_eval = _read_csv_if_exists(artifact_path / "neutralized_eval.csv")
+    return {
+        "eval": _candidate_eval_frame(raw_eval, neutral_eval),
+        "yearly": _candidate_analysis_frame(root_path, "stability_by_year.tsv", candidate_name),
+        "redundancy": _candidate_analysis_frame(root_path, "dedup_clusters.tsv", candidate_name),
+    }
+
+
 def _risk_config(raw: dict[str, Any] | RiskConfig) -> RiskConfig:
     if isinstance(raw, RiskConfig):
         return raw
@@ -291,3 +382,148 @@ def _review_focus_for_check(check: str) -> str:
         "max_turnover": "降低换手或拉长调仓周期，检查交易成本敏感性。",
     }
     return focus.get(check, "人工复核该约束是否合理。")
+
+
+def _pretrade_row(check: str, fail_status: str, instruments: list[str], focus: str) -> dict[str, Any]:
+    return {
+        "check": check,
+        "status": fail_status if instruments else "pass",
+        "count": len(instruments),
+        "detail": "; ".join(instruments[:12]),
+        "review_focus": focus,
+    }
+
+
+def _instruments_where(portfolio: pd.DataFrame, column: str, predicate) -> list[str]:
+    if portfolio.empty or column not in portfolio.columns:
+        return []
+    output = []
+    for _, row in portfolio.iterrows():
+        if predicate(row.get(column)):
+            output.append(str(row.get("instrument", "")))
+    return [item for item in output if item]
+
+
+def _any_flagged_instruments(portfolio: pd.DataFrame, columns: list[str]) -> list[str]:
+    if portfolio.empty:
+        return []
+    output = []
+    for _, row in portfolio.iterrows():
+        if any(_truthy(row.get(column)) for column in columns if column in portfolio.columns):
+            output.append(str(row.get("instrument", "")))
+    return [item for item in output if item]
+
+
+def _announcement_watch_instruments(portfolio: pd.DataFrame) -> list[str]:
+    if portfolio.empty:
+        return []
+    output = []
+    for _, row in portfolio.iterrows():
+        has_event_count = _number(row.get("event_count")) > 0
+        has_summary = not _blank(row.get("event_risk_summary"))
+        has_types = not _blank(row.get("active_event_types"))
+        if has_event_count or has_summary or has_types:
+            output.append(str(row.get("instrument", "")))
+    return [item for item in output if item]
+
+
+def _risk_flag_instruments(portfolio: pd.DataFrame, hard_flags: set[str]) -> list[str]:
+    if portfolio.empty or "risk_flags" not in portfolio.columns:
+        return []
+    output = []
+    for _, row in portfolio.iterrows():
+        flags = {item.strip() for item in str(row.get("risk_flags", "")).split(";") if item.strip()}
+        flags |= {item.strip() for item in str(row.get("risk_flags", "")).split(",") if item.strip()}
+        if flags & hard_flags:
+            output.append(str(row.get("instrument", "")))
+    return [item for item in output if item]
+
+
+def _autoresearch_stage_status(queue: pd.DataFrame) -> str:
+    summary = summarize_autoresearch_queue(queue)
+    if summary["review"] > 0:
+        return "review"
+    if summary["crash"] > 0:
+        return "crash"
+    if queue.empty:
+        return "missing"
+    return "done"
+
+
+def _autoresearch_stage_detail(queue: pd.DataFrame) -> str:
+    summary = summarize_autoresearch_queue(queue)
+    return f"review={summary['review']}; discard={summary['discard_candidate']}; crash={summary['crash']}"
+
+
+def _expert_decision(path: Path | None) -> str:
+    if path is None or not path.exists():
+        return "missing"
+    text = path.read_text(encoding="utf-8")
+    for decision in ["reject", "caution", "pass", "approve", "approved"]:
+        if f"decision: {decision}" in text or f"decision：{decision}" in text:
+            return "pass" if decision in {"approve", "approved"} else decision
+    return "review"
+
+
+def _candidate_eval_frame(raw_eval: pd.DataFrame, neutral_eval: pd.DataFrame) -> pd.DataFrame:
+    raw = _eval_subset(raw_eval, "raw")
+    neutral = _eval_subset(neutral_eval, "neutralized")
+    if raw.empty:
+        return neutral
+    if neutral.empty:
+        return raw
+    return raw.merge(neutral, on=["factor", "horizon"], how="outer")
+
+
+def _eval_subset(frame: pd.DataFrame, prefix: str) -> pd.DataFrame:
+    if frame.empty:
+        return pd.DataFrame()
+    keep = ["factor", "horizon", "rank_ic_mean", "ic_mean", "long_short_mean_return", "top_quantile_turnover"]
+    output = frame.loc[:, [column for column in keep if column in frame.columns]].copy()
+    return output.rename(
+        columns={
+            "rank_ic_mean": f"{prefix}_rank_ic_mean",
+            "ic_mean": f"{prefix}_ic_mean",
+            "long_short_mean_return": f"{prefix}_long_short_mean_return",
+            "top_quantile_turnover": f"{prefix}_top_quantile_turnover",
+        }
+    )
+
+
+def _candidate_analysis_frame(root: Path, filename: str, candidate_name: str) -> pd.DataFrame:
+    frames = []
+    for path in sorted((root / AUTORESEARCH_REVIEW_ANALYSIS).glob(f"review_analysis_*/{filename}")):
+        frame = _read_csv_if_exists(path, sep="\t")
+        if frame.empty or "candidate_name" not in frame.columns:
+            continue
+        frames.append(frame.loc[frame["candidate_name"].astype(str) == str(candidate_name)].copy())
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def _read_csv_if_exists(path: Path, *, sep: str = ",") -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path, sep=sep)
+
+
+def _truthy(value: Any) -> bool:
+    if pd.isna(value):
+        return False
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _number(value: Any) -> float:
+    try:
+        if pd.isna(value):
+            return float("nan")
+        return float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def _blank(value: Any) -> bool:
+    return pd.isna(value) or str(value).strip() == ""
