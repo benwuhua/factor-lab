@@ -65,7 +65,17 @@ def main() -> None:
         st.sidebar.image(str(APP_ICON), width=64)
     st.sidebar.title("Factor Lab")
     st.sidebar.caption("AI 辅助 A 股因子投研工作台\n从候选因子到组合复核")
-    st.sidebar.markdown(_sidebar_nav_html(pages, page), unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="native-nav">', unsafe_allow_html=True)
+    for nav_page in pages:
+        if st.sidebar.button(
+            nav_page,
+            key=f"workbench-nav-{quote_plus(nav_page)}",
+            width="stretch",
+            disabled=nav_page == page,
+        ):
+            st.query_params["page"] = nav_page
+            st.rerun()
+    st.sidebar.markdown("</div>", unsafe_allow_html=True)
     if not st.query_params.get("page"):
         st.query_params["page"] = page
     st.sidebar.divider()
@@ -130,7 +140,7 @@ def render_dashboard() -> None:
 
         st.subheader("今日投研队列")
         st.caption("把 nightly 研究、专家复核、portfolio gate 和纸面订单串成一个可追踪状态流。")
-        st.dataframe(build_research_pipeline_status(ROOT), use_container_width=True, hide_index=True)
+        st.dataframe(build_research_pipeline_status(ROOT), width="stretch", hide_index=True)
 
         st.subheader("产物新鲜度")
         st.caption("用红黄绿灯判断当前工作台读到的是不是最近一轮研究产物。")
@@ -139,14 +149,14 @@ def render_dashboard() -> None:
             freshness["灯号"] = freshness["status"].map({"ready": "green", "stale": "yellow", "missing": "red"}).fillna("gray")
             st.dataframe(
                 freshness.loc[:, ["灯号", "label", "status", "age_hours", "path"]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
         left, right = st.columns([1.15, 0.85])
         with left:
             st.subheader("Portfolio Gate 快照")
-            st.dataframe(_gate_frame(gate.checks), use_container_width=True, hide_index=True)
+            st.dataframe(_gate_frame(gate.checks), width="stretch", hide_index=True)
         with right:
             st.subheader("Autoresearch 状态")
             summary = summarize_autoresearch_queue(queue)
@@ -193,7 +203,7 @@ def render_data_governance() -> None:
             freshness["灯号"] = freshness["status"].map({"ready": "green", "stale": "yellow", "missing": "red"}).fillna("gray")
             st.dataframe(
                 freshness.loc[:, ["灯号", "label", "status", "age_hours", "path"]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -276,13 +286,13 @@ def render_factor_research() -> None:
                 unsafe_allow_html=True,
             )
             keep = [column for column in ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"] if column in multilane.columns]
-            st.dataframe(multilane.loc[:, keep], use_container_width=True, hide_index=True)
+            st.dataframe(multilane.loc[:, keep], width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("Approved 因子清单", "governed factor set"), unsafe_allow_html=True)
         if approved.empty:
             st.info("还没有 approved_factors.yaml。")
         else:
-            st.dataframe(approved, use_container_width=True, hide_index=True)
+            st.dataframe(approved, width="stretch", hide_index=True)
 
         chart_cols = st.columns(2)
         with chart_cols[0]:
@@ -297,7 +307,7 @@ def render_factor_research() -> None:
                 st.info("暂无 single_factor_diagnostics CSV。")
             else:
                 keep = [column for column in ["factor", "status", "family", "neutral_rank_ic_mean_h20", "decision"] if column in diagnostics.columns]
-                st.dataframe(diagnostics.loc[:, keep] if keep else diagnostics, use_container_width=True, hide_index=True)
+                st.dataframe(diagnostics.loc[:, keep] if keep else diagnostics, width="stretch", hide_index=True)
     with rail_col:
         st.markdown(
             '<aside class="right-rail detail-rail">'
@@ -382,10 +392,10 @@ def render_portfolio_gate() -> None:
         if expert["risk_notes"]:
             st.caption(expert["risk_notes"])
         if expert["watchlist"]:
-            st.dataframe(pd.DataFrame({"instrument": expert["watchlist"]}), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame({"instrument": expert["watchlist"]}), width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("为什么被 caution / reject", "gate evidence"), unsafe_allow_html=True)
-        st.dataframe(_gate_frame(gate.checks), use_container_width=True, hide_index=True)
+        st.dataframe(_gate_frame(gate.checks), width="stretch", hide_index=True)
         if review_items.empty:
             st.success("当前 gate 没有失败项。")
         else:
@@ -393,13 +403,13 @@ def render_portfolio_gate() -> None:
                 _section_header_html("前置复核动作", "caution 降仓或人工确认，reject 阻断"),
                 unsafe_allow_html=True,
             )
-            st.dataframe(review_items, use_container_width=True, hide_index=True)
+            st.dataframe(review_items, width="stretch", hide_index=True)
 
         st.markdown(
             _section_header_html("交易前检查", "announcement, limit, suspension, liquidity"),
             unsafe_allow_html=True,
         )
-        st.dataframe(pretrade, use_container_width=True, hide_index=True)
+        st.dataframe(pretrade, width="stretch", hide_index=True)
 
         st.markdown(
             _section_header_html("投研证据层", "events, announcements, master data"),
@@ -414,13 +424,13 @@ def render_portfolio_gate() -> None:
             if event_types.empty:
                 st.info("当前组合没有事件类型证据。")
             else:
-                st.dataframe(event_types, use_container_width=True, hide_index=True)
+                st.dataframe(event_types, width="stretch", hide_index=True)
         with evidence_cols[1]:
             st.subheader("需人工查看的证据")
             if evidence_detail.empty:
                 st.success("当前组合没有公告/事件/主数据异常证据。")
             else:
-                st.dataframe(evidence_detail, use_container_width=True, hide_index=True)
+                st.dataframe(evidence_detail, width="stretch", hide_index=True)
 
         chart_cols = st.columns(2)
         with chart_cols[0]:
@@ -455,7 +465,7 @@ def render_portfolio_gate() -> None:
             ]
             if column in portfolio.columns
         ]
-        st.dataframe(portfolio.loc[:, keep] if keep else portfolio, use_container_width=True, hide_index=True)
+        st.dataframe(portfolio.loc[:, keep] if keep else portfolio, width="stretch", hide_index=True)
     with rail_col:
         _portfolio_detail_rail(latest, gate, expert, pretrade)
 
@@ -499,21 +509,21 @@ def render_paper_execution() -> None:
             if orders.empty:
                 st.info("最近 run 里还没有 orders.csv。")
             else:
-                st.dataframe(orders, use_container_width=True, hide_index=True)
+                st.dataframe(orders, width="stretch", hide_index=True)
         with tab_fills:
             if fills.empty:
                 st.info("最近 run 里还没有 fills.csv。")
             else:
-                st.dataframe(fills, use_container_width=True, hide_index=True)
+                st.dataframe(fills, width="stretch", hide_index=True)
         with tab_positions:
             if positions.empty:
                 st.info("最近 run 里还没有 positions_expected.csv。")
             else:
-                st.dataframe(positions, use_container_width=True, hide_index=True)
+                st.dataframe(positions, width="stretch", hide_index=True)
 
         pipeline = build_research_pipeline_status(ROOT)
         st.markdown(_section_header_html("执行包状态", "paper bundle"), unsafe_allow_html=True)
-        st.dataframe(pipeline, use_container_width=True, hide_index=True)
+        st.dataframe(pipeline, width="stretch", hide_index=True)
     with rail_col:
         st.markdown(
             '<aside class="right-rail detail-rail">'
@@ -590,7 +600,7 @@ def render_evidence_library() -> None:
                 filtered = filtered[filtered["event_type"].astype(str).isin(selected_types)]
             if selected_severity:
                 filtered = filtered[filtered["severity"].astype(str).isin(selected_severity)]
-            st.dataframe(filtered, use_container_width=True, hide_index=True)
+            st.dataframe(filtered, width="stretch", hide_index=True)
 
         chart_cols = st.columns(2)
         with chart_cols[0]:
@@ -598,13 +608,13 @@ def render_evidence_library() -> None:
             if event_types.empty:
                 st.info("暂无事件类型统计。")
             else:
-                st.dataframe(event_types, use_container_width=True, hide_index=True)
+                st.dataframe(event_types, width="stretch", hide_index=True)
         with chart_cols[1]:
             st.subheader("严重程度")
             if severity.empty:
                 st.info("暂无严重程度统计。")
             else:
-                st.dataframe(severity, use_container_width=True, hide_index=True)
+                st.dataframe(severity, width="stretch", hide_index=True)
     with rail_col:
         st.markdown(
             '<aside class="right-rail detail-rail">'
@@ -674,7 +684,7 @@ def render_stock_cards() -> None:
             }
         )
     frame = pd.DataFrame(rows)
-    st.dataframe(frame, use_container_width=True, hide_index=True)
+    st.dataframe(frame, width="stretch", hide_index=True)
 
     selected = st.selectbox("查看卡片详情", frame["instrument"].astype(str).tolist())
     selected_idx = frame.index[frame["instrument"].astype(str) == selected][0]
@@ -734,7 +744,7 @@ def render_autoresearch_queue() -> None:
         st.markdown(_autoresearch_progress_cards_html(progress), unsafe_allow_html=True)
         recent_candidates = pd.DataFrame(progress["recent_candidates"])
         if not recent_candidates.empty:
-            st.dataframe(recent_candidates, use_container_width=True, hide_index=True)
+            st.dataframe(recent_candidates, width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("多车道结果", "latest smoke / nightly lane summary"), unsafe_allow_html=True)
         if multilane.empty:
@@ -757,7 +767,7 @@ def render_autoresearch_queue() -> None:
                 unsafe_allow_html=True,
             )
             lane_cols = [column for column in ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"] if column in multilane.columns]
-            st.dataframe(multilane.loc[:, lane_cols], use_container_width=True, hide_index=True)
+            st.dataframe(multilane.loc[:, lane_cols], width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("研究队列", "nightly ledger"), unsafe_allow_html=True)
         display_cols = [
@@ -773,7 +783,7 @@ def render_autoresearch_queue() -> None:
         if filtered.empty:
             st.info("暂无 expression ledger 候选。")
         else:
-            st.dataframe(filtered.loc[:, [column for column in display_cols if column in filtered.columns]], use_container_width=True)
+            st.dataframe(filtered.loc[:, [column for column in display_cols if column in filtered.columns]], width="stretch")
 
         st.markdown(
             _section_header_html("候选对比", "primary metric vs complexity"),
@@ -802,15 +812,15 @@ def render_autoresearch_queue() -> None:
                 st.caption(f"artifact: {artifacts['artifact_dir']}")
                 if not diagnostics["eval"].empty:
                     st.subheader("IC / 收益摘要")
-                    st.dataframe(diagnostics["eval"], use_container_width=True, hide_index=True)
+                    st.dataframe(diagnostics["eval"], width="stretch", hide_index=True)
                 if not diagnostics["yearly"].empty:
                     st.subheader("年度稳定性")
                     yearly = diagnostics["yearly"]
                     st.bar_chart(yearly.set_index("segment")["neutral_rank_ic_mean"])
-                    st.dataframe(yearly, use_container_width=True, hide_index=True)
+                    st.dataframe(yearly, width="stretch", hide_index=True)
                 if not diagnostics["redundancy"].empty:
                     st.subheader("重复因子簇")
-                    st.dataframe(diagnostics["redundancy"], use_container_width=True, hide_index=True)
+                    st.dataframe(diagnostics["redundancy"], width="stretch", hide_index=True)
                 if artifacts["summary"]:
                     st.code(artifacts["summary"], language="yaml")
                 if artifacts["candidate"]:
@@ -943,8 +953,9 @@ def _sidebar_nav_html(pages: list[str], current_page: str) -> str:
     items = []
     for page in pages:
         klass = "side-nav-item active" if page == current_page else "side-nav-item"
+        href = f"/?page={quote_plus(page)}"
         items.append(
-            f'<a class="{klass}" href="/?page={quote_plus(page)}" target="_self">'
+            f'<a class="{klass}" href="{href}" target="_self" onclick="window.location.href=\'{href}\'; return false;">'
             '<span class="side-nav-dot"></span>'
             f"<span>{_html(page)}</span>"
             "</a>"
@@ -981,7 +992,7 @@ def _render_workflow_task_buttons(rows: list[dict[str, object]], key_prefix: str
         task_id = str(row["task_id"])
         label = f'{row.get("action", "Run")} · {row.get("title", task_id)}'
         with cols[index % len(cols)]:
-            if st.button(label, key=f"task-{key_prefix}-{task_id}", use_container_width=True):
+            if st.button(label, key=f"task-{key_prefix}-{task_id}", width="stretch"):
                 env_overrides = row.get("env_overrides")
                 record = launch_workbench_task(
                     ROOT,
@@ -1017,7 +1028,7 @@ def _render_research_context_controls() -> None:
             notice_end=notice_end,
             universes=universes,
         )
-        if st.button("Run · 刷新证据库", key="task-evidence-library-research-context-param", use_container_width=True):
+        if st.button("Run · 刷新证据库", key="task-evidence-library-research-context-param", width="stretch"):
             record = launch_workbench_task(ROOT, "research-context", env_overrides=env_overrides)
             st.success("已启动后台任务: research-context")
             st.caption(f"manifest: {record.manifest_path}")
@@ -1033,12 +1044,12 @@ def _render_task_monitor(key_prefix: str) -> None:
     running_count = summary.get("queued", 0) + summary.get("running", 0)
     if running_count:
         st.progress(min(running_count / max(len(recent), 1), 1.0), text=f"{running_count} 个后台任务仍在运行或排队")
-    if st.button("刷新任务状态", key=f"refresh-tasks-{key_prefix}", use_container_width=True):
+    if st.button("刷新任务状态", key=f"refresh-tasks-{key_prefix}", width="stretch"):
         st.rerun(scope="fragment")
     with st.expander("最近后台任务", expanded=bool(running_count)):
         display = pd.DataFrame(recent)
         keep = [column for column in ["created_at", "task_id", "status", "returncode", "run_dir"] if column in display.columns]
-        st.dataframe(display.loc[:, keep], use_container_width=True, hide_index=True)
+        st.dataframe(display.loc[:, keep], width="stretch", hide_index=True)
         latest = recent[0]
         if latest.get("log_tail"):
             st.caption(f"latest log: {latest.get('task_id')}")
@@ -1061,7 +1072,7 @@ def _render_task_monitor(key_prefix: str) -> None:
             manifest = detail.get("manifest", {})
             task_id = str(manifest.get("task_id", ""))
             if task_id:
-                if st.button(_rerun_task_button_label(manifest), key=f"rerun-task-{key_prefix}", use_container_width=True):
+                if st.button(_rerun_task_button_label(manifest), key=f"rerun-task-{key_prefix}", width="stretch"):
                     record = rerun_workbench_task(ROOT, str(selected_run.get("run_dir", "")))
                     st.success(f"已重跑后台任务: {record.task_id}")
                     st.caption(f"manifest: {record.manifest_path}")
@@ -1553,6 +1564,31 @@ def _style() -> None:
             font-size: 22px !important;
             font-weight: 760 !important;
             margin-top: 22px;
+          }
+          section[data-testid="stSidebar"] .native-nav {
+            display: grid;
+            gap: 6px;
+            margin-top: 18px;
+          }
+          section[data-testid="stSidebar"] .stButton > button {
+            justify-content: flex-start;
+            border-radius: 6px;
+            border: 0;
+            background: transparent;
+            color: #edf2ee;
+            font-size: 14px;
+            font-weight: 680;
+            padding: 10px 9px;
+          }
+          section[data-testid="stSidebar"] .stButton > button:hover {
+            background: rgba(237, 242, 238, 0.08);
+            color: #ffffff;
+          }
+          section[data-testid="stSidebar"] .stButton > button:disabled {
+            background: #26342f;
+            box-shadow: inset 3px 0 0 #55b08a;
+            color: #edf2ee;
+            opacity: 1;
           }
           section[data-testid="stSidebar"] .side-nav {
             display: grid;

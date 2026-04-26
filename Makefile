@@ -50,7 +50,7 @@ RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
 
-.PHONY: help install test workbench check-env research-context data-governance candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env research-context data-governance candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -58,6 +58,7 @@ help:
 	@printf "  make install          Create .venv and install project dependencies\n"
 	@printf "  make test             Run unit tests\n"
 	@printf "  make workbench        Start the local Streamlit research workbench\n"
+	@printf "  make workbench-e2e    Run browser E2E checks for the workbench\n"
 	@printf "  make check-env        Check local Qlib provider environment\n"
 	@printf "  make research-context Refresh security master and company event evidence\n"
 	@printf "  make data-governance Check PIT data-domain coverage and lane readiness\n"
@@ -119,6 +120,9 @@ test:
 
 workbench:
 	$(PYTHON) scripts/run_workbench.py
+
+workbench-e2e:
+	$(PYTHON) scripts/run_workbench_e2e.py
 
 check-env:
 	$(PYTHON) scripts/check_env.py --provider-config $(CSI500_PROVIDER)

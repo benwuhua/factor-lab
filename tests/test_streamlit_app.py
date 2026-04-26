@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from app.streamlit_app import (
     _autoresearch_progress_cards_html,
@@ -23,6 +24,11 @@ from app.streamlit_app import (
 
 
 class StreamlitAppUiTests(unittest.TestCase):
+    def test_streamlit_app_uses_current_width_api(self):
+        source = Path(__file__).resolve().parents[1].joinpath("app", "streamlit_app.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("use_container_width", source)
+
     def test_page_topbar_html_uses_shared_workbench_shell(self):
         html = _page_topbar_html(
             "自动挖掘",
@@ -219,6 +225,7 @@ class StreamlitAppUiTests(unittest.TestCase):
 
         self.assertIn('href="/?page=03+%E5%9B%A0%E5%AD%90%E7%A0%94%E7%A9%B6"', html)
         self.assertIn('target="_self"', html)
+        self.assertIn("window.location.href='/?page=03+%E5%9B%A0%E5%AD%90%E7%A0%94%E7%A9%B6'", html)
         self.assertIn('class="side-nav-item active"', html)
         self.assertIn("03 因子研究", html)
 

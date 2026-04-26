@@ -1,5 +1,4 @@
 import unittest
-from urllib.parse import quote_plus
 
 from streamlit.testing.v1 import AppTest
 
@@ -38,9 +37,9 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
             with self.subTest(page=page):
                 self.assert_page_ok(self.run_page(page), expected_text)
 
-    def test_sidebar_navigation_exposes_all_pages_as_deep_links(self):
+    def test_sidebar_navigation_exposes_all_pages(self):
         app = self.run_page("04 自动挖掘")
-        html = "\n".join(item.value for item in app.sidebar.markdown)
+        labels = _sidebar_button_labels(app)
 
         for page in [
             "01 总览仪表盘",
@@ -54,11 +53,14 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
             "09 个股卡片",
         ]:
             with self.subTest(page=page):
-                self.assertIn(page, html)
-                self.assertIn(f'href="/?page={quote_plus(page)}"', html)
-        self.assertIn('class="side-nav-item active"', html)
-        self.assertIn('target="_self"', html)
-        self.assertIn("04 自动挖掘", html)
+                self.assertIn(page, labels)
+
+    def test_sidebar_navigation_uses_native_buttons(self):
+        app = self.run_page("04 自动挖掘")
+
+        labels = _sidebar_button_labels(app)
+        self.assertIn("04 自动挖掘", labels)
+        self.assertIn("03 因子研究", labels)
 
     def test_factor_research_page_surfaces_multilane_smoke_and_actions(self):
         app = self.run_page("03 因子研究")
@@ -91,6 +93,11 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
 
 def _button_labels(app: AppTest) -> list[str]:
     return [button.label for button in app.button]
+
+
+def _sidebar_button_labels(app: AppTest) -> list[str]:
+    return [button.label for button in app.sidebar.button]
+
 
 
 def _app_text(app: AppTest) -> str:
