@@ -64,6 +64,7 @@ class DataGovernanceTests(unittest.TestCase):
             self.assertEqual(frame.loc["security_master", "pit_field_completeness"], 1.0)
             self.assertEqual(frame.loc["shareholder_capital", "status"], "missing")
             self.assertEqual(frame.loc["shareholder_capital", "activation_status"], "shadow")
+            self.assertTrue(report.passed)
 
             output = write_data_governance_report(report, root / "reports/data_governance.md")
             self.assertIn("security_master", output.read_text(encoding="utf-8"))
@@ -109,6 +110,36 @@ class DataGovernanceTests(unittest.TestCase):
             self.assertEqual(row["freshness_status"], "missing")
             self.assertEqual(row["status"], "fail")
             self.assertEqual(row["activation_status"], "shadow")
+            self.assertTrue(report.passed)
+
+    def test_blocking_activation_failure_marks_report_failed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame({"instrument": ["AAA"]}).to_csv(root / "data/universe.csv", index=False)
+            config_path = root / "configs/data_governance.yaml"
+            config_path.parent.mkdir()
+            config_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "data_governance": {
+                            "expected_universe_path": "data/universe.csv",
+                            "domains": {
+                                "security_master": {
+                                    "path": "data/missing.csv",
+                                    "required_fields": ["instrument"],
+                                    "activation_if_missing": "block",
+                                },
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = build_data_governance_report(load_data_governance_config(config_path), project_root=root)
+
+            self.assertFalse(report.passed)
 
 
 if __name__ == "__main__":

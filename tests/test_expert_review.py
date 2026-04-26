@@ -62,6 +62,25 @@ class ExpertReviewTests(unittest.TestCase):
         self.assertIn("https://example.test/events/evt-1", packet)
         self.assertIn("5. 哪些候选需要因为公告、监管、减持、解禁、ST/退市、诉讼或异常波动被阻断或人工复核？", packet)
 
+    def test_build_expert_review_packet_includes_stock_card_context(self):
+        packet = build_expert_review_packet(
+            target_portfolio=self._target_portfolio(),
+            stock_cards=[
+                {
+                    "instrument": "AAA",
+                    "audit": {"review_decision": "caution"},
+                    "current_signal": {"top_factor_1": "alpha_a", "ensemble_score": 5.0},
+                    "evidence": {"event_count": 1, "max_event_severity": "watch", "event_risk_summary": "buyback watch"},
+                    "review_questions": {"gate_reason": "max_industry_weight:fail"},
+                }
+            ],
+            run_date="2026-04-23",
+        )
+
+        self.assertIn("## Stock Research Cards", packet)
+        self.assertIn("buyback watch", packet)
+        self.assertIn("max_industry_weight:fail", packet)
+
     def test_apply_expert_review_portfolio_gate_scales_caution_weights(self):
         portfolio = self._target_portfolio()
 

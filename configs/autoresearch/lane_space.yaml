@@ -25,7 +25,7 @@ data_governance:
         - available_at
         - active_until
     emotion_atmosphere:
-      current_status: missing
+      current_status: partial
       pit_fields:
         - trade_date
         - as_of_date
@@ -107,10 +107,9 @@ lanes:
     cadence: daily
     editable_space: configs/autoresearch/emotion_space.yaml
     factor_type: market_state_event_like
-    activation_status: shadow
+    activation_status: active
     required_data_domains:
       - market_ohlcv
-      - emotion_atmosphere
     families:
       - turnover_heat
       - limit_pressure

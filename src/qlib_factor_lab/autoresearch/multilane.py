@@ -9,8 +9,10 @@ from typing import Any
 
 import pandas as pd
 
+from qlib_factor_lab.autoresearch.event_oracle import run_event_lane_oracle
 from qlib_factor_lab.autoresearch.oracle import run_expression_oracle
 from qlib_factor_lab.config import load_yaml
+from qlib_factor_lab.factor_mining import generate_candidate_factors, load_mining_config
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,8 @@ def run_multilane_autoresearch(
     contract_path: str | Path = "configs/autoresearch/contracts/csi500_current_v1.yaml",
     expression_space_path: str | Path = "configs/autoresearch/expression_space.yaml",
     expression_candidate_path: str | Path = "configs/autoresearch/candidates/example_expression.yaml",
+    mining_config_path: str | Path = "configs/factor_mining.yaml",
+    provider_config_path: str | Path = "configs/provider_current.yaml",
     output_path: str | Path = "reports/autoresearch/multilane_summary.md",
     include_shadow: bool = False,
     max_workers: int = 4,
@@ -57,6 +61,16 @@ def run_multilane_autoresearch(
                 continue
             if activation == "disabled":
                 rows.append(_row(lane_name, activation, "disabled_skipped", "", float("nan"), "", "lane is disabled"))
+                continue
+            if lane_name in {"pattern_event", "emotion_atmosphere"}:
+                future = executor.submit(
+                    run_event_lane_oracle,
+                    lane_name=lane_name,
+                    factor_specs=_event_factor_specs(root, mining_config_path, lane_name),
+                    provider_config=provider_config_path,
+                    project_root=root,
+                )
+                futures[future] = (lane_name, activation)
                 continue
             if lane_name != "expression_price_volume":
                 rows.append(_row(lane_name, activation, "unsupported", "", float("nan"), "", "no runner implemented"))
@@ -153,6 +167,33 @@ def _row(
 def _resolve(root: Path, path: str | Path) -> Path:
     value = Path(path)
     return value if value.is_absolute() else root / value
+
+
+def _event_factor_specs(root: Path, mining_config_path: str | Path, lane_name: str) -> list[dict[str, Any]]:
+    factors = generate_candidate_factors(load_mining_config(_resolve(root, mining_config_path)))
+    names = _event_factor_names(lane_name)
+    specs = [
+        {
+            "name": factor.name,
+            "expression": factor.expression,
+            "direction": factor.direction,
+            "category": factor.category,
+            "description": factor.description,
+        }
+        for factor in factors
+        if factor.name in names
+    ]
+    if not specs:
+        raise ValueError(f"no event factor specs configured for lane: {lane_name}")
+    return specs
+
+
+def _event_factor_names(lane_name: str) -> set[str]:
+    if lane_name == "pattern_event":
+        return {"wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"}
+    if lane_name == "emotion_atmosphere":
+        return {"arbr_26", "davol_5", "davol_10", "davol_20", "turnover_mean_5", "turnover_mean_20"}
+    return set()
 
 
 def _format_float(value: Any) -> str:

@@ -18,10 +18,12 @@ from qlib_factor_lab.workbench import (
     build_research_evidence_summary,
     build_research_pipeline_status,
     build_workbench_freshness,
+    find_latest_stock_cards,
     find_latest_run_dir,
     get_candidate_diagnostics,
     get_candidate_artifacts,
     load_autoresearch_queue,
+    load_stock_cards,
     load_workbench_snapshot,
     parse_expert_review_result,
     summarize_autoresearch_queue,
@@ -182,6 +184,21 @@ class WorkbenchTests(unittest.TestCase):
 
         self.assertEqual(snapshot.approved_factor_count, 2)
         self.assertEqual(snapshot.latest_target_portfolio.name, "target_portfolio_20260424.csv")
+
+    def test_load_stock_cards_reads_latest_jsonl(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "reports").mkdir()
+            older = root / "reports/stock_cards_20260423.jsonl"
+            latest = root / "reports/stock_cards_20260424.jsonl"
+            older.write_text('{"instrument": "OLD"}\n', encoding="utf-8")
+            latest.write_text('{"instrument": "AAA", "audit": {"review_decision": "caution"}}\n', encoding="utf-8")
+
+            path = find_latest_stock_cards(root)
+            cards = load_stock_cards(root)
+
+        self.assertEqual(path.name, "stock_cards_20260424.jsonl")
+        self.assertEqual(cards[0]["instrument"], "AAA")
 
     def test_latest_run_dir_ignores_workbench_task_monitor_runs(self):
         with tempfile.TemporaryDirectory() as tmp:

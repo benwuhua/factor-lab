@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import re
+import json
 
 import pandas as pd
 import yaml
@@ -157,6 +158,45 @@ def find_latest_target_portfolio(root: str | Path = ".") -> Path | None:
     candidates = list((root_path / "reports").glob("target_portfolio_*.csv"))
     candidates.extend((root_path / "runs").glob("*/target_portfolio.csv"))
     return _latest_path(candidates)
+
+
+def find_latest_stock_cards(root: str | Path = ".") -> Path | None:
+    root_path = Path(root)
+    candidates = list((root_path / "reports").glob("stock_cards_*.jsonl"))
+    candidates.extend((root_path / "runs").glob("*/stock_cards.jsonl"))
+    return _latest_path(candidates)
+
+
+def load_stock_cards(root: str | Path = ".", path: str | Path | None = None) -> list[dict[str, Any]]:
+    cards_path = _resolve(Path(root), path) if path is not None else find_latest_stock_cards(root)
+    if cards_path is None or not cards_path.exists():
+        return []
+    cards = []
+    for line in cards_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        cards.append(json.loads(line))
+    return cards
+
+
+def summarize_stock_cards(cards: list[dict[str, Any]]) -> dict[str, int]:
+    decisions = [
+        _normalized_decision(((card.get("audit") or {}).get("review_decision", "")))
+        for card in cards
+        if isinstance(card, dict)
+    ]
+    event_watch = 0
+    for card in cards:
+        evidence = (card.get("evidence") or {}) if isinstance(card, dict) else {}
+        if _number(evidence.get("event_count")) > 0 or not _blank(evidence.get("event_risk_summary")):
+            event_watch += 1
+    return {
+        "cards": len(cards),
+        "pass": decisions.count("pass"),
+        "caution": decisions.count("caution"),
+        "reject": decisions.count("reject"),
+        "event_watch": event_watch,
+    }
 
 
 def find_latest_run_dir(root: str | Path = ".") -> Path | None:

@@ -197,6 +197,8 @@ autoresearch-multilane:
 		--contract $(AUTORESEARCH_CONTRACT) \
 		--expression-space $(AUTORESEARCH_SPACE) \
 		--expression-candidate $(AUTORESEARCH_CANDIDATE) \
+		--mining-config $(FACTOR_CONFIG) \
+		--provider-config $(CSI500_PROVIDER) \
 		--output $(AUTORESEARCH_MULTILANE_OUTPUT)
 
 autoresearch-ledger:

@@ -183,6 +183,7 @@ def normalize_akshare_notices(raw: pd.DataFrame) -> pd.DataFrame:
         event_type, severity = classify_notice_event(title, str(row.get(type_col, "") if type_col else ""))
         source_url = str(row.get(url_col, "") if url_col else "").strip()
         event_key = "|".join([instrument, event_date_text, title, source_url])
+        active_until = _notice_active_until(event_date, event_type, severity)
         rows.append(
             {
                 "event_id": hashlib.sha1(event_key.encode("utf-8")).hexdigest()[:16],
@@ -195,7 +196,7 @@ def normalize_akshare_notices(raw: pd.DataFrame) -> pd.DataFrame:
                 "severity": severity,
                 "summary": title,
                 "evidence": title,
-                "active_until": "",
+                "active_until": active_until,
             }
         )
     return pd.DataFrame(rows, columns=COMPANY_EVENT_COLUMNS)
@@ -257,6 +258,20 @@ def classify_notice_event(title: str, category: str = "") -> tuple[str, str]:
     if any(word in text for word in ["异动", "异常波动"]):
         return "abnormal_volatility", "watch"
     return "announcement", "info"
+
+
+def _notice_active_until(event_date: pd.Timestamp, event_type: str, severity: str) -> str:
+    if pd.isna(event_date):
+        return ""
+    if severity == "block" or event_type in {"disciplinary_action", "delisting_risk", "trading_suspension", "st_status"}:
+        days = 90
+    elif severity == "risk":
+        days = 60
+    elif severity == "watch":
+        days = 45
+    else:
+        days = 30
+    return str((event_date.date() + dt.timedelta(days=days)))
 
 
 def write_symbol_csv(frame: pd.DataFrame, output_dir: str | Path, symbol: str) -> Path:
@@ -400,6 +415,9 @@ def fetch_company_notices(start_date: str, end_date: str, delay: float = 0.2) ->
             raw = ak.stock_notice_report(symbol="全部", date=date_text)
         except TypeError:
             raw = ak.stock_notice_report(date=date_text)
+        except Exception as exc:
+            print(f"skip failed notices: {date_text} ({exc})")
+            raw = None
         if raw is not None and not raw.empty:
             frames.append(raw)
         if delay > 0:

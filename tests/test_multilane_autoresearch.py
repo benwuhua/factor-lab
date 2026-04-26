@@ -31,6 +31,18 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.write_text(
+                yaml.safe_dump(
+                    {
+                        "templates": [
+                            {"name": "wangji-factor1", "expression": "$close", "direction": 1},
+                            {"name": "arbr_26", "expression": "$close", "direction": -1},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
 
             with patch("qlib_factor_lab.autoresearch.multilane.run_expression_oracle") as oracle:
                 oracle.return_value = (
@@ -59,6 +71,52 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "shadow_skipped")
             self.assertTrue((root / "reports/autoresearch/multilane_summary.md").exists())
             self.assertTrue((root / "reports/autoresearch/multilane_summary.json").exists())
+
+    def test_runner_dispatches_pattern_and_emotion_event_oracles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump(
+                    {
+                        "lanes": {
+                            "pattern_event": {"activation_status": "active"},
+                            "emotion_atmosphere": {"activation_status": "active"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.write_text(
+                yaml.safe_dump(
+                    {
+                        "templates": [
+                            {"name": "wangji-factor1", "expression": "$close", "direction": 1},
+                            {"name": "arbr_26", "expression": "$close", "direction": -1},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle:
+                event_oracle.side_effect = [
+                    ({"candidate": "wangji-factor1", "status": "review", "primary_metric": 0.02, "artifact_dir": "a"}, ""),
+                    ({"candidate": "arbr_26", "status": "review", "primary_metric": 0.01, "artifact_dir": "b"}, ""),
+                ]
+
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    mining_config_path=mining_config,
+                )
+
+            self.assertEqual(event_oracle.call_count, 2)
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["pattern_event", "run_status"], "completed")
+            self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "completed")
 
 
 if __name__ == "__main__":

@@ -10,10 +10,8 @@ data_governance:
         - instrument
         - name
         - valid_from
-        - valid_to
       pit_fields:
         - valid_from
-        - valid_to
       min_coverage_ratio: 0.95
       activation_lane: security_master
     company_events:

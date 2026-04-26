@@ -3,6 +3,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import yaml
@@ -10,6 +11,7 @@ import yaml
 from qlib_factor_lab.akshare_data import (
     build_dump_bin_command,
     filter_frame_to_universes,
+    fetch_company_notices,
     fetch_universe_symbols,
     normalize_akshare_notices,
     normalize_security_master_snapshot,
@@ -163,6 +165,18 @@ class AkShareDataTests(unittest.TestCase):
         reduction = result[result["instrument"] == "SZ000001"].iloc[0]
         self.assertEqual(reduction["event_type"], "shareholder_reduction")
         self.assertEqual(reduction["severity"], "risk")
+        self.assertEqual(reduction["active_until"], "2026-06-20")
+
+    def test_fetch_company_notices_skips_upstream_schema_errors(self):
+        class FakeAkshare:
+            def stock_notice_report(self, symbol, date):
+                raise KeyError("代码")
+
+        with patch("qlib_factor_lab.akshare_data._get_akshare", return_value=FakeAkshare()):
+            result = fetch_company_notices("2026-04-20", "2026-04-20", delay=0)
+
+        self.assertTrue(result.empty)
+        self.assertIn("instrument", result.columns)
 
     def test_build_research_context_data_cli_normalizes_local_sources(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -216,3 +230,4 @@ class AkShareDataTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+    fetch_company_notices,

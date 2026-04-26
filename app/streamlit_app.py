@@ -26,6 +26,7 @@ from qlib_factor_lab.workbench import (
     build_research_pipeline_status,
     classify_gate_decision,
     find_latest_run_dir,
+    find_latest_stock_cards,
     find_latest_target_portfolio,
     get_candidate_diagnostics,
     get_candidate_artifacts,
@@ -33,9 +34,11 @@ from qlib_factor_lab.workbench import (
     load_autoresearch_queue,
     load_factor_family_map_safe,
     load_portfolio_gate_explanation,
+    load_stock_cards,
     load_risk_config_dict,
     load_workbench_snapshot,
     parse_expert_review_result,
+    summarize_stock_cards,
     summarize_autoresearch_queue,
 )
 from qlib_factor_lab.workbench_tasks import (
@@ -52,7 +55,7 @@ st.set_page_config(page_title="Factor Lab Workbench", page_icon=str(APP_ICON), l
 
 def main() -> None:
     _style()
-    pages = ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行", "08 证据库"]
+    pages = ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行", "08 证据库", "09 个股卡片"]
     default_page = _resolve_nav_page(st.query_params.get("page", ""), pages)
     if APP_ICON.exists():
         st.sidebar.image(str(APP_ICON), width=64)
@@ -84,6 +87,8 @@ def main() -> None:
         render_paper_execution()
     elif page == "08 证据库":
         render_evidence_library()
+    elif page == "09 个股卡片":
+        render_stock_cards()
     else:
         render_dashboard()
 
@@ -605,6 +610,55 @@ def render_evidence_library() -> None:
         )
 
 
+def render_stock_cards() -> None:
+    cards = load_stock_cards(ROOT)
+    summary = summarize_stock_cards(cards)
+    latest = find_latest_stock_cards(ROOT)
+    st.markdown(
+        _page_topbar_html(
+            "个股卡片",
+            "把目标组合里的每只股票拆成可审查证据包：信号、因子 driver、事件证据、交易状态和复核问题。",
+            ["Cards", "Evidence", "Gate", "Export"],
+        ),
+        unsafe_allow_html=True,
+    )
+    st.markdown(_stock_card_metric_cards_html(summary), unsafe_allow_html=True)
+    st.caption(f"stock cards: {latest or 'n/a'}")
+    if not cards:
+        st.info("还没有 stock_cards JSONL。先运行 make stock-cards。")
+        return
+
+    rows = []
+    for card in cards:
+        signal = card.get("current_signal", {})
+        evidence = card.get("evidence", {})
+        audit = card.get("audit", {})
+        review = card.get("review_questions", {})
+        identity = card.get("identity", {})
+        rows.append(
+            {
+                "instrument": card.get("instrument", ""),
+                "name": card.get("name", ""),
+                "industry": identity.get("industry") or identity.get("industry_sw", ""),
+                "decision": audit.get("review_decision", ""),
+                "rank": signal.get("rank"),
+                "target_weight": signal.get("target_weight"),
+                "ensemble_score": signal.get("ensemble_score"),
+                "top_factor_1": signal.get("top_factor_1", ""),
+                "event_count": evidence.get("event_count", 0),
+                "max_event_severity": evidence.get("max_event_severity", ""),
+                "risk_flags": evidence.get("risk_flags", ""),
+                "gate_reason": review.get("gate_reason", ""),
+            }
+        )
+    frame = pd.DataFrame(rows)
+    st.dataframe(frame, use_container_width=True, hide_index=True)
+
+    selected = st.selectbox("查看卡片详情", frame["instrument"].astype(str).tolist())
+    selected_idx = frame.index[frame["instrument"].astype(str) == selected][0]
+    st.json(cards[selected_idx], expanded=False)
+
+
 def render_autoresearch_queue() -> None:
     st.markdown(
         _page_topbar_html(
@@ -1017,6 +1071,20 @@ def _event_library_cards_html(cards: dict[str, object]) -> str:
     return f'<section class="evidence-grid">{html}</section>'
 
 
+def _stock_card_metric_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("Stock Cards", cards.get("cards", 0)),
+        ("Caution", cards.get("caution", 0)),
+        ("Reject", cards.get("reject", 0)),
+        ("Event Watch", cards.get("event_watch", 0)),
+    ]
+    html = "".join(
+        f'<div class="evidence-card"><label>{_html(label)}</label><strong>{_html(value)}</strong></div>'
+        for label, value in items
+    )
+    return f'<section class="evidence-grid stock-card-grid">{html}</section>'
+
+
 def _task_run_option_label(row: dict[str, object]) -> str:
     run_name = Path(str(row.get("run_dir", "n/a"))).name
     status = str(row.get("status", "unknown") or "unknown")
@@ -1073,8 +1141,8 @@ def _factor_research_rows() -> list[dict[str, object]]:
 
 def _autoresearch_rows() -> list[dict[str, object]]:
     return [
-        {"step": "01 LOOP", "title": "启动自动挖掘", "command": "make autoresearch-codex-loop", "status": "review", "action": "Queue", "task_id": "autoresearch-codex-loop"},
-        {"step": "02 REVIEW", "title": "复核挖掘结果", "command": "make autoresearch-review", "status": "ready", "action": "Review", "task_id": "autoresearch-review"},
+        {"step": "01 MULTI", "title": "多车道挖掘", "command": "make autoresearch-multilane", "status": "lane gated", "action": "Run", "task_id": "autoresearch-multilane"},
+        {"step": "02 LOOP", "title": "启动自动挖掘", "command": "make autoresearch-codex-loop", "status": "review", "action": "Queue", "task_id": "autoresearch-codex-loop"},
         {"step": "03 SELECT", "title": "沉淀 approved 因子", "command": "make select-factors", "status": "governed", "action": "Run", "task_id": "select-factors"},
     ]
 

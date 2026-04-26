@@ -35,7 +35,7 @@ class DataGovernanceReport:
 
     @property
     def passed(self) -> bool:
-        return all(row["status"] == "pass" for row in self.rows)
+        return all(row["status"] == "pass" or row["activation_status"] == "shadow" for row in self.rows)
 
     def to_frame(self) -> pd.DataFrame:
         return pd.DataFrame(

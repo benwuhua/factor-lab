@@ -14,6 +14,7 @@ add_src_to_path()
 from qlib_factor_lab.expert_review import (
     ExpertReviewRunConfig,
     build_expert_review_packet,
+    load_stock_cards_jsonl,
     run_expert_review_command,
     write_expert_review_result,
 )
@@ -24,6 +25,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build a Markdown packet for expert LLM portfolio review.")
     parser.add_argument("--target-portfolio", required=True, help="Target portfolio CSV.")
     parser.add_argument("--factor-diagnostics", default=None, help="Optional single factor diagnostics CSV.")
+    parser.add_argument("--stock-cards", default=None, help="Optional stock card JSONL file.")
     parser.add_argument("--run-date", default="")
     parser.add_argument("--output", default="reports/expert_review_packet.md")
     parser.add_argument("--run-review", action="store_true", help="Run an expert LLM command with the packet on stdin.")
@@ -36,7 +38,8 @@ def main() -> int:
     root = Path(args.project_root).expanduser().resolve()
     target = pd.read_csv(_resolve(root, args.target_portfolio))
     diagnostics = pd.read_csv(_resolve(root, args.factor_diagnostics)) if args.factor_diagnostics else None
-    packet = build_expert_review_packet(target, diagnostics, run_date=args.run_date)
+    stock_cards = load_stock_cards_jsonl(_resolve(root, args.stock_cards)) if args.stock_cards else None
+    packet = build_expert_review_packet(target, diagnostics, run_date=args.run_date, stock_cards=stock_cards)
     output = _resolve(root, args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(packet, encoding="utf-8")

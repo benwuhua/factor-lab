@@ -11,6 +11,7 @@ from app.streamlit_app import (
     _research_context_env_overrides,
     _resolve_nav_page,
     _rerun_task_button_label,
+    _stock_card_metric_cards_html,
     _short_text,
     _task_run_option_label,
     _task_status_cards_html,
@@ -166,6 +167,13 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("<strong>15.0%</strong>", html)
         self.assertIn("Source Coverage", html)
         self.assertIn("2026-04-25", html)
+
+    def test_stock_card_metric_cards_html_shows_card_counts(self):
+        html = _stock_card_metric_cards_html({"cards": 3, "caution": 1, "reject": 0, "event_watch": 2})
+
+        self.assertIn("Stock Cards", html)
+        self.assertIn("<strong>3</strong>", html)
+        self.assertIn("Caution", html)
 
     def test_research_context_env_overrides_normalize_dates_and_universes(self):
         env = _research_context_env_overrides(

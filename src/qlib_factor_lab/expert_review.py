@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import re
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -176,6 +177,7 @@ def build_expert_review_packet(
     *,
     run_date: str = "",
     max_positions: int = 20,
+    stock_cards: list[dict[str, Any]] | None = None,
 ) -> str:
     lines = [
         "# Expert Portfolio Review Packet",
@@ -298,6 +300,37 @@ def build_expert_review_packet(
                 )
                 + " |"
             )
+    lines.extend(["", "## Stock Research Cards", ""])
+    if not stock_cards:
+        lines.append("- No stock cards were supplied.")
+    else:
+        lines.extend(
+            [
+                "| instrument | decision | score | top_factor | event_count | severity | gate_reason | evidence |",
+                "|---|---|---:|---|---:|---|---|---|",
+            ]
+        )
+        for card in stock_cards[:max_positions]:
+            signal = card.get("current_signal", {}) if isinstance(card, dict) else {}
+            evidence = card.get("evidence", {}) if isinstance(card, dict) else {}
+            audit = card.get("audit", {}) if isinstance(card, dict) else {}
+            review = card.get("review_questions", {}) if isinstance(card, dict) else {}
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        _text(card.get("instrument", "")),
+                        _text(audit.get("review_decision", "")),
+                        _format_float(signal.get("ensemble_score")),
+                        _text(signal.get("top_factor_1", "")),
+                        _format_float(evidence.get("event_count")),
+                        _text(evidence.get("max_event_severity", "")),
+                        _text(review.get("gate_reason", "")),
+                        _text(evidence.get("event_risk_summary", "")),
+                    ]
+                )
+                + " |"
+            )
     lines.extend(
         [
             "",
@@ -313,6 +346,20 @@ def build_expert_review_packet(
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def load_stock_cards_jsonl(path: str | Path | None) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    cards_path = Path(path)
+    if not cards_path.exists():
+        return []
+    cards = []
+    for line in cards_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        cards.append(json.loads(line))
+    return cards
 
 
 def _format_float(value) -> str:
