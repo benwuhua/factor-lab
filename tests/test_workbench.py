@@ -19,14 +19,17 @@ from qlib_factor_lab.workbench import (
     build_research_pipeline_status,
     build_workbench_freshness,
     find_latest_stock_cards,
+    find_latest_multilane_report,
     find_latest_run_dir,
     get_candidate_diagnostics,
     get_candidate_artifacts,
     load_autoresearch_queue,
+    load_multilane_report,
     load_stock_cards,
     load_workbench_snapshot,
     parse_expert_review_result,
     summarize_autoresearch_queue,
+    summarize_multilane_report,
 )
 
 
@@ -199,6 +202,41 @@ class WorkbenchTests(unittest.TestCase):
 
         self.assertEqual(path.name, "stock_cards_20260424.jsonl")
         self.assertEqual(cards[0]["instrument"], "AAA")
+
+    def test_load_multilane_report_reads_latest_json_sidecar_and_summarizes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            report_dir = root / "reports/autoresearch"
+            report_dir.mkdir(parents=True)
+            older = report_dir / "multilane_smoke_20260424.md"
+            latest = report_dir / "multilane_smoke_20260425.md"
+            older.write_text("# old\n", encoding="utf-8")
+            latest.write_text("# latest\n", encoding="utf-8")
+            latest.with_suffix(".json").write_text(
+                """
+                [
+                  {"lane": "emotion_atmosphere", "activation_status": "active", "run_status": "completed", "candidate": "heat", "primary_metric": 0.018, "detail": "review"},
+                  {"lane": "expression_price_volume", "activation_status": "active", "run_status": "completed", "candidate": "mom", "primary_metric": -0.002, "detail": "discard_candidate"},
+                  {"lane": "liquidity_microstructure", "activation_status": "active", "run_status": "unsupported", "candidate": "", "primary_metric": null, "detail": "no runner implemented"}
+                ]
+                """,
+                encoding="utf-8",
+            )
+            os.utime(older, (datetime(2026, 4, 24, 8, 0).timestamp(), datetime(2026, 4, 24, 8, 0).timestamp()))
+            os.utime(latest, (datetime(2026, 4, 25, 8, 0).timestamp(), datetime(2026, 4, 25, 8, 0).timestamp()))
+
+            path = find_latest_multilane_report(root)
+            frame = load_multilane_report(root)
+            summary = summarize_multilane_report(frame)
+
+        self.assertEqual(path.name, "multilane_smoke_20260425.md")
+        self.assertEqual(list(frame["lane"]), ["emotion_atmosphere", "expression_price_volume", "liquidity_microstructure"])
+        self.assertEqual(summary["lanes"], 3)
+        self.assertEqual(summary["completed"], 2)
+        self.assertEqual(summary["unsupported"], 1)
+        self.assertEqual(summary["review"], 1)
+        self.assertEqual(summary["best_lane"], "emotion_atmosphere")
+        self.assertAlmostEqual(summary["best_primary_metric"], 0.018)
 
     def test_latest_run_dir_ignores_workbench_task_monitor_runs(self):
         with tempfile.TemporaryDirectory() as tmp:

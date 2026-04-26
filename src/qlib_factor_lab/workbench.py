@@ -179,6 +179,77 @@ def load_stock_cards(root: str | Path = ".", path: str | Path | None = None) -> 
     return cards
 
 
+def find_latest_multilane_report(root: str | Path = ".") -> Path | None:
+    root_path = Path(root)
+    candidates = list((root_path / "reports/autoresearch").glob("multilane*.md"))
+    return _latest_path(candidates)
+
+
+def load_multilane_report(root: str | Path = ".", path: str | Path | None = None) -> pd.DataFrame:
+    report_path = _resolve(Path(root), path) if path is not None else find_latest_multilane_report(root)
+    columns = ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"]
+    if report_path is None or not report_path.exists():
+        return pd.DataFrame(columns=columns)
+    json_path = report_path.with_suffix(".json")
+    if json_path.exists():
+        frame = pd.read_json(json_path)
+    else:
+        frame = _parse_multilane_markdown(report_path)
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = pd.NA
+    frame["primary_metric"] = pd.to_numeric(frame["primary_metric"], errors="coerce")
+    frame["source_path"] = str(report_path)
+    return frame.loc[:, columns + ["source_path"]].reset_index(drop=True)
+
+
+def summarize_multilane_report(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame.empty:
+        return {
+            "lanes": 0,
+            "completed": 0,
+            "review": 0,
+            "unsupported": 0,
+            "crash": 0,
+            "best_lane": "n/a",
+            "best_primary_metric": float("nan"),
+        }
+    status = frame["run_status"].fillna("").astype(str)
+    detail = frame["detail"].fillna("").astype(str)
+    metrics = pd.to_numeric(frame["primary_metric"], errors="coerce")
+    best_idx = metrics.idxmax() if metrics.notna().any() else None
+    return {
+        "lanes": int(len(frame)),
+        "completed": int((status == "completed").sum()),
+        "review": int((detail == "review").sum()),
+        "unsupported": int((status == "unsupported").sum()),
+        "crash": int((status == "crash").sum()),
+        "best_lane": str(frame.loc[best_idx, "lane"]) if best_idx is not None else "n/a",
+        "best_primary_metric": float(metrics.loc[best_idx]) if best_idx is not None else float("nan"),
+    }
+
+
+def _parse_multilane_markdown(path: Path) -> pd.DataFrame:
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("| ") or "---" in line or " lane " in line:
+            continue
+        parts = [part.strip() for part in line.strip("|").split("|")]
+        if len(parts) < 6:
+            continue
+        rows.append(
+            {
+                "lane": parts[0],
+                "activation_status": parts[1],
+                "run_status": parts[2],
+                "candidate": parts[3],
+                "primary_metric": parts[4],
+                "detail": parts[5],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def summarize_stock_cards(cards: list[dict[str, Any]]) -> dict[str, int]:
     decisions = [
         _normalized_decision(((card.get("audit") or {}).get("review_decision", "")))

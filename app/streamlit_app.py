@@ -26,6 +26,7 @@ from qlib_factor_lab.workbench import (
     build_research_evidence_summary,
     build_research_pipeline_status,
     classify_gate_decision,
+    find_latest_multilane_report,
     find_latest_run_dir,
     find_latest_stock_cards,
     find_latest_target_portfolio,
@@ -34,6 +35,7 @@ from qlib_factor_lab.workbench import (
     load_execution_gate_card,
     load_autoresearch_queue,
     load_factor_family_map_safe,
+    load_multilane_report,
     load_portfolio_gate_explanation,
     load_stock_cards,
     load_risk_config_dict,
@@ -41,6 +43,7 @@ from qlib_factor_lab.workbench import (
     parse_expert_review_result,
     summarize_stock_cards,
     summarize_autoresearch_queue,
+    summarize_multilane_report,
 )
 from qlib_factor_lab.workbench_tasks import (
     latest_workbench_task_runs,
@@ -222,6 +225,9 @@ def render_data_governance() -> None:
 
 def render_factor_research() -> None:
     queue = load_autoresearch_queue(ROOT)
+    multilane = load_multilane_report(ROOT)
+    multilane_summary = summarize_multilane_report(multilane)
+    latest_multilane = find_latest_multilane_report(ROOT)
     approved = _approved_factor_rows()
     diagnostics = _latest_single_factor_diagnostics()
     summary = summarize_autoresearch_queue(queue)
@@ -251,6 +257,26 @@ def render_factor_research() -> None:
         factor_rows = _factor_research_rows()
         st.markdown(_workflow_card_grid_html(factor_rows), unsafe_allow_html=True)
         _render_workflow_task_buttons(factor_rows, "factor-research")
+
+        st.markdown(_section_header_html("最新 Smoke / 多车道结果", "expression, pattern, emotion lanes"), unsafe_allow_html=True)
+        if multilane.empty:
+            st.info("还没有 multilane smoke/nightly 报告。先点击 Smoke 或运行 make autoresearch-multilane。")
+        else:
+            st.markdown(
+                _detail_card_html(
+                    "Multilane Summary",
+                    [
+                        ("lanes", multilane_summary["lanes"]),
+                        ("completed", multilane_summary["completed"]),
+                        ("review", multilane_summary["review"]),
+                        ("best", _short_text(multilane_summary["best_lane"], 18)),
+                    ],
+                    note=f"latest: {latest_multilane.name if latest_multilane else 'n/a'}",
+                ),
+                unsafe_allow_html=True,
+            )
+            keep = [column for column in ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"] if column in multilane.columns]
+            st.dataframe(multilane.loc[:, keep], use_container_width=True, hide_index=True)
 
         st.markdown(_section_header_html("Approved 因子清单", "governed factor set"), unsafe_allow_html=True)
         if approved.empty:
@@ -665,11 +691,13 @@ def render_autoresearch_queue() -> None:
         unsafe_allow_html=True,
     )
     queue = load_autoresearch_queue(ROOT)
+    multilane = load_multilane_report(ROOT)
+    multilane_summary = summarize_multilane_report(multilane)
+    latest_multilane = find_latest_multilane_report(ROOT)
     task_runs = latest_workbench_task_runs(ROOT, limit=12)
     progress = build_autoresearch_progress(queue=queue, task_runs=task_runs)
     if queue.empty:
         st.warning("还没有 expression_results.tsv。先运行 make autoresearch-expression 或 autoresearch-codex-loop。")
-        return
 
     summary = summarize_autoresearch_queue(queue)
     primary = queue["primary_metric"].dropna().max() if "primary_metric" in queue.columns else float("nan")
@@ -683,12 +711,15 @@ def render_autoresearch_queue() -> None:
         ]
     )
 
-    status = st.multiselect(
-        "状态过滤",
-        options=sorted(queue["status"].dropna().astype(str).unique()),
-        default=["review"] if "review" in set(queue["status"].astype(str)) else [],
-    )
-    filtered = queue[queue["status"].astype(str).isin(status)] if status else queue
+    if queue.empty:
+        filtered = queue
+    else:
+        status = st.multiselect(
+            "状态过滤",
+            options=sorted(queue["status"].dropna().astype(str).unique()),
+            default=["review"] if "review" in set(queue["status"].astype(str)) else [],
+        )
+        filtered = queue[queue["status"].astype(str).isin(status)] if status else queue
     selected = ""
     selected_artifact = ""
 
@@ -705,6 +736,29 @@ def render_autoresearch_queue() -> None:
         if not recent_candidates.empty:
             st.dataframe(recent_candidates, use_container_width=True, hide_index=True)
 
+        st.markdown(_section_header_html("多车道结果", "latest smoke / nightly lane summary"), unsafe_allow_html=True)
+        if multilane.empty:
+            st.info("暂无 multilane 报告。运行 make autoresearch-multilane 或在因子研究页点击 Smoke。")
+        else:
+            st.markdown(
+                _detail_card_html(
+                    "Latest Multilane",
+                    [
+                        ("completed", multilane_summary["completed"]),
+                        ("unsupported", multilane_summary["unsupported"]),
+                        ("best lane", _short_text(multilane_summary["best_lane"], 18)),
+                        (
+                            "best metric",
+                            f"{multilane_summary['best_primary_metric']:.4f}" if pd.notna(multilane_summary["best_primary_metric"]) else "n/a",
+                        ),
+                    ],
+                    note=f"source: {latest_multilane.name if latest_multilane else 'n/a'}",
+                ),
+                unsafe_allow_html=True,
+            )
+            lane_cols = [column for column in ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"] if column in multilane.columns]
+            st.dataframe(multilane.loc[:, lane_cols], use_container_width=True, hide_index=True)
+
         st.markdown(_section_header_html("研究队列", "nightly ledger"), unsafe_allow_html=True)
         display_cols = [
             "timestamp",
@@ -716,7 +770,10 @@ def render_autoresearch_queue() -> None:
             "decision_reason",
             "artifact_dir",
         ]
-        st.dataframe(filtered.loc[:, [column for column in display_cols if column in filtered.columns]], use_container_width=True)
+        if filtered.empty:
+            st.info("暂无 expression ledger 候选。")
+        else:
+            st.dataframe(filtered.loc[:, [column for column in display_cols if column in filtered.columns]], use_container_width=True)
 
         st.markdown(
             _section_header_html("候选对比", "primary metric vs complexity"),
