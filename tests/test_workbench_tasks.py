@@ -35,9 +35,19 @@ class WorkbenchTaskTests(unittest.TestCase):
 
     def test_task_registry_includes_north_star_pipeline_tasks(self):
         self.assertEqual(WORKBENCH_TASKS["data-governance"].command, ("make", "data-governance"))
+        self.assertEqual(WORKBENCH_TASKS["factor-research"].command, ("make", "factor-research"))
         self.assertEqual(WORKBENCH_TASKS["autoresearch-multilane"].command, ("make", "autoresearch-multilane"))
         self.assertEqual(WORKBENCH_TASKS["autoresearch-multilane-smoke"].command, ("make", "autoresearch-multilane"))
         self.assertEqual(WORKBENCH_TASKS["stock-cards"].command, ("make", "stock-cards"))
+
+    def test_makefile_exposes_one_command_factor_research_pipeline(self):
+        makefile = Path(__file__).resolve().parents[1].joinpath("Makefile").read_text(encoding="utf-8")
+
+        self.assertIn("factor-research:", makefile)
+        self.assertIn("$(MAKE) research-context", makefile)
+        self.assertIn("$(MAKE) data-governance", makefile)
+        self.assertIn("$(MAKE) autoresearch-multilane", makefile)
+        self.assertIn("$(MAKE) select-factors", makefile)
 
     def test_launch_workbench_task_writes_manifest_and_starts_runner(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -50,7 +50,7 @@ RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
 
-.PHONY: help install test workbench workbench-e2e check-env research-context data-governance candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -62,6 +62,7 @@ help:
 	@printf "  make check-env        Check local Qlib provider environment\n"
 	@printf "  make research-context Refresh security master and company event evidence\n"
 	@printf "  make data-governance Check PIT data-domain coverage and lane readiness\n"
+	@printf "  make factor-research Run the one-command factor research pipeline\n"
 	@printf "  make candidates       Generate candidate factor table for CSI500 config\n"
 	@printf "  make mine-csi500      Run 5/20 day candidate mining on CSI500 config\n"
 	@printf "  make mine-csi300      Run 5/20 day candidate mining on CSI300 config\n"
@@ -139,6 +140,12 @@ data-governance:
 		--config $(DATA_GOVERNANCE_CONFIG) \
 		--as-of-date $(RUN_DATE) \
 		--output $(DATA_GOVERNANCE_OUTPUT)
+
+factor-research:
+	$(MAKE) research-context
+	$(MAKE) data-governance
+	$(MAKE) autoresearch-multilane
+	$(MAKE) select-factors
 
 candidates:
 	$(PYTHON) scripts/mine_factors.py \

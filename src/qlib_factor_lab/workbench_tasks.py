@@ -31,6 +31,7 @@ WORKBENCH_TASKS: dict[str, WorkbenchTask] = {
     "data-governance": WorkbenchTask("data-governance", "检查数据治理", ("make", "data-governance"), "检查数据域覆盖率、PIT 字段和 lane 激活状态。"),
     "daily-signal": WorkbenchTask("daily-signal", "生成当日信号", ("make", "daily-signal"), "从 approved 因子生成当日解释型信号。"),
     "check-data-quality": WorkbenchTask("check-data-quality", "检查信号质量", ("make", "check-data-quality"), "对当日信号覆盖率和缺失情况做质量门禁。"),
+    "factor-research": WorkbenchTask("factor-research", "开始因子研究", ("make", "factor-research"), "刷新研究上下文、数据治理、多车道挖掘，并生成 approved 因子。"),
     "select-factors": WorkbenchTask("select-factors", "生成 approved 因子", ("make", "select-factors"), "根据治理配置刷新 approved_factors.yaml。"),
     "autoresearch-codex-loop": WorkbenchTask("autoresearch-codex-loop", "启动自动挖掘", ("make", "autoresearch-codex-loop"), "启动受控候选表达式研究循环。"),
     "autoresearch-multilane": WorkbenchTask("autoresearch-multilane", "多车道挖掘", ("make", "autoresearch-multilane"), "按 lane_space 运行 active lane，并记录 shadow/unsupported lane 状态。"),

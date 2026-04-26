@@ -1220,6 +1220,14 @@ def _factor_research_rows() -> list[dict[str, object]]:
     )
     return [
         {
+            "step": "00 START",
+            "title": "开始因子研究",
+            "command": "make factor-research",
+            "status": "one-click",
+            "action": "Run",
+            "task_id": "factor-research",
+        },
+        {
             "step": "01 REGISTRY",
             "title": "维护候选因子池",
             "command": "factors/registry.yaml",

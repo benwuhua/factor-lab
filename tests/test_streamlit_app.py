@@ -206,6 +206,15 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("AUTORESEARCH_START_TIME", smoke["command"])
         self.assertEqual(smoke["action"], "Smoke")
 
+    def test_factor_research_rows_include_one_click_pipeline(self):
+        rows = _factor_research_rows()
+        pipeline = rows[0]
+
+        self.assertEqual(pipeline["task_id"], "factor-research")
+        self.assertEqual(pipeline["title"], "开始因子研究")
+        self.assertEqual(pipeline["command"], "make factor-research")
+        self.assertEqual(pipeline["action"], "Run")
+
     def test_autoresearch_smoke_env_overrides_normalize_dates_and_output(self):
         env = _autoresearch_smoke_env_overrides(start_date="2026-01-01", end_date="2026-04-20")
 

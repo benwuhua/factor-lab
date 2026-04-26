@@ -68,6 +68,7 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
 
         self.assertIn("最新 Smoke / 多车道结果", text)
         self.assertIn("Multilane Summary", text)
+        self.assertIn("Run · 开始因子研究", _button_labels(app))
         self.assertIn("Smoke · 短窗多车道 smoke", _button_labels(app))
         self.assertIn("Run · 生成 approved 因子", _button_labels(app))
 
