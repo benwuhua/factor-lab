@@ -2,11 +2,13 @@ import unittest
 
 from app.streamlit_app import (
     _autoresearch_progress_cards_html,
+    _autoresearch_smoke_env_overrides,
     _detail_card_html,
     _evidence_cards_html,
     _evidence_health_cards_html,
     _evidence_library_rows,
     _event_library_cards_html,
+    _factor_research_rows,
     _page_topbar_html,
     _research_context_env_overrides,
     _resolve_nav_page,
@@ -188,6 +190,21 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertEqual(env["RESEARCH_CONTEXT_NOTICE_START"], "20260401")
         self.assertEqual(env["RESEARCH_CONTEXT_NOTICE_END"], "20260425")
         self.assertEqual(env["RESEARCH_CONTEXT_UNIVERSES"], "csi500")
+
+    def test_factor_research_rows_include_short_window_multilane_smoke(self):
+        rows = _factor_research_rows()
+        smoke = next(row for row in rows if row.get("task_id") == "autoresearch-multilane-smoke")
+
+        self.assertIn("短窗", smoke["title"])
+        self.assertIn("AUTORESEARCH_START_TIME", smoke["command"])
+        self.assertEqual(smoke["action"], "Smoke")
+
+    def test_autoresearch_smoke_env_overrides_normalize_dates_and_output(self):
+        env = _autoresearch_smoke_env_overrides(start_date="2026-01-01", end_date="2026-04-20")
+
+        self.assertEqual(env["AUTORESEARCH_START_TIME"], "2026-01-01")
+        self.assertEqual(env["AUTORESEARCH_END_TIME"], "2026-04-20")
+        self.assertEqual(env["AUTORESEARCH_MULTILANE_OUTPUT"], "reports/autoresearch/multilane_smoke_20260420.md")
 
     def test_resolve_nav_page_supports_deep_link_shortcuts(self):
         pages = ["01 总览仪表盘", "08 证据库"]

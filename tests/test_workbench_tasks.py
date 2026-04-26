@@ -36,6 +36,7 @@ class WorkbenchTaskTests(unittest.TestCase):
     def test_task_registry_includes_north_star_pipeline_tasks(self):
         self.assertEqual(WORKBENCH_TASKS["data-governance"].command, ("make", "data-governance"))
         self.assertEqual(WORKBENCH_TASKS["autoresearch-multilane"].command, ("make", "autoresearch-multilane"))
+        self.assertEqual(WORKBENCH_TASKS["autoresearch-multilane-smoke"].command, ("make", "autoresearch-multilane"))
         self.assertEqual(WORKBENCH_TASKS["stock-cards"].command, ("make", "stock-cards"))
 
     def test_launch_workbench_task_writes_manifest_and_starts_runner(self):
@@ -65,12 +66,11 @@ class WorkbenchTaskTests(unittest.TestCase):
             with patch("qlib_factor_lab.workbench_tasks.subprocess.Popen"):
                 record = launch_workbench_task(
                     root,
-                    "research-context",
+                    "autoresearch-multilane-smoke",
                     env_overrides={
-                        "RUN_DATE": "20260425",
-                        "RESEARCH_CONTEXT_NOTICE_START": "20260401",
-                        "RESEARCH_CONTEXT_NOTICE_END": "20260425",
-                        "RESEARCH_CONTEXT_UNIVERSES": "csi300 csi500",
+                        "AUTORESEARCH_START_TIME": "2026-01-01",
+                        "AUTORESEARCH_END_TIME": "2026-04-20",
+                        "AUTORESEARCH_MULTILANE_OUTPUT": "reports/autoresearch/multilane_smoke_20260420.md",
                         "UNSAFE": "ignored",
                     },
                 )
@@ -79,10 +79,9 @@ class WorkbenchTaskTests(unittest.TestCase):
             self.assertEqual(
                 manifest["env_overrides"],
                 {
-                    "RUN_DATE": "20260425",
-                    "RESEARCH_CONTEXT_NOTICE_START": "20260401",
-                    "RESEARCH_CONTEXT_NOTICE_END": "20260425",
-                    "RESEARCH_CONTEXT_UNIVERSES": "csi300 csi500",
+                    "AUTORESEARCH_START_TIME": "2026-01-01",
+                    "AUTORESEARCH_END_TIME": "2026-04-20",
+                    "AUTORESEARCH_MULTILANE_OUTPUT": "reports/autoresearch/multilane_smoke_20260420.md",
                 },
             )
 

@@ -916,7 +916,12 @@ def _render_workflow_task_buttons(rows: list[dict[str, object]], key_prefix: str
         label = f'{row.get("action", "Run")} · {row.get("title", task_id)}'
         with cols[index % len(cols)]:
             if st.button(label, key=f"task-{key_prefix}-{task_id}", use_container_width=True):
-                record = launch_workbench_task(ROOT, task_id)
+                env_overrides = row.get("env_overrides")
+                record = launch_workbench_task(
+                    ROOT,
+                    task_id,
+                    env_overrides=env_overrides if isinstance(env_overrides, dict) else None,
+                )
                 st.success(f"已启动后台任务: {task_id}")
                 st.caption(f"manifest: {record.manifest_path}")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -1132,10 +1137,43 @@ def _quality_rows(snapshot) -> list[dict[str, object]]:
 
 
 def _factor_research_rows() -> list[dict[str, object]]:
+    smoke_env = _autoresearch_smoke_env_overrides(
+        start_date=(pd.Timestamp.today() - pd.Timedelta(days=120)).date(),
+        end_date=pd.Timestamp.today().date(),
+    )
     return [
-        {"step": "01 REGISTRY", "title": "维护候选因子池", "command": "factors/registry.yaml", "status": _exists_status(ROOT / "factors/registry.yaml"), "action": "Open"},
-        {"step": "02 SELECT", "title": "生成 approved 因子", "command": "make select-factors", "status": _exists_status(ROOT / "reports/approved_factors.yaml"), "action": "Run", "task_id": "select-factors"},
-        {"step": "03 SIGNAL", "title": "构建解释型信号", "command": "make daily-signal", "status": "ready", "action": "Run", "task_id": "daily-signal"},
+        {
+            "step": "01 REGISTRY",
+            "title": "维护候选因子池",
+            "command": "factors/registry.yaml",
+            "status": _exists_status(ROOT / "factors/registry.yaml"),
+            "action": "Open",
+        },
+        {
+            "step": "02 SMOKE",
+            "title": "短窗多车道 smoke",
+            "command": "AUTORESEARCH_START_TIME/END_TIME make autoresearch-multilane",
+            "status": "short-window",
+            "action": "Smoke",
+            "task_id": "autoresearch-multilane-smoke",
+            "env_overrides": smoke_env,
+        },
+        {
+            "step": "03 SELECT",
+            "title": "生成 approved 因子",
+            "command": "make select-factors",
+            "status": _exists_status(ROOT / "reports/approved_factors.yaml"),
+            "action": "Run",
+            "task_id": "select-factors",
+        },
+        {
+            "step": "04 SIGNAL",
+            "title": "构建解释型信号",
+            "command": "make daily-signal",
+            "status": "ready",
+            "action": "Run",
+            "task_id": "daily-signal",
+        },
     ]
 
 
@@ -1211,6 +1249,17 @@ def _research_context_env_overrides(
         "RESEARCH_CONTEXT_NOTICE_START": start,
         "RESEARCH_CONTEXT_NOTICE_END": end,
         "RESEARCH_CONTEXT_UNIVERSES": " ".join(selected_universes),
+    }
+
+
+def _autoresearch_smoke_env_overrides(*, start_date: object, end_date: object) -> dict[str, str]:
+    start = pd.Timestamp(start_date).strftime("%Y-%m-%d")
+    end = pd.Timestamp(end_date).strftime("%Y-%m-%d")
+    end_compact = pd.Timestamp(end_date).strftime("%Y%m%d")
+    return {
+        "AUTORESEARCH_START_TIME": start,
+        "AUTORESEARCH_END_TIME": end,
+        "AUTORESEARCH_MULTILANE_OUTPUT": f"reports/autoresearch/multilane_smoke_{end_compact}.md",
     }
 
 
