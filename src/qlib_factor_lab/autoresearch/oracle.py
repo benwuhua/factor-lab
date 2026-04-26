@@ -114,6 +114,8 @@ def run_expression_oracle(
     space_path: str | Path,
     candidate_path: str | Path,
     project_root: str | Path = ".",
+    start_time: str | None = None,
+    end_time: str | None = None,
 ) -> tuple[dict[str, Any], str]:
     started = time.time()
     root = Path(project_root)
@@ -128,7 +130,11 @@ def run_expression_oracle(
         candidate_name = candidate.name
         factor = candidate.to_factor_def()
         project_config = load_project_config(_resolve(root, contract.provider_config))
-        project_config = replace(project_config, start_time=contract.start_time, end_time=contract.end_time)
+        project_config = replace(
+            project_config,
+            start_time=start_time or contract.start_time,
+            end_time=end_time or contract.end_time,
+        )
         initialized = False
         raw_eval = pd.DataFrame()
         neutralized_eval = pd.DataFrame()

@@ -266,6 +266,62 @@ class AutoresearchOracleTests(unittest.TestCase):
             self.assertEqual({config.purification_mad_n for config in eval_configs}, {2.5})
             self.assertEqual(payload["purification"], "mad+rank")
 
+    def test_run_expression_oracle_overrides_contract_window_for_smoke_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            contract_path = self._write_contract(root)
+            space_path = root / "space.yaml"
+            space_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "fields": ["close"],
+                        "windows": [5, 20],
+                        "operators": ["Ref"],
+                        "families": ["momentum"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            candidate_path = root / "candidate.yaml"
+            candidate_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "name": "mom",
+                        "family": "momentum",
+                        "expression": "Ref($close, 5) / Ref($close, 20) - 1",
+                        "direction": 1,
+                        "description": "Momentum.",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.oracle.load_project_config") as load_config:
+                with patch("qlib_factor_lab.autoresearch.oracle.evaluate_factor") as evaluate:
+                    load_config.return_value = ProjectConfig(
+                        provider_uri=Path("data"),
+                        region="cn",
+                        market="csi500_current",
+                        benchmark="SH000905",
+                        freq="day",
+                        start_time="2015-01-01",
+                        end_time="2026-04-20",
+                    )
+                    evaluate.return_value = self._eval_frame("none", 0.02, 0.03)
+
+                    run_expression_oracle(
+                        contract_path=contract_path,
+                        space_path=space_path,
+                        candidate_path=candidate_path,
+                        project_root=root,
+                        start_time="2026-01-01",
+                        end_time="2026-04-20",
+                    )
+
+            configs = [call.args[0] for call in evaluate.call_args_list]
+            self.assertEqual({config.start_time for config in configs}, {"2026-01-01"})
+            self.assertEqual({config.end_time for config in configs}, {"2026-04-20"})
+
     def _write_contract(
         self,
         root: Path,

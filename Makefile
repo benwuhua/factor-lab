@@ -15,6 +15,9 @@ AUTORESEARCH_LEDGER ?= reports/autoresearch/expression_results.tsv
 AUTORESEARCH_LEDGER_MD ?= reports/autoresearch/expression_results_summary.md
 AUTORESEARCH_LANE_SPACE ?= configs/autoresearch/lane_space.yaml
 AUTORESEARCH_MULTILANE_OUTPUT ?= reports/autoresearch/multilane_summary.md
+AUTORESEARCH_START_TIME ?=
+AUTORESEARCH_END_TIME ?=
+AUTORESEARCH_WINDOW_ARGS = $(if $(AUTORESEARCH_START_TIME),--start-time $(AUTORESEARCH_START_TIME),) $(if $(AUTORESEARCH_END_TIME),--end-time $(AUTORESEARCH_END_TIME),)
 AUTORESEARCH_CODEX_MODEL ?= gpt-5.4
 AUTORESEARCH_CODEX_UNTIL ?= 08:30
 AUTORESEARCH_CODEX_ITERATIONS ?= 30
@@ -199,7 +202,8 @@ autoresearch-multilane:
 		--expression-candidate $(AUTORESEARCH_CANDIDATE) \
 		--mining-config $(FACTOR_CONFIG) \
 		--provider-config $(CSI500_PROVIDER) \
-		--output $(AUTORESEARCH_MULTILANE_OUTPUT)
+		--output $(AUTORESEARCH_MULTILANE_OUTPUT) \
+		$(AUTORESEARCH_WINDOW_ARGS)
 
 autoresearch-ledger:
 	$(PYTHON) scripts/autoresearch/summarize_expression_ledger.py \

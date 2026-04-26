@@ -28,6 +28,8 @@ def main() -> int:
     parser.add_argument("--output", default="reports/autoresearch/multilane_summary.md")
     parser.add_argument("--include-shadow", action="store_true")
     parser.add_argument("--max-workers", type=int, default=4)
+    parser.add_argument("--start-time", default="")
+    parser.add_argument("--end-time", default="")
     args = parser.parse_args()
 
     report = run_multilane_autoresearch(
@@ -41,6 +43,8 @@ def main() -> int:
         output_path=args.output,
         include_shadow=args.include_shadow,
         max_workers=args.max_workers,
+        start_time=args.start_time or None,
+        end_time=args.end_time or None,
     )
     print(report.to_frame().to_string(index=False))
     print(f"wrote: {report.output_path}")

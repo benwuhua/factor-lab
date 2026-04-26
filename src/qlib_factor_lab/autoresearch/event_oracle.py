@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import time
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,8 @@ def run_event_lane_oracle(
     artifact_root: str | Path = "reports/autoresearch/runs",
     horizons: tuple[int, ...] = (5, 20),
     buckets: tuple[tuple[float, float], ...] = ((0.85, 0.95), (0.95, 1.0)),
+    start_time: str | None = None,
+    end_time: str | None = None,
 ) -> tuple[dict[str, Any], str]:
     started = time.time()
     root = Path(project_root)
@@ -32,6 +35,12 @@ def run_event_lane_oracle(
     artifact_dir = _resolve(root, artifact_root) / f"{lane_name}_{run_id}"
     artifact_dir.mkdir(parents=True, exist_ok=True)
     project_config = load_project_config(_resolve(root, provider_config))
+    if start_time or end_time:
+        project_config = replace(
+            project_config,
+            start_time=start_time or project_config.start_time,
+            end_time=end_time or project_config.end_time,
+        )
     init_qlib(project_config)
 
     backtest_config = EventBacktestConfig(horizons=horizons, buckets=buckets)

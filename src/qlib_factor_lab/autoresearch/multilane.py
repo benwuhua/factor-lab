@@ -47,6 +47,8 @@ def run_multilane_autoresearch(
     output_path: str | Path = "reports/autoresearch/multilane_summary.md",
     include_shadow: bool = False,
     max_workers: int = 4,
+    start_time: str | None = None,
+    end_time: str | None = None,
 ) -> MultiLaneReport:
     root = Path(project_root)
     lane_space = load_yaml(_resolve(root, lane_space_path))
@@ -69,6 +71,8 @@ def run_multilane_autoresearch(
                     factor_specs=_event_factor_specs(root, mining_config_path, lane_name),
                     provider_config=provider_config_path,
                     project_root=root,
+                    start_time=start_time,
+                    end_time=end_time,
                 )
                 futures[future] = (lane_name, activation)
                 continue
@@ -81,6 +85,8 @@ def run_multilane_autoresearch(
                 space_path=expression_space_path,
                 candidate_path=expression_candidate_path,
                 project_root=root,
+                start_time=start_time,
+                end_time=end_time,
             )
             futures[future] = (lane_name, activation)
         for future in as_completed(futures):
@@ -192,7 +198,17 @@ def _event_factor_names(lane_name: str) -> set[str]:
     if lane_name == "pattern_event":
         return {"wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"}
     if lane_name == "emotion_atmosphere":
-        return {"arbr_26", "davol_5", "davol_10", "davol_20", "turnover_mean_5", "turnover_mean_20"}
+        return {
+            "arbr_26",
+            "breadth_proxy_20",
+            "davol_5",
+            "davol_10",
+            "davol_20",
+            "heat_cooling_5_20",
+            "limit_pressure_5",
+            "turnover_mean_5",
+            "turnover_mean_20",
+        }
     return set()
 
 

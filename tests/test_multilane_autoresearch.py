@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import yaml
 
-from qlib_factor_lab.autoresearch.multilane import run_multilane_autoresearch
+from qlib_factor_lab.autoresearch.multilane import _event_factor_specs, run_multilane_autoresearch
 
 
 class MultilaneAutoresearchTests(unittest.TestCase):
@@ -111,12 +111,52 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                     lane_space_path=lane_space,
                     project_root=root,
                     mining_config_path=mining_config,
+                    start_time="2026-01-01",
+                    end_time="2026-04-20",
                 )
 
             self.assertEqual(event_oracle.call_count, 2)
+            for call in event_oracle.call_args_list:
+                self.assertEqual(call.kwargs["start_time"], "2026-01-01")
+                self.assertEqual(call.kwargs["end_time"], "2026-04-20")
             frame = report.to_frame().set_index("lane")
             self.assertEqual(frame.loc["pattern_event", "run_status"], "completed")
             self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "completed")
+
+    def test_runner_passes_smoke_window_to_expression_oracle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"expression_price_volume": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_expression_oracle") as oracle:
+                oracle.return_value = (
+                    {"candidate": "demo", "status": "review", "primary_metric": 0.01, "artifact_dir": "a"},
+                    "",
+                )
+
+                run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    start_time="2026-01-01",
+                    end_time="2026-04-20",
+                )
+
+            self.assertEqual(oracle.call_args.kwargs["start_time"], "2026-01-01")
+            self.assertEqual(oracle.call_args.kwargs["end_time"], "2026-04-20")
+
+    def test_emotion_lane_includes_heat_limit_and_breadth_proxy_factors(self):
+        repo_root = Path(__file__).resolve().parents[1]
+
+        names = {spec["name"] for spec in _event_factor_specs(repo_root, "configs/factor_mining.yaml", "emotion_atmosphere")}
+
+        self.assertIn("limit_pressure_5", names)
+        self.assertIn("heat_cooling_5_20", names)
+        self.assertIn("breadth_proxy_20", names)
 
 
 if __name__ == "__main__":

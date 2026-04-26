@@ -81,6 +81,21 @@ templates:
     direction: -1
     category: candidate_emotion
     description: "JoinQuant ARBR-style sentiment factor over 26 days; lower ARBR is ranked higher based on factorlib screening."
+  - name: limit_pressure_5
+    expression: "Mean(Greater($close / Ref($close, 1) - 1, 0.095), 5)"
+    direction: -1
+    category: candidate_emotion
+    description: "A-share limit-up pressure proxy over 5 sessions; high recent limit-like moves indicate hot crowding."
+  - name: heat_cooling_5_20
+    expression: "Mean(Abs($close / Ref($close, 1) - 1) * $turnover, 5) / (Mean(Abs($close / Ref($close, 1) - 1) * $turnover, 20) + 0.000001)"
+    direction: -1
+    category: candidate_emotion
+    description: "Short-term price-turnover heat versus 20 day baseline; lower heat is favored after crowding cools."
+  - name: breadth_proxy_20
+    expression: "Mean(Greater($close / Ref($close, 1) - 1, 0), 20) - Mean(Less($close / Ref($close, 1) - 1, 0), 20)"
+    direction: 1
+    category: candidate_emotion
+    description: "Single-name market breadth proxy: 20 day balance of up days versus down days."
   - name: boll_position_20
     expression: "($close - Mean($close, 20)) / (2 * Std($close, 20) + 0.000001)"
     direction: -1
