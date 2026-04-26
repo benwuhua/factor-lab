@@ -944,7 +944,7 @@ def _sidebar_nav_html(pages: list[str], current_page: str) -> str:
     for page in pages:
         klass = "side-nav-item active" if page == current_page else "side-nav-item"
         items.append(
-            f'<a class="{klass}" href="?page={quote_plus(page)}">'
+            f'<a class="{klass}" href="/?page={quote_plus(page)}" target="_self">'
             '<span class="side-nav-dot"></span>'
             f"<span>{_html(page)}</span>"
             "</a>"

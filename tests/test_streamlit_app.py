@@ -217,7 +217,8 @@ class StreamlitAppUiTests(unittest.TestCase):
     def test_sidebar_nav_html_uses_links_and_marks_current_page(self):
         html = _sidebar_nav_html(["01 总览仪表盘", "03 因子研究"], "03 因子研究")
 
-        self.assertIn('href="?page=03+%E5%9B%A0%E5%AD%90%E7%A0%94%E7%A9%B6"', html)
+        self.assertIn('href="/?page=03+%E5%9B%A0%E5%AD%90%E7%A0%94%E7%A9%B6"', html)
+        self.assertIn('target="_self"', html)
         self.assertIn('class="side-nav-item active"', html)
         self.assertIn("03 因子研究", html)
 
