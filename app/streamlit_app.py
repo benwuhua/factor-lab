@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from urllib.parse import quote_plus
 
 import pandas as pd
 import yaml
@@ -56,18 +57,13 @@ st.set_page_config(page_title="Factor Lab Workbench", page_icon=str(APP_ICON), l
 def main() -> None:
     _style()
     pages = ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行", "08 证据库", "09 个股卡片"]
-    default_page = _resolve_nav_page(st.query_params.get("page", ""), pages)
+    page = _resolve_nav_page(st.query_params.get("page", ""), pages)
     if APP_ICON.exists():
         st.sidebar.image(str(APP_ICON), width=64)
     st.sidebar.title("Factor Lab")
     st.sidebar.caption("AI 辅助 A 股因子投研工作台\n从候选因子到组合复核")
-    page = st.sidebar.radio(
-        "导航",
-        pages,
-        index=pages.index(default_page),
-        label_visibility="collapsed",
-    )
-    if st.query_params.get("page") != page:
+    st.sidebar.markdown(_sidebar_nav_html(pages, page), unsafe_allow_html=True)
+    if not st.query_params.get("page"):
         st.query_params["page"] = page
     st.sidebar.divider()
     st.sidebar.caption("数据边界")
@@ -886,6 +882,19 @@ def _resolve_nav_page(raw_page: object, pages: list[str]) -> str:
     return pages[0]
 
 
+def _sidebar_nav_html(pages: list[str], current_page: str) -> str:
+    items = []
+    for page in pages:
+        klass = "side-nav-item active" if page == current_page else "side-nav-item"
+        items.append(
+            f'<a class="{klass}" href="?page={quote_plus(page)}">'
+            '<span class="side-nav-dot"></span>'
+            f"<span>{_html(page)}</span>"
+            "</a>"
+        )
+    return f'<nav class="side-nav">{"".join(items)}</nav>'
+
+
 def _short_text(value: object, limit: int) -> str:
     text = str(value)
     return text if len(text) <= limit else f"{text[: max(limit - 3, 1)]}..."
@@ -1488,18 +1497,37 @@ def _style() -> None:
             font-weight: 760 !important;
             margin-top: 22px;
           }
-          section[data-testid="stSidebar"] [role="radiogroup"] {
+          section[data-testid="stSidebar"] .side-nav {
             display: grid;
             gap: 6px;
             margin-top: 18px;
           }
-          section[data-testid="stSidebar"] label {
+          section[data-testid="stSidebar"] .side-nav-item {
+            align-items: center;
             border-radius: 6px;
+            display: flex;
+            gap: 9px;
             padding: 10px 8px;
+            text-decoration: none;
+            transition: background 120ms ease, box-shadow 120ms ease;
           }
-          section[data-testid="stSidebar"] label:has(input:checked) {
+          section[data-testid="stSidebar"] .side-nav-item.active {
             background: #26342f;
             box-shadow: inset 3px 0 0 #55b08a;
+          }
+          section[data-testid="stSidebar"] .side-nav-item:hover {
+            background: rgba(237, 242, 238, 0.08);
+          }
+          section[data-testid="stSidebar"] .side-nav-dot {
+            background: #edf2ee;
+            border-radius: 999px;
+            display: inline-block;
+            height: 14px;
+            width: 14px;
+          }
+          section[data-testid="stSidebar"] .side-nav-item.active .side-nav-dot {
+            background: #f06455;
+            border: 4px solid #edf2ee;
           }
           section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
             color: #aebbb4;

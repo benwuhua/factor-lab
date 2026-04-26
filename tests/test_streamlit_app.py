@@ -12,6 +12,7 @@ from app.streamlit_app import (
     _page_topbar_html,
     _research_context_env_overrides,
     _resolve_nav_page,
+    _sidebar_nav_html,
     _rerun_task_button_label,
     _stock_card_metric_cards_html,
     _short_text,
@@ -212,6 +213,13 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertEqual(_resolve_nav_page("08", pages), "08 证据库")
         self.assertEqual(_resolve_nav_page("08 证据库", pages), "08 证据库")
         self.assertEqual(_resolve_nav_page("missing", pages), "01 总览仪表盘")
+
+    def test_sidebar_nav_html_uses_links_and_marks_current_page(self):
+        html = _sidebar_nav_html(["01 总览仪表盘", "03 因子研究"], "03 因子研究")
+
+        self.assertIn('href="?page=03+%E5%9B%A0%E5%AD%90%E7%A0%94%E7%A9%B6"', html)
+        self.assertIn('class="side-nav-item active"', html)
+        self.assertIn("03 因子研究", html)
 
 
 if __name__ == "__main__":
