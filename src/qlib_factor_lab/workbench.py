@@ -11,6 +11,7 @@ import yaml
 
 from .exposure_attribution import build_exposure_attribution, load_factor_family_map
 from .company_events import COMPANY_EVENT_COLUMNS, load_company_events, load_event_risk_config
+from .expert_review import parse_expert_review_manual_items
 from .risk import RiskConfig, check_portfolio_risk
 
 
@@ -363,6 +364,43 @@ def build_gate_review_items(checks: pd.DataFrame) -> pd.DataFrame:
     return failed.loc[:, keep].reset_index(drop=True)
 
 
+def build_portfolio_gate_trend(root: str | Path = ".", *, limit: int = 20) -> pd.DataFrame:
+    root_path = Path(root)
+    rows = []
+    for run_dir in sorted((root_path / "runs").glob("*")):
+        target = run_dir / "target_portfolio.csv"
+        if not run_dir.is_dir() or not target.exists():
+            continue
+        portfolio = pd.read_csv(target)
+        gate = build_portfolio_gate_explanation(
+            portfolio,
+            risk_config=load_risk_config_dict(root_path),
+            factor_family_map=load_factor_family_map_safe(root_path),
+        )
+        rows.append(
+            {
+                "run_date": run_dir.name,
+                "decision": gate.decision,
+                "positions": int(len(portfolio)),
+                "industry_coverage": _portfolio_industry_coverage(portfolio),
+                "event_coverage": _portfolio_event_coverage(portfolio),
+                "factor_family_concentration": _portfolio_family_concentration(gate.family),
+            }
+        )
+    if not rows:
+        return pd.DataFrame(
+            columns=[
+                "run_date",
+                "decision",
+                "positions",
+                "industry_coverage",
+                "event_coverage",
+                "factor_family_concentration",
+            ]
+        )
+    return pd.DataFrame(rows).tail(limit).reset_index(drop=True)
+
+
 def build_workbench_freshness(root: str | Path = ".", *, now: pd.Timestamp | None = None) -> list[dict[str, Any]]:
     root_path = Path(root)
     current = pd.Timestamp.now() if now is None else pd.Timestamp(now)
@@ -596,12 +634,16 @@ def parse_expert_review_result(source: str | Path | None) -> dict[str, Any]:
     text = _expert_text(source)
     metadata = _expert_metadata(text)
     output = _section_after(text, "## Output")
+    manual_items = parse_expert_review_manual_items(output)
     return {
         "status": metadata.get("status", "missing" if not text.strip() else ""),
         "decision": _normalized_decision(metadata.get("decision", "")),
         "error": metadata.get("error", ""),
         "summary": _expert_summary(output),
         "watchlist": _expert_watchlist(output),
+        "manual_items": manual_items,
+        "hard_manual_review": manual_items.get("hard_manual_review", []),
+        "liquidity_review": manual_items.get("liquidity_review", []),
         "risk_notes": _expert_risk_notes(output),
         "raw_output": output.strip(),
     }
@@ -744,6 +786,39 @@ def _review_focus_for_check(check: str) -> str:
         "max_turnover": "降低换手或拉长调仓周期，检查交易成本敏感性。",
     }
     return focus.get(check, "人工复核该约束是否合理。")
+
+
+def _portfolio_industry_coverage(portfolio: pd.DataFrame) -> float:
+    if portfolio.empty:
+        return 0.0
+    columns = [column for column in ["industry", "industry_sw", "industry_csrc"] if column in portfolio.columns]
+    if not columns:
+        return 0.0
+    covered = pd.Series(False, index=portfolio.index)
+    for column in columns:
+        covered = covered | portfolio[column].fillna("").astype(str).str.strip().ne("")
+    return float(covered.mean())
+
+
+def _portfolio_event_coverage(portfolio: pd.DataFrame) -> float:
+    if portfolio.empty:
+        return 0.0
+    covered = pd.Series(False, index=portfolio.index)
+    if "event_count" in portfolio.columns:
+        covered = covered | (pd.to_numeric(portfolio["event_count"], errors="coerce").fillna(0) > 0)
+    for column in ["active_event_types", "event_risk_summary", "event_source_urls", "announcement_flag"]:
+        if column in portfolio.columns:
+            covered = covered | portfolio[column].fillna("").astype(str).str.strip().ne("")
+    return float(covered.mean())
+
+
+def _portfolio_family_concentration(family: pd.DataFrame) -> float:
+    if family.empty or "abs_weighted_contribution" not in family.columns:
+        return 0.0
+    total = float(pd.to_numeric(family["abs_weighted_contribution"], errors="coerce").fillna(0.0).sum())
+    if total <= 0:
+        return 0.0
+    return float(pd.to_numeric(family["abs_weighted_contribution"], errors="coerce").fillna(0.0).max() / total)
 
 
 def _pretrade_row(check: str, fail_status: str, instruments: list[str], focus: str) -> dict[str, Any]:

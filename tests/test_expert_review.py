@@ -11,6 +11,7 @@ from qlib_factor_lab.expert_review import (
     apply_expert_review_portfolio_gate,
     build_expert_review_packet,
     parse_expert_review_decision,
+    parse_expert_review_manual_items,
     run_expert_review_command,
     write_expert_review_result,
 )
@@ -117,6 +118,49 @@ class ExpertReviewTests(unittest.TestCase):
         self.assertTrue(gated.empty)
         self.assertEqual(gate["status"], "blocked")
         self.assertIn("required expert review", gate["detail"])
+
+    def test_apply_expert_review_portfolio_gate_requires_confirmation_for_hard_manual_list(self):
+        portfolio = self._target_portfolio()
+        portfolio["instrument"] = ["SH600580", "SZ002568"]
+        output = """
+结论：`caution`
+
+建议“硬人工复核后再决定”：
+
+- `SH600580`：公告密集，建议人工复核。
+- `SZ002568`：流动性复核。
+"""
+
+        gated, gate = apply_expert_review_portfolio_gate(
+            portfolio,
+            decision="caution",
+            review_output=output,
+            caution_action="scale",
+            caution_weight_multiplier=0.5,
+        )
+
+        self.assertEqual(gate["status"], "manual_confirmation_required")
+        self.assertEqual(gate["action"], "require_manual_confirmation")
+        self.assertIn("SH600580", gate["detail"])
+        self.assertTrue(gated["risk_flags"].str.contains("expert_manual_review_required").all())
+        self.assertAlmostEqual(float(gated["target_weight"].sum()), 0.0475)
+
+    def test_parse_expert_review_manual_items_extracts_hard_review_section(self):
+        text = """
+建议“硬人工复核后再决定”：
+
+- `SZ002738`：权益变动、减持相关。
+- `SH603899`：分拆上市相关。
+
+建议流动性复核：
+
+`SH601921`、`SH603899`
+"""
+
+        result = parse_expert_review_manual_items(text)
+
+        self.assertEqual(result["hard_manual_review"], ["SZ002738", "SH603899"])
+        self.assertEqual(result["liquidity_review"], ["SH601921", "SH603899"])
 
     def test_build_expert_review_packet_cli_writes_markdown(self):
         with tempfile.TemporaryDirectory() as tmp:

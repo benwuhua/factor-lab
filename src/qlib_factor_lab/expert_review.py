@@ -11,6 +11,7 @@ import pandas as pd
 
 
 EXPERT_REVIEW_FLAG = "expert_review_caution_scaled"
+EXPERT_MANUAL_REVIEW_FLAG = "expert_manual_review_required"
 
 
 @dataclass(frozen=True)
@@ -95,10 +96,13 @@ def apply_expert_review_portfolio_gate(
     review_required: bool = False,
     caution_action: str = "scale",
     caution_weight_multiplier: float = 0.5,
+    review_output: str = "",
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     normalized_decision = str(decision or "unknown").lower()
     normalized_status = str(review_status or "unknown").lower()
     normalized_action = str(caution_action or "scale").lower()
+    manual_items = parse_expert_review_manual_items(review_output)
+    hard_manual = manual_items.get("hard_manual_review", [])
     if review_required and (normalized_status != "completed" or normalized_decision == "unknown"):
         return portfolio.iloc[0:0].copy(), {
             "status": "blocked",
@@ -112,6 +116,17 @@ def apply_expert_review_portfolio_gate(
             "action": "block",
             "decision": normalized_decision,
             "detail": "expert review rejected the portfolio",
+        }
+    if hard_manual and normalized_decision in {"pass", "caution", "unknown"}:
+        gated = portfolio.copy()
+        if normalized_decision == "caution" and "target_weight" in gated.columns:
+            gated["target_weight"] = gated["target_weight"].astype(float) * float(caution_weight_multiplier)
+        gated = _append_risk_flag_for_instruments(gated, EXPERT_MANUAL_REVIEW_FLAG, set(hard_manual))
+        return gated, {
+            "status": "manual_confirmation_required",
+            "action": "require_manual_confirmation",
+            "decision": normalized_decision,
+            "detail": f"expert hard manual review required: {', '.join(hard_manual)}",
         }
     if normalized_decision == "caution" and normalized_action in {"manual_confirmation", "require_confirmation"}:
         return portfolio.copy(), {
@@ -151,6 +166,27 @@ def parse_expert_review_decision(text: str) -> str:
         if f"`{value}`" in lower:
             return value
     return "unknown"
+
+
+def parse_expert_review_manual_items(text: str) -> dict[str, list[str]]:
+    return {
+        "hard_manual_review": _section_instruments(
+            text,
+            [
+                "硬人工复核",
+                "硬性人工复核",
+                "阻断或人工复核",
+                "人工复核后再决定",
+                "硬性复核",
+            ],
+            stop_markers=["流动性复核", "普通下单前检查", "其余标的", "参考公开来源"],
+        ),
+        "liquidity_review": _section_instruments(
+            text,
+            ["流动性复核", "流动性"],
+            stop_markers=["下单前", "参考公开来源", "硬人工复核", "硬性人工复核"],
+        ),
+    }
 
 
 def write_expert_review_result(result: ExpertReviewResult, output_path: str | Path) -> Path:
@@ -385,6 +421,17 @@ def _append_risk_flag(frame: pd.DataFrame, flag: str) -> pd.DataFrame:
     return output
 
 
+def _append_risk_flag_for_instruments(frame: pd.DataFrame, flag: str, instruments: set[str]) -> pd.DataFrame:
+    output = frame.copy()
+    if "risk_flags" not in output.columns:
+        output["risk_flags"] = ""
+    if "instrument" not in output.columns:
+        return output
+    mask = output["instrument"].astype(str).str.upper().isin({item.upper() for item in instruments})
+    output.loc[mask, "risk_flags"] = output.loc[mask, "risk_flags"].apply(lambda value: _join_flag(value, flag))
+    return output
+
+
 def _join_flag(value, flag: str) -> str:
     existing = "" if pd.isna(value) else str(value).strip()
     if not existing:
@@ -393,3 +440,47 @@ def _join_flag(value, flag: str) -> str:
     if flag not in flags:
         flags.append(flag)
     return ";".join(flags)
+
+
+def _section_instruments(text: str, markers: list[str], *, stop_markers: list[str]) -> list[str]:
+    lines = str(text or "").splitlines()
+    collecting = False
+    collected: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not collecting and any(marker in stripped for marker in markers):
+            collecting = True
+            collected.extend(_instrument_codes(stripped))
+            continue
+        if not collecting:
+            continue
+        if not stripped.startswith(("-", "*")) and any(marker in stripped for marker in stop_markers):
+            break
+        if stripped.startswith("**") and collected:
+            break
+        collected.extend(_instrument_codes(stripped))
+    return _dedupe_preserve_order(collected)
+
+
+def _instrument_codes(text: str) -> list[str]:
+    pattern = re.compile(r"\b(?:SH|SZ)?(?:60|68|69|00|30|301|002|003)\d{4}\b", re.IGNORECASE)
+    output = []
+    for match in pattern.findall(str(text or "")):
+        code = match.upper()
+        if code.startswith(("SH", "SZ")):
+            output.append(code)
+        elif code.startswith(("60", "68", "69")):
+            output.append(f"SH{code}")
+        else:
+            output.append(f"SZ{code}")
+    return output
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen = set()
+    output = []
+    for value in values:
+        if value not in seen:
+            seen.add(value)
+            output.append(value)
+    return output

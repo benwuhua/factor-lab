@@ -141,6 +141,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         review_required=expert_review_config.required,
         caution_action=expert_review_config.caution_action,
         caution_weight_multiplier=expert_review_config.caution_weight_multiplier,
+        review_output=expert_review.output,
     )
     portfolio_path = write_target_portfolio(portfolio, run_dir / "target_portfolio.csv")
     portfolio_summary_path = write_portfolio_summary(portfolio, run_dir / "target_portfolio_summary.md")

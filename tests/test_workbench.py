@@ -12,6 +12,7 @@ from qlib_factor_lab.workbench import (
     build_execution_gate_card,
     build_event_evidence_library,
     build_portfolio_gate_explanation,
+    build_portfolio_gate_trend,
     build_research_context_health,
     build_gate_review_items,
     build_pretrade_review,
@@ -165,6 +166,31 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(list(items["decision_level"]), ["caution", "reject"])
         self.assertIn("降低行业集中", items.iloc[0]["review_focus"])
         self.assertIn("单票权重", items.iloc[1]["review_focus"])
+
+    def test_portfolio_gate_trend_reports_coverage_and_family_concentration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs/20260423"
+            run.mkdir(parents=True)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB"],
+                    "target_weight": [0.5, 0.5],
+                    "industry_sw": ["tech", ""],
+                    "event_count": [1, 0],
+                    "family_momentum_score": [0.3, 0.3],
+                    "family_reversal_score": [0.1, 0.1],
+                }
+            ).to_csv(run / "target_portfolio.csv", index=False)
+
+            trend = build_portfolio_gate_trend(root)
+
+        self.assertEqual(len(trend), 1)
+        row = trend.iloc[0]
+        self.assertEqual(row["run_date"], "20260423")
+        self.assertAlmostEqual(float(row["industry_coverage"]), 0.5)
+        self.assertAlmostEqual(float(row["event_coverage"]), 0.5)
+        self.assertAlmostEqual(float(row["factor_family_concentration"]), 0.75)
 
     def test_workbench_snapshot_counts_approved_factors_and_latest_target(self):
         with tempfile.TemporaryDirectory() as tmp:

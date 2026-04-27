@@ -22,6 +22,7 @@ from qlib_factor_lab.workbench import (
     build_gate_review_items,
     build_portfolio_gate_explanation,
     build_pretrade_review,
+    build_portfolio_gate_trend,
     build_research_context_health,
     build_research_evidence_summary,
     build_research_pipeline_status,
@@ -354,6 +355,7 @@ def render_portfolio_gate() -> None:
     expert = _latest_expert_review()
     pretrade = build_pretrade_review(portfolio)
     evidence = build_research_evidence_summary(portfolio)
+    trend = build_portfolio_gate_trend(ROOT)
     execution_card = load_execution_gate_card(ROOT)
     review_items = build_gate_review_items(gate.checks)
     pretrade_blocks = int((pretrade["status"].astype(str) == "reject").sum()) if not pretrade.empty else 0
@@ -393,6 +395,15 @@ def render_portfolio_gate() -> None:
             st.caption(expert["risk_notes"])
         if expert["watchlist"]:
             st.dataframe(pd.DataFrame({"instrument": expert["watchlist"]}), width="stretch", hide_index=True)
+        st.markdown(_section_header_html("专家硬复核名单", "manual block before paper execution"), unsafe_allow_html=True)
+        hard_manual = expert.get("hard_manual_review", [])
+        liquidity_manual = expert.get("liquidity_review", [])
+        if hard_manual or liquidity_manual:
+            rows = [{"instrument": item, "review_type": "hard_manual_review"} for item in hard_manual]
+            rows.extend({"instrument": item, "review_type": "liquidity_review"} for item in liquidity_manual)
+            st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+        else:
+            st.success("专家复核没有提取到硬人工复核名单。")
 
         st.markdown(_section_header_html("为什么被 caution / reject", "gate evidence"), unsafe_allow_html=True)
         st.dataframe(_gate_frame(gate.checks), width="stretch", hide_index=True)
@@ -431,6 +442,21 @@ def render_portfolio_gate() -> None:
                 st.success("当前组合没有公告/事件/主数据异常证据。")
             else:
                 st.dataframe(evidence_detail, width="stretch", hide_index=True)
+
+        st.markdown(_section_header_html("门禁趋势", "industry coverage, event evidence, factor concentration"), unsafe_allow_html=True)
+        if trend.empty:
+            st.info("还没有可展示的历史组合门禁趋势。")
+        else:
+            display_trend = trend.copy()
+            for column in ["industry_coverage", "event_coverage", "factor_family_concentration"]:
+                if column in display_trend.columns:
+                    display_trend[column] = display_trend[column].map(lambda value: f"{float(value):.1%}")
+            st.dataframe(display_trend, width="stretch", hide_index=True)
+            chart_trend = trend.set_index("run_date")[
+                [column for column in ["industry_coverage", "event_coverage", "factor_family_concentration"] if column in trend.columns]
+            ]
+            if not chart_trend.empty:
+                st.line_chart(chart_trend)
 
         chart_cols = st.columns(2)
         with chart_cols[0]:
