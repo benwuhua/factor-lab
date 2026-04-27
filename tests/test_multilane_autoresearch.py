@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import yaml
 
-from qlib_factor_lab.autoresearch.multilane import _event_factor_specs, run_multilane_autoresearch
+from qlib_factor_lab.autoresearch.multilane import _event_factor_specs, _lane_factor_specs, run_multilane_autoresearch
 
 
 class MultilaneAutoresearchTests(unittest.TestCase):
@@ -122,6 +122,54 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             frame = report.to_frame().set_index("lane")
             self.assertEqual(frame.loc["pattern_event", "run_status"], "completed")
             self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "completed")
+
+    def test_runner_dispatches_liquidity_cross_sectional_oracle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"liquidity_microstructure": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.write_text(
+                yaml.safe_dump(
+                    {
+                        "templates": [
+                            {"name": "amount_mean_{window}", "expression": "$amount", "windows": [5], "direction": 1, "category": "candidate_liquidity"},
+                            {"name": "amihud_illiq_{window}", "expression": "$close", "windows": [20], "direction": -1, "category": "candidate_liquidity"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_cross_sectional_lane_oracle") as oracle:
+                oracle.return_value = (
+                    {
+                        "candidate": "amount_mean_5",
+                        "status": "review",
+                        "primary_metric": 0.014,
+                        "artifact_dir": "reports/autoresearch/runs/liquidity",
+                    },
+                    "",
+                )
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    mining_config_path=mining_config,
+                    start_time="2026-01-01",
+                    end_time="2026-04-20",
+                )
+
+            oracle.assert_called_once()
+            self.assertEqual(oracle.call_args.kwargs["lane_name"], "liquidity_microstructure")
+            self.assertEqual(oracle.call_args.kwargs["start_time"], "2026-01-01")
+            self.assertEqual(oracle.call_args.kwargs["end_time"], "2026-04-20")
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["liquidity_microstructure", "run_status"], "completed")
+            self.assertEqual(frame.loc["liquidity_microstructure", "candidate"], "amount_mean_5")
 
     def test_runner_applies_data_governance_activation_override(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -287,6 +335,16 @@ class MultilaneAutoresearchTests(unittest.TestCase):
         self.assertIn("limit_pressure_5", names)
         self.assertIn("heat_cooling_5_20", names)
         self.assertIn("breadth_proxy_20", names)
+
+    def test_liquidity_lane_includes_amount_amihud_and_turnover_factors(self):
+        repo_root = Path(__file__).resolve().parents[1]
+
+        names = {spec["name"] for spec in _lane_factor_specs(repo_root, "configs/factor_mining.yaml", "liquidity_microstructure")}
+
+        self.assertIn("amount_mean_20", names)
+        self.assertIn("amihud_illiq_20", names)
+        self.assertIn("turnover_mean_20", names)
+        self.assertIn("turnover_volatility_20", names)
 
 
 if __name__ == "__main__":

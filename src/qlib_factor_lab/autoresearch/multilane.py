@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from qlib_factor_lab.autoresearch.cross_sectional_oracle import run_cross_sectional_lane_oracle
 from qlib_factor_lab.autoresearch.event_oracle import run_event_lane_oracle
 from qlib_factor_lab.autoresearch.oracle import run_expression_oracle
 from qlib_factor_lab.config import load_yaml
@@ -72,6 +73,18 @@ def run_multilane_autoresearch(
                     lane_name=lane_name,
                     factor_specs=_event_factor_specs(root, mining_config_path, lane_name),
                     provider_config=provider_config_path,
+                    project_root=root,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+                futures[future] = (lane_name, activation)
+                continue
+            if lane_name == "liquidity_microstructure":
+                future = executor.submit(
+                    run_cross_sectional_lane_oracle,
+                    lane_name=lane_name,
+                    factor_specs=_lane_factor_specs(root, mining_config_path, lane_name),
+                    contract_path=contract_path,
                     project_root=root,
                     start_time=start_time,
                     end_time=end_time,
@@ -210,8 +223,12 @@ def _resolve(root: Path, path: str | Path) -> Path:
 
 
 def _event_factor_specs(root: Path, mining_config_path: str | Path, lane_name: str) -> list[dict[str, Any]]:
+    return _lane_factor_specs(root, mining_config_path, lane_name)
+
+
+def _lane_factor_specs(root: Path, mining_config_path: str | Path, lane_name: str) -> list[dict[str, Any]]:
     factors = generate_candidate_factors(load_mining_config(_resolve(root, mining_config_path)))
-    names = _event_factor_names(lane_name)
+    names = _lane_factor_names(lane_name)
     specs = [
         {
             "name": factor.name,
@@ -224,11 +241,15 @@ def _event_factor_specs(root: Path, mining_config_path: str | Path, lane_name: s
         if factor.name in names
     ]
     if not specs:
-        raise ValueError(f"no event factor specs configured for lane: {lane_name}")
+        raise ValueError(f"no factor specs configured for lane: {lane_name}")
     return specs
 
 
 def _event_factor_names(lane_name: str) -> set[str]:
+    return _lane_factor_names(lane_name)
+
+
+def _lane_factor_names(lane_name: str) -> set[str]:
     if lane_name == "pattern_event":
         return {"wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"}
     if lane_name == "emotion_atmosphere":
@@ -242,6 +263,20 @@ def _event_factor_names(lane_name: str) -> set[str]:
             "limit_pressure_5",
             "turnover_mean_5",
             "turnover_mean_20",
+        }
+    if lane_name == "liquidity_microstructure":
+        return {
+            "amount_mean_5",
+            "amount_mean_20",
+            "amount_mean_60",
+            "amihud_illiq_10",
+            "amihud_illiq_20",
+            "amihud_illiq_60",
+            "turnover_mean_5",
+            "turnover_mean_20",
+            "turnover_mean_60",
+            "turnover_volatility_20",
+            "vosc_12_26",
         }
     return set()
 
