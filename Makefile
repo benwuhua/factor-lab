@@ -15,6 +15,7 @@ AUTORESEARCH_LEDGER ?= reports/autoresearch/expression_results.tsv
 AUTORESEARCH_LEDGER_MD ?= reports/autoresearch/expression_results_summary.md
 AUTORESEARCH_LANE_SPACE ?= configs/autoresearch/lane_space.yaml
 AUTORESEARCH_MULTILANE_OUTPUT ?= reports/autoresearch/multilane_summary.md
+AUTORESEARCH_DATA_GOVERNANCE_REPORT ?= reports/data_governance_$(RUN_DATE).md
 AUTORESEARCH_START_TIME ?=
 AUTORESEARCH_END_TIME ?=
 AUTORESEARCH_WINDOW_ARGS = $(if $(AUTORESEARCH_START_TIME),--start-time $(AUTORESEARCH_START_TIME),) $(if $(AUTORESEARCH_END_TIME),--end-time $(AUTORESEARCH_END_TIME),)
@@ -225,6 +226,7 @@ autoresearch-multilane:
 		--mining-config $(FACTOR_CONFIG) \
 		--provider-config $(CSI500_PROVIDER) \
 		--output $(AUTORESEARCH_MULTILANE_OUTPUT) \
+		--data-governance-report $(AUTORESEARCH_DATA_GOVERNANCE_REPORT) \
 		$(AUTORESEARCH_WINDOW_ARGS)
 
 autoresearch-ledger:

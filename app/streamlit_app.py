@@ -271,6 +271,14 @@ def render_factor_research() -> None:
 
         st.markdown(_section_header_html("最新 Smoke / 多车道结果", "expression, pattern, emotion lanes"), unsafe_allow_html=True)
         if multilane.empty:
+            st.markdown(
+                _detail_card_html(
+                    "Multilane Summary",
+                    [("lanes", 0), ("completed", 0), ("review", 0), ("best", "n/a")],
+                    note="还没有 multilane smoke/nightly 报告。",
+                ),
+                unsafe_allow_html=True,
+            )
             st.info("还没有 multilane smoke/nightly 报告。先点击 Smoke 或运行 make autoresearch-multilane。")
         else:
             st.markdown(
@@ -343,6 +351,9 @@ def render_portfolio_gate() -> None:
     )
     latest = find_latest_target_portfolio(ROOT)
     if latest is None:
+        st.markdown(_section_header_html("专家硬复核名单", "manual block before paper execution"), unsafe_allow_html=True)
+        st.markdown(_section_header_html("为什么被 caution / reject", "gate evidence"), unsafe_allow_html=True)
+        st.markdown(_section_header_html("门禁趋势", "historical gate coverage"), unsafe_allow_html=True)
         st.warning("还没有找到 target_portfolio CSV。先运行 make target-portfolio。")
         return
 

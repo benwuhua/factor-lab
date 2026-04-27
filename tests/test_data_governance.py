@@ -60,6 +60,7 @@ class DataGovernanceTests(unittest.TestCase):
             frame = report.to_frame().set_index("domain")
             self.assertEqual(frame.loc["security_master", "status"], "pass")
             self.assertEqual(frame.loc["security_master", "activation_status"], "active")
+            self.assertEqual(frame.loc["security_master", "activation_lane"], "security_master")
             self.assertAlmostEqual(frame.loc["security_master", "coverage_ratio"], 2 / 3)
             self.assertEqual(frame.loc["security_master", "pit_field_completeness"], 1.0)
             self.assertEqual(frame.loc["shareholder_capital", "status"], "missing")

@@ -46,8 +46,11 @@ class DailyPipelineTests(unittest.TestCase):
             run_dir = root / "runs/20260423"
             self.assertTrue((run_dir / "signals.csv").exists())
             self.assertTrue((run_dir / "signal_summary.md").exists())
+            self.assertTrue((run_dir / "data_governance.md").exists())
+            self.assertTrue((run_dir / "data_governance.csv").exists())
             self.assertTrue((run_dir / "target_portfolio.csv").exists())
             self.assertTrue((run_dir / "target_portfolio_summary.md").exists())
+            self.assertTrue((run_dir / "stock_cards.jsonl").exists())
             self.assertTrue((run_dir / "expert_review_packet.md").exists())
             self.assertTrue((run_dir / "expert_review_result.md").exists())
             self.assertTrue((run_dir / "risk_report.md").exists())
@@ -61,11 +64,17 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "pass")
             self.assertTrue(manifest["risk_passed"])
             self.assertIn("signals", manifest["artifacts"])
+            self.assertIn("data_governance", manifest["artifacts"])
+            self.assertIn("data_governance_csv", manifest["artifacts"])
+            self.assertIn("stock_cards", manifest["artifacts"])
             self.assertIn("expert_review_packet", manifest["artifacts"])
             self.assertIn("expert_review_result", manifest["artifacts"])
             self.assertIn("run_summary", manifest["artifacts"])
             self.assertEqual(manifest["expert_review"]["decision"], "not_run")
             self.assertIn("orders", manifest["artifacts"])
+            packet = (run_dir / "expert_review_packet.md").read_text(encoding="utf-8")
+            self.assertIn("## Stock Research Cards", packet)
+            self.assertIn("AAA", packet)
             self.assertIn("wrote:", result.stdout)
 
     def test_daily_pipeline_stops_before_orders_when_risk_fails(self):
@@ -272,6 +281,70 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertIn("block_report", manifest["artifacts"])
             self.assertIn("run_summary", manifest["artifacts"])
 
+    def test_daily_pipeline_allows_orders_after_manual_confirmation_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            execution_path = root / "configs/execution.yaml"
+            data = yaml.safe_load(execution_path.read_text(encoding="utf-8"))
+            data["expert_review"] = {
+                "enabled": True,
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); print('research_review_status: caution')",
+                ],
+                "caution_action": "manual_confirmation",
+                "caution_weight_multiplier": 0.5,
+                "manual_confirmation": {
+                    "enabled": True,
+                    "reviewer": "ryan",
+                    "reason": "checked chart and event packet",
+                },
+            }
+            execution_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            run_dir = root / "runs/20260423"
+            self.assertTrue((run_dir / "orders.csv").exists())
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "pass")
+            self.assertEqual(manifest["expert_review_gate"]["status"], "manual_confirmed")
+            self.assertEqual(manifest["expert_review_gate"]["reviewer"], "ryan")
+            portfolio = pd.read_csv(run_dir / "target_portfolio.csv")
+            aaa = portfolio[portfolio["instrument"] == "AAA"].iloc[0]
+            self.assertIn("expert_manual_confirmed", aaa["risk_flags"])
+            stock_cards = (run_dir / "stock_cards.jsonl").read_text(encoding="utf-8")
+            self.assertIn("manual_confirmed", stock_cards)
+            self.assertIn("expert_manual_confirmed", stock_cards)
+
     def test_daily_pipeline_writes_event_risk_snapshot_and_enriches_portfolio(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -318,6 +391,73 @@ class DailyPipelineTests(unittest.TestCase):
             aaa = portfolio[portfolio["instrument"] == "AAA"].iloc[0]
             self.assertEqual(aaa["industry_sw"], "Pharma")
             self.assertIn("earnings_watch", aaa["event_risk_summary"])
+            stock_cards = (run_dir / "stock_cards.jsonl").read_text(encoding="utf-8")
+            self.assertIn("earnings_watch", stock_cards)
+            self.assertIn("Alpha A", stock_cards)
+
+    def test_daily_pipeline_stops_before_signal_when_data_governance_blocks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            (root / "configs/data_governance.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "data_governance": {
+                            "expected_universe_path": "data/universe.csv",
+                            "domains": {
+                                "required_vendor_feed": {
+                                    "path": "data/missing_vendor.csv",
+                                    "required_fields": ["instrument"],
+                                    "activation_if_missing": "block",
+                                    "activation_lane": "expression_price_volume",
+                                }
+                            },
+                        }
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+            repo = Path(__file__).resolve().parents[1]
+            (root / "data/exposures.csv").unlink()
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            run_dir = root / "runs/20260423"
+            self.assertTrue((run_dir / "data_governance.md").exists())
+            self.assertTrue((run_dir / "data_governance.csv").exists())
+            self.assertTrue((run_dir / "run_summary.md").exists())
+            self.assertFalse((run_dir / "signals.csv").exists())
+            self.assertFalse((run_dir / "orders.csv").exists())
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "data_governance_failed")
+            self.assertFalse(manifest["risk_passed"])
+            self.assertIn("data_governance", manifest["artifacts"])
 
     def test_daily_pipeline_event_risk_enrichment_preserves_duplicate_signal_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -535,6 +675,27 @@ class DailyPipelineTests(unittest.TestCase):
                 "announcement_flag": [False, True, False],
             }
         ).to_csv(root / "data/exposures.csv", index=False)
+        pd.DataFrame({"instrument": ["AAA", "BBB", "CCC"]}).to_csv(root / "data/universe.csv", index=False)
+        (root / "configs/data_governance.yaml").write_text(
+            yaml.safe_dump(
+                {
+                    "data_governance": {
+                        "expected_universe_path": "data/universe.csv",
+                        "domains": {
+                            "market_ohlcv": {
+                                "path": "data/exposures.csv",
+                                "required_fields": ["date", "instrument", "core_alpha"],
+                                "pit_fields": ["date"],
+                                "min_coverage_ratio": 0.5,
+                                "activation_lane": "expression_price_volume",
+                            }
+                        },
+                    }
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
         pd.DataFrame(columns=["instrument", "current_weight", "last_price"]).to_csv(
             root / "state/current_positions.csv",
             index=False,

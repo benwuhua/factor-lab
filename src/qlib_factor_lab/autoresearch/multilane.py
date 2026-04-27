@@ -45,6 +45,7 @@ def run_multilane_autoresearch(
     mining_config_path: str | Path = "configs/factor_mining.yaml",
     provider_config_path: str | Path = "configs/provider_current.yaml",
     output_path: str | Path = "reports/autoresearch/multilane_summary.md",
+    data_governance_report_path: str | Path | None = None,
     include_shadow: bool = False,
     max_workers: int = 4,
     start_time: str | None = None,
@@ -53,11 +54,12 @@ def run_multilane_autoresearch(
     root = Path(project_root)
     lane_space = load_yaml(_resolve(root, lane_space_path))
     lanes = lane_space.get("lanes") or {}
+    lane_overrides = _load_data_governance_activation_overrides(root, data_governance_report_path)
     rows: list[dict[str, Any]] = []
     futures = {}
     with ThreadPoolExecutor(max_workers=max(1, int(max_workers))) as executor:
         for lane_name, lane in lanes.items():
-            activation = str((lane or {}).get("activation_status", "active"))
+            activation = lane_overrides.get(lane_name, str((lane or {}).get("activation_status", "active")))
             if activation == "shadow" and not include_shadow:
                 rows.append(_row(lane_name, activation, "shadow_skipped", "", float("nan"), "", "lane is shadow"))
                 continue
@@ -110,6 +112,38 @@ def run_multilane_autoresearch(
     report = MultiLaneReport(tuple(rows), output_path=_resolve(root, output_path))
     write_multilane_report(report, report.output_path)
     return report
+
+
+def _load_data_governance_activation_overrides(root: Path, report_path: str | Path | None) -> dict[str, str]:
+    if report_path is None:
+        return {}
+    path = _resolve(root, report_path)
+    if path.suffix.lower() == ".md":
+        path = path.with_suffix(".csv")
+    if not path.exists():
+        return {}
+    frame = pd.read_csv(path)
+    if "activation_status" not in frame.columns:
+        return {}
+    lane_col = "activation_lane" if "activation_lane" in frame.columns else "domain"
+    if lane_col not in frame.columns:
+        return {}
+    output: dict[str, str] = {}
+    for _, row in frame.iterrows():
+        lane = str(row.get(lane_col, "") or "").strip()
+        status = _normalize_activation_status(row.get("activation_status"))
+        if lane and status:
+            output[lane] = status
+    return output
+
+
+def _normalize_activation_status(value: Any) -> str:
+    status = str(value or "").strip().lower()
+    if status == "block":
+        return "disabled"
+    if status in {"active", "shadow", "disabled"}:
+        return status
+    return status
 
 
 def write_multilane_report(report: MultiLaneReport, output_path: str | Path | None) -> Path:

@@ -12,6 +12,7 @@ import pandas as pd
 
 EXPERT_REVIEW_FLAG = "expert_review_caution_scaled"
 EXPERT_MANUAL_REVIEW_FLAG = "expert_manual_review_required"
+EXPERT_MANUAL_CONFIRMED_FLAG = "expert_manual_confirmed"
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,7 @@ class ExpertReviewRunConfig:
     required: bool = False
     caution_action: str = "scale"
     caution_weight_multiplier: float = 0.5
+    manual_confirmation: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,7 @@ def load_expert_review_run_config(data: dict[str, Any]) -> ExpertReviewRunConfig
         required=bool(raw.get("required", False)),
         caution_action=str(raw.get("caution_action", "scale")),
         caution_weight_multiplier=float(raw.get("caution_weight_multiplier", 0.5)),
+        manual_confirmation=_manual_confirmation_config(raw.get("manual_confirmation")),
     )
 
 
@@ -97,6 +100,7 @@ def apply_expert_review_portfolio_gate(
     caution_action: str = "scale",
     caution_weight_multiplier: float = 0.5,
     review_output: str = "",
+    manual_confirmation: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     normalized_decision = str(decision or "unknown").lower()
     normalized_status = str(review_status or "unknown").lower()
@@ -122,6 +126,13 @@ def apply_expert_review_portfolio_gate(
         if normalized_decision == "caution" and "target_weight" in gated.columns:
             gated["target_weight"] = gated["target_weight"].astype(float) * float(caution_weight_multiplier)
         gated = _append_risk_flag_for_instruments(gated, EXPERT_MANUAL_REVIEW_FLAG, set(hard_manual))
+        if _manual_confirmation_enabled(manual_confirmation):
+            gated = _append_risk_flag_for_instruments(gated, EXPERT_MANUAL_CONFIRMED_FLAG, set(hard_manual))
+            return gated, _manual_confirmed_gate(
+                normalized_decision,
+                manual_confirmation,
+                f"expert hard manual review confirmed: {', '.join(hard_manual)}",
+            )
         return gated, {
             "status": "manual_confirmation_required",
             "action": "require_manual_confirmation",
@@ -129,6 +140,12 @@ def apply_expert_review_portfolio_gate(
             "detail": f"expert hard manual review required: {', '.join(hard_manual)}",
         }
     if normalized_decision == "caution" and normalized_action in {"manual_confirmation", "require_confirmation"}:
+        if _manual_confirmation_enabled(manual_confirmation):
+            return _append_risk_flag(portfolio.copy(), EXPERT_MANUAL_CONFIRMED_FLAG), _manual_confirmed_gate(
+                normalized_decision,
+                manual_confirmation,
+                "expert manual confirmation completed",
+            )
         return portfolio.copy(), {
             "status": "manual_confirmation_required",
             "action": "require_manual_confirmation",
@@ -151,6 +168,38 @@ def apply_expert_review_portfolio_gate(
         "action": "none",
         "decision": normalized_decision,
         "detail": "",
+    }
+
+
+def _manual_confirmation_config(raw: Any) -> dict[str, str] | None:
+    if not isinstance(raw, dict):
+        return None
+    return {str(key): str(value) for key, value in raw.items()}
+
+
+def _manual_confirmation_enabled(raw: dict[str, Any] | None) -> bool:
+    if not raw:
+        return False
+    value = raw.get("enabled", False)
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _manual_confirmed_gate(decision: str, raw: dict[str, Any] | None, detail: str) -> dict[str, str]:
+    raw = raw or {}
+    reviewer = str(raw.get("reviewer", "") or "").strip()
+    reason = str(raw.get("reason", "") or "").strip()
+    full_detail = detail
+    if reason:
+        full_detail = f"{full_detail}; reason: {reason}"
+    return {
+        "status": "manual_confirmed",
+        "action": "allow_after_manual_confirmation",
+        "decision": decision,
+        "detail": full_detail,
+        "reviewer": reviewer,
+        "override_reason": reason,
     }
 
 

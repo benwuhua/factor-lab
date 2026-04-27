@@ -105,6 +105,19 @@ class ExpertReviewTests(unittest.TestCase):
         self.assertEqual(gate["status"], "blocked")
         self.assertEqual(gate["action"], "block")
 
+    def test_apply_expert_review_portfolio_gate_blocks_reject_even_with_manual_confirmation(self):
+        portfolio = self._target_portfolio()
+
+        gated, gate = apply_expert_review_portfolio_gate(
+            portfolio,
+            decision="reject",
+            manual_confirmation={"enabled": True, "reviewer": "ryan", "reason": "override attempt"},
+        )
+
+        self.assertTrue(gated.empty)
+        self.assertEqual(gate["status"], "blocked")
+        self.assertEqual(gate["action"], "block")
+
     def test_apply_expert_review_portfolio_gate_blocks_missing_required_review(self):
         portfolio = self._target_portfolio()
 
@@ -143,6 +156,31 @@ class ExpertReviewTests(unittest.TestCase):
         self.assertEqual(gate["action"], "require_manual_confirmation")
         self.assertIn("SH600580", gate["detail"])
         self.assertTrue(gated["risk_flags"].str.contains("expert_manual_review_required").all())
+        self.assertAlmostEqual(float(gated["target_weight"].sum()), 0.0475)
+
+    def test_apply_expert_review_portfolio_gate_allows_confirmed_hard_manual_list(self):
+        portfolio = pd.DataFrame(
+            {
+                "instrument": ["SH600580", "SZ002568"],
+                "target_weight": [0.05, 0.045],
+                "risk_flags": ["", ""],
+            }
+        )
+
+        gated, gate = apply_expert_review_portfolio_gate(
+            portfolio,
+            decision="caution",
+            caution_weight_multiplier=0.5,
+            review_output="硬人工复核名单：SH600580、SZ002568",
+            manual_confirmation={"enabled": True, "reviewer": "ryan", "reason": "charts checked"},
+        )
+
+        self.assertEqual(gate["status"], "manual_confirmed")
+        self.assertEqual(gate["action"], "allow_after_manual_confirmation")
+        self.assertEqual(gate["reviewer"], "ryan")
+        self.assertIn("charts checked", gate["detail"])
+        self.assertTrue(gated["risk_flags"].str.contains("expert_manual_review_required").all())
+        self.assertTrue(gated["risk_flags"].str.contains("expert_manual_confirmed").all())
         self.assertAlmostEqual(float(gated["target_weight"].sum()), 0.0475)
 
     def test_parse_expert_review_manual_items_extracts_hard_review_section(self):

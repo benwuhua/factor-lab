@@ -17,6 +17,7 @@ from .company_events import (
     load_event_risk_config,
 )
 from .config import load_project_config, load_yaml
+from .data_governance import build_data_governance_report, load_data_governance_config, write_data_governance_report
 from .data_quality import check_signal_quality, load_data_quality_config, write_quality_report
 from .expert_review import (
     apply_expert_review_portfolio_gate,
@@ -40,6 +41,7 @@ from .signal import (
     write_signal_summary,
 )
 from .state import apply_fills_to_positions, write_positions_state
+from .stock_cards import build_stock_cards, write_stock_cards
 from .tradability import apply_tradability_filter, load_trading_config
 
 
@@ -51,6 +53,7 @@ class DailyPipelineInputs:
     risk_config_path: Path
     execution_config_path: Path
     event_risk_config_path: Path | None = None
+    data_governance_config_path: Path | None = None
     exposures_csv: Path | None = None
     current_positions_csv: Path | None = None
     run_date: str | None = None
@@ -79,6 +82,29 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             **{**signal_config.__dict__, "execution_calendar_path": _resolve(root_path, signal_config.execution_calendar_path)}
         )
 
+    execution_config = load_yaml(_resolve(root_path, inputs.execution_config_path))
+    artifacts: dict[str, str] = {}
+    run_dir: Path | None = None
+    governance_checked = False
+    preflight_run_date = _preflight_run_date(signal_config.run_date)
+    if preflight_run_date is not None:
+        run_dir = _resolve(root_path, _run_dir(execution_config, preflight_run_date))
+        run_dir.mkdir(parents=True, exist_ok=True)
+        governance_report = _write_data_governance_artifacts(root_path, run_dir, preflight_run_date, inputs, artifacts)
+        governance_checked = True
+        if governance_report is not None and not governance_report.passed:
+            _copy_configs(root_path, run_dir, inputs, artifacts)
+            run_summary_path = _write_run_summary(
+                run_dir / "run_summary.md",
+                run_date=preflight_run_date,
+                status="data_governance_failed",
+                risk_passed=False,
+                artifacts=artifacts,
+            )
+            artifacts["run_summary"] = str(run_summary_path)
+            manifest_path = _write_manifest(root_path, run_dir, preflight_run_date, "data_governance_failed", False, artifacts, inputs)
+            return DailyPipelineResult(preflight_run_date, run_dir, "data_governance_failed", False, manifest_path, artifacts)
+
     factors = load_approved_signal_factors(_resolve(root_path, signal_config.approved_factors_path))
     exposures = _load_exposures(root_path, inputs.exposures_csv, signal_config, factors)
     if signal_config.run_date == "latest":
@@ -86,10 +112,25 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
 
     signal = build_daily_signal(exposures, factors, signal_config)
     run_date = str(signal["date"].max()) if not signal.empty else signal_config.run_date
-    run_dir = _resolve(root_path, _run_dir(load_yaml(_resolve(root_path, inputs.execution_config_path)), run_date))
+    run_dir = run_dir or _resolve(root_path, _run_dir(execution_config, run_date))
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    artifacts: dict[str, str] = {}
+    if not governance_checked:
+        governance_report = _write_data_governance_artifacts(root_path, run_dir, run_date, inputs, artifacts)
+    else:
+        governance_report = None
+    if not governance_checked and governance_report is not None and not governance_report.passed:
+        run_summary_path = _write_run_summary(
+            run_dir / "run_summary.md",
+            run_date=run_date,
+            status="data_governance_failed",
+            risk_passed=False,
+            artifacts=artifacts,
+        )
+        artifacts["run_summary"] = str(run_summary_path)
+        manifest_path = _write_manifest(root_path, run_dir, run_date, "data_governance_failed", False, artifacts, inputs)
+        return DailyPipelineResult(run_date, run_dir, "data_governance_failed", False, manifest_path, artifacts)
+
     signal = _enrich_signal_with_event_risk(root_path, run_dir, signal, inputs, artifacts)
     signal_path = write_daily_signal(signal, run_dir / "signals.csv")
     signal_summary_path = write_signal_summary(signal, factors, signal_config, run_dir / "signal_summary.md")
@@ -121,11 +162,16 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     )
 
     diagnostics = _load_factor_diagnostics(root_path, run_date)
+    pre_review_stock_cards = build_stock_cards(
+        portfolio,
+        run_id=f"daily_{run_date.replace('-', '')}",
+        as_of_date=run_date,
+        gate_decision="pending",
+    )
     expert_review_path = run_dir / "expert_review_packet.md"
-    expert_review_packet = build_expert_review_packet(portfolio, diagnostics, run_date=run_date)
+    expert_review_packet = build_expert_review_packet(portfolio, diagnostics, run_date=run_date, stock_cards=pre_review_stock_cards)
     expert_review_path.write_text(expert_review_packet, encoding="utf-8")
     artifacts["expert_review_packet"] = str(expert_review_path)
-    execution_config = load_yaml(_resolve(root_path, inputs.execution_config_path))
     expert_review_config = load_expert_review_run_config(execution_config)
     expert_review = run_expert_review_command(
         expert_review_packet,
@@ -142,10 +188,19 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         caution_action=expert_review_config.caution_action,
         caution_weight_multiplier=expert_review_config.caution_weight_multiplier,
         review_output=expert_review.output,
+        manual_confirmation=expert_review_config.manual_confirmation,
     )
     portfolio_path = write_target_portfolio(portfolio, run_dir / "target_portfolio.csv")
     portfolio_summary_path = write_portfolio_summary(portfolio, run_dir / "target_portfolio_summary.md")
     artifacts.update({"target_portfolio": str(portfolio_path), "target_portfolio_summary": str(portfolio_summary_path)})
+    stock_cards = build_stock_cards(
+        portfolio,
+        run_id=f"daily_{run_date.replace('-', '')}",
+        as_of_date=run_date,
+        gate_decision=expert_review_gate["status"],
+    )
+    stock_cards_path = write_stock_cards(stock_cards, run_dir / "stock_cards.jsonl")
+    artifacts["stock_cards"] = str(stock_cards_path)
     if expert_review_gate["status"] in {"blocked", "manual_confirmation_required"}:
         block_report_path = _write_block_report(
             run_dir / "block_report.md",
@@ -277,6 +332,13 @@ def _load_current_positions(root: Path, current_positions_csv: Path | None) -> p
     return pd.read_csv(path)
 
 
+def _preflight_run_date(run_date: str) -> str | None:
+    value = str(run_date or "").strip()
+    if not value or value.lower() == "latest":
+        return None
+    return value
+
+
 def _load_factor_diagnostics(root: Path, run_date: str) -> pd.DataFrame | None:
     candidates = [
         root / "reports" / f"single_factor_diagnostics_{run_date.replace('-', '')}.csv",
@@ -322,6 +384,29 @@ def _enrich_signal_with_event_risk(
     return enriched_signal
 
 
+def _write_data_governance_artifacts(
+    root: Path,
+    run_dir: Path,
+    run_date: str,
+    inputs: DailyPipelineInputs,
+    artifacts: dict[str, str],
+):
+    if inputs.data_governance_config_path is None:
+        return None
+    config_path = _resolve(root, inputs.data_governance_config_path)
+    if not config_path.exists():
+        return None
+    report = build_data_governance_report(
+        load_data_governance_config(config_path),
+        project_root=root,
+        as_of_date=run_date,
+    )
+    report_path = write_data_governance_report(report, run_dir / "data_governance.md")
+    artifacts["data_governance"] = str(report_path)
+    artifacts["data_governance_csv"] = str(report_path.with_suffix(".csv"))
+    return report
+
+
 def _copy_configs(root: Path, run_dir: Path, inputs: DailyPipelineInputs, artifacts: dict[str, str]) -> None:
     config_dir = run_dir / "configs"
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -334,6 +419,8 @@ def _copy_configs(root: Path, run_dir: Path, inputs: DailyPipelineInputs, artifa
     ]
     if inputs.event_risk_config_path is not None:
         config_paths.append(("event_risk_config", inputs.event_risk_config_path))
+    if inputs.data_governance_config_path is not None:
+        config_paths.append(("data_governance_config", inputs.data_governance_config_path))
     for name, path in config_paths:
         _copy_if_exists(_resolve(root, path), config_dir / Path(path).name, artifacts, name)
 
@@ -471,6 +558,7 @@ def _write_manifest(
             "risk_config": str(inputs.risk_config_path),
             "execution_config": str(inputs.execution_config_path),
             "event_risk_config": str(inputs.event_risk_config_path) if inputs.event_risk_config_path else None,
+            "data_governance_config": str(inputs.data_governance_config_path) if inputs.data_governance_config_path else None,
             "exposures_csv": str(inputs.exposures_csv) if inputs.exposures_csv else None,
             "current_positions_csv": str(inputs.current_positions_csv) if inputs.current_positions_csv else None,
         },

@@ -1068,10 +1068,12 @@ def _expert_text(source: str | Path | None) -> str:
     if source is None:
         return ""
     if isinstance(source, Path):
-        return source.read_text(encoding="utf-8") if source.exists() else ""
+        return source.read_text(encoding="utf-8") if source.exists() and source.is_file() else ""
     text = str(source)
+    if not text.strip():
+        return ""
     possible_path = Path(text)
-    if "\n" not in text and possible_path.exists():
+    if "\n" not in text and possible_path.exists() and possible_path.is_file():
         return possible_path.read_text(encoding="utf-8")
     return text
 

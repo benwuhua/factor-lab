@@ -26,6 +26,7 @@ def main() -> int:
     parser.add_argument("--mining-config", default=str(root / "configs/factor_mining.yaml"))
     parser.add_argument("--provider-config", default=str(root / "configs/provider_current.yaml"))
     parser.add_argument("--output", default="reports/autoresearch/multilane_summary.md")
+    parser.add_argument("--data-governance-report", default="")
     parser.add_argument("--include-shadow", action="store_true")
     parser.add_argument("--max-workers", type=int, default=4)
     parser.add_argument("--start-time", default="")
@@ -41,6 +42,7 @@ def main() -> int:
         mining_config_path=args.mining_config,
         provider_config_path=args.provider_config,
         output_path=args.output,
+        data_governance_report_path=args.data_governance_report or None,
         include_shadow=args.include_shadow,
         max_workers=args.max_workers,
         start_time=args.start_time or None,

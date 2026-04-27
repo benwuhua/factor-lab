@@ -42,6 +42,7 @@ class DataGovernanceReport:
             self.rows,
             columns=[
                 "domain",
+                "activation_lane",
                 "status",
                 "activation_status",
                 "coverage_ratio",
@@ -232,6 +233,7 @@ def _row(
 ) -> dict[str, Any]:
     return {
         "domain": domain.name,
+        "activation_lane": domain.activation_lane or domain.name,
         "status": status,
         "activation_status": activation_status,
         "coverage_ratio": float(coverage_ratio),

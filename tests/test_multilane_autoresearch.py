@@ -123,6 +123,136 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertEqual(frame.loc["pattern_event", "run_status"], "completed")
             self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "completed")
 
+    def test_runner_applies_data_governance_activation_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump(
+                    {
+                        "lanes": {
+                            "emotion_atmosphere": {"activation_status": "active"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            governance = root / "reports/data_governance.csv"
+            governance.parent.mkdir(parents=True)
+            governance.write_text(
+                "domain,activation_lane,activation_status\n"
+                "emotion_atmosphere,emotion_atmosphere,shadow\n",
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle:
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    data_governance_report_path=governance,
+                )
+
+            event_oracle.assert_not_called()
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["emotion_atmosphere", "activation_status"], "shadow")
+            self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "shadow_skipped")
+
+    def test_runner_can_include_shadow_after_data_governance_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"emotion_atmosphere": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+            governance = root / "reports/data_governance.csv"
+            governance.parent.mkdir(parents=True)
+            governance.write_text(
+                "domain,activation_lane,activation_status\n"
+                "emotion_atmosphere,emotion_atmosphere,shadow\n",
+                encoding="utf-8",
+            )
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.write_text(
+                yaml.safe_dump({"templates": [{"name": "arbr_26", "expression": "$close", "direction": -1}]}),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle:
+                event_oracle.return_value = (
+                    {"candidate": "arbr_26", "status": "review", "primary_metric": 0.01, "artifact_dir": "b"},
+                    "",
+                )
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    mining_config_path=mining_config,
+                    data_governance_report_path=governance,
+                    include_shadow=True,
+                )
+
+            event_oracle.assert_called_once()
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["emotion_atmosphere", "activation_status"], "shadow")
+            self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "completed")
+
+    def test_runner_maps_governance_block_to_disabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"expression_price_volume": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+            governance = root / "reports/data_governance.csv"
+            governance.parent.mkdir(parents=True)
+            governance.write_text(
+                "domain,activation_lane,activation_status\n"
+                "market_ohlcv,expression_price_volume,block\n",
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_expression_oracle") as oracle:
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    data_governance_report_path=governance,
+                )
+
+            oracle.assert_not_called()
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["expression_price_volume", "activation_status"], "disabled")
+            self.assertEqual(frame.loc["expression_price_volume", "run_status"], "disabled_skipped")
+
+    def test_runner_uses_lane_space_when_governance_report_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"expression_price_volume": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_expression_oracle") as oracle:
+                oracle.return_value = (
+                    {"candidate": "demo", "status": "review", "primary_metric": 0.01, "artifact_dir": "a"},
+                    "",
+                )
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    data_governance_report_path="reports/missing_governance.md",
+                )
+
+            oracle.assert_called_once()
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["expression_price_volume", "activation_status"], "active")
+            self.assertEqual(frame.loc["expression_price_volume", "run_status"], "completed")
+
     def test_runner_passes_smoke_window_to_expression_oracle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
