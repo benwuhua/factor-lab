@@ -48,6 +48,17 @@ class AutoresearchCliTests(unittest.TestCase):
 
         self.assertTrue(callable(module.main))
 
+    def test_run_multilane_loop_script_exposes_main(self):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "autoresearch" / "run_multilane_loop.py"
+
+        spec = importlib.util.spec_from_file_location("run_multilane_loop", script)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        self.assertTrue(callable(module.main))
+
 
 if __name__ == "__main__":
     unittest.main()

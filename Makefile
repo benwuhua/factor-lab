@@ -15,6 +15,15 @@ AUTORESEARCH_LEDGER ?= reports/autoresearch/expression_results.tsv
 AUTORESEARCH_LEDGER_MD ?= reports/autoresearch/expression_results_summary.md
 AUTORESEARCH_LANE_SPACE ?= configs/autoresearch/lane_space.yaml
 AUTORESEARCH_MULTILANE_OUTPUT ?= reports/autoresearch/multilane_summary.md
+AUTORESEARCH_MULTILANE_LOOP_ROOT ?= reports/autoresearch/multilane_loop
+AUTORESEARCH_MULTILANE_UNTIL ?= 08:30
+AUTORESEARCH_MULTILANE_ITERATIONS ?= 0
+AUTORESEARCH_MULTILANE_MAX_HOURS ?=
+AUTORESEARCH_MULTILANE_SLEEP_SEC ?= 60
+AUTORESEARCH_MULTILANE_MAX_CRASHES ?= 5
+AUTORESEARCH_MULTILANE_MAX_WORKERS ?= 4
+AUTORESEARCH_MULTILANE_INCLUDE_SHADOW ?= 0
+AUTORESEARCH_MULTILANE_INCLUDE_SHADOW_ARG = $(if $(filter 1 true yes TRUE YES,$(AUTORESEARCH_MULTILANE_INCLUDE_SHADOW)),--include-shadow,)
 AUTORESEARCH_DATA_GOVERNANCE_REPORT ?= reports/data_governance_$(RUN_DATE).md
 AUTORESEARCH_START_TIME ?=
 AUTORESEARCH_END_TIME ?=
@@ -54,7 +63,7 @@ INDUSTRY_OVERRIDES_OUTPUT ?= data/security_industry_overrides.csv
 INDUSTRY_OVERRIDES_AS_OF ?= $(RUN_DATE)
 INDUSTRY_OVERRIDES_UNIVERSES ?= csi300 csi500
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -76,6 +85,7 @@ help:
 	@printf "  make summarize-event  Render Markdown from an event summary CSV\n"
 	@printf "  make autoresearch-expression  Run one controlled expression-factor loop\n"
 	@printf "  make autoresearch-multilane  Run configured autoresearch lanes with shadow gating\n"
+	@printf "  make autoresearch-multilane-loop  Run multilane autoresearch repeatedly until a deadline\n"
 	@printf "  make autoresearch-ledger  Summarize expression autoresearch ledger\n"
 	@printf "  make autoresearch-codex-loop  Run overnight Codex CLI expression autoresearch\n"
 	@printf "  make select-factors   Build approved factor governance artifacts\n"
@@ -98,6 +108,7 @@ help:
 	@printf "  make event-csi300 FACTOR=arbr_26\n"
 	@printf "  make summarize-event FACTOR=arbr_26 SUMMARY=reports/factor_arbr_26_event_backtest_summary_csi300.csv\n"
 	@printf "  make autoresearch-expression AUTORESEARCH_CANDIDATE=configs/autoresearch/candidates/example_expression.yaml\n"
+	@printf "  make autoresearch-multilane-loop AUTORESEARCH_MULTILANE_UNTIL=08:30 AUTORESEARCH_MULTILANE_INCLUDE_SHADOW=1\n"
 	@printf "  make autoresearch-ledger AUTORESEARCH_LEDGER=reports/autoresearch/expression_results.tsv\n"
 	@printf "  make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30\n"
 	@printf "  make select-factors FACTOR_SELECTION_CONFIG=configs/factor_selection.yaml\n"
@@ -227,6 +238,25 @@ autoresearch-multilane:
 		--provider-config $(CSI500_PROVIDER) \
 		--output $(AUTORESEARCH_MULTILANE_OUTPUT) \
 		--data-governance-report $(AUTORESEARCH_DATA_GOVERNANCE_REPORT) \
+		$(AUTORESEARCH_WINDOW_ARGS)
+
+autoresearch-multilane-loop:
+	$(PYTHON) scripts/autoresearch/run_multilane_loop.py \
+		--lane-space $(AUTORESEARCH_LANE_SPACE) \
+		--contract $(AUTORESEARCH_CONTRACT) \
+		--expression-space $(AUTORESEARCH_SPACE) \
+		--expression-candidate $(AUTORESEARCH_CANDIDATE) \
+		--mining-config $(FACTOR_CONFIG) \
+		--provider-config $(CSI500_PROVIDER) \
+		--output-root $(AUTORESEARCH_MULTILANE_LOOP_ROOT) \
+		--data-governance-report $(AUTORESEARCH_DATA_GOVERNANCE_REPORT) \
+		--until $(AUTORESEARCH_MULTILANE_UNTIL) \
+		--max-iterations $(AUTORESEARCH_MULTILANE_ITERATIONS) \
+		$(if $(AUTORESEARCH_MULTILANE_MAX_HOURS),--max-hours $(AUTORESEARCH_MULTILANE_MAX_HOURS),) \
+		--sleep-sec $(AUTORESEARCH_MULTILANE_SLEEP_SEC) \
+		--max-crashes $(AUTORESEARCH_MULTILANE_MAX_CRASHES) \
+		--max-workers $(AUTORESEARCH_MULTILANE_MAX_WORKERS) \
+		$(AUTORESEARCH_MULTILANE_INCLUDE_SHADOW_ARG) \
 		$(AUTORESEARCH_WINDOW_ARGS)
 
 autoresearch-ledger:
