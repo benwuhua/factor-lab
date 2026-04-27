@@ -99,6 +99,7 @@ def run_multilane_loop(
     iterations: list[dict[str, Any]] = []
     iterations_started = 0
     crash_count = 0
+    lane_crash_count = 0
     crash_budget = max(1, int(max_crashes))
     stop_reason = "max_iterations"
     iteration = 0
@@ -108,6 +109,7 @@ def run_multilane_loop(
         iterations=iterations,
         iterations_started=iterations_started,
         crash_count=crash_count,
+        lane_crash_count=lane_crash_count,
         stop_reason="running",
     )
 
@@ -160,7 +162,7 @@ def run_multilane_loop(
             lanes = _json_safe(frame.to_dict(orient="records"))
             lane_crashes = int((frame["run_status"] == "crash").sum()) if "run_status" in frame else 0
             if lane_crashes:
-                crash_count += lane_crashes
+                lane_crash_count += lane_crashes
                 iteration_row["status"] = "lane_crash"
             iteration_row["lane_crashes"] = lane_crashes
             iteration_row["lanes"] = lanes
@@ -181,6 +183,7 @@ def run_multilane_loop(
             iterations=iterations,
             iterations_started=iterations_started,
             crash_count=crash_count,
+            lane_crash_count=lane_crash_count,
             stop_reason="running",
         )
 
@@ -195,6 +198,7 @@ def run_multilane_loop(
         iterations=iterations,
         iterations_started=iterations_started,
         crash_count=crash_count,
+        lane_crash_count=lane_crash_count,
         stop_reason=stop_reason,
     )
     return MultiLaneLoopResult(
@@ -258,11 +262,13 @@ def _write_loop_summary(
     iterations: list[dict[str, Any]],
     iterations_started: int,
     crash_count: int,
+    lane_crash_count: int,
     stop_reason: str,
 ) -> None:
     payload = {
         "iterations_started": iterations_started,
         "crash_count": crash_count,
+        "lane_crash_count": lane_crash_count,
         "stop_reason": stop_reason,
         "iterations": iterations,
     }
@@ -270,6 +276,7 @@ def _write_loop_summary(
     lines = [
         f"iterations_started: {iterations_started}",
         f"crash_count: {crash_count}",
+        f"lane_crash_count: {lane_crash_count}",
         f"stop_reason: {stop_reason}",
         "",
         "| iteration | status | lane_crashes | output |",

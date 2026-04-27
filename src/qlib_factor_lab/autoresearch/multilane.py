@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,6 +16,9 @@ from qlib_factor_lab.autoresearch.oracle import run_expression_oracle
 from qlib_factor_lab.autoresearch.regime_oracle import run_regime_lane_oracle
 from qlib_factor_lab.config import load_yaml
 from qlib_factor_lab.factor_mining import generate_candidate_factors, load_mining_config
+
+
+_QLIB_ORACLE_LOCK = threading.RLock()
 
 
 @dataclass(frozen=True)
@@ -71,36 +75,45 @@ def run_multilane_autoresearch(
                 continue
             if lane_name in {"pattern_event", "emotion_atmosphere"}:
                 future = executor.submit(
+                    _run_qlib_oracle,
                     run_event_lane_oracle,
-                    lane_name=lane_name,
-                    factor_specs=_event_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
-                    provider_config=provider_config_path,
-                    project_root=root,
-                    start_time=start_time,
-                    end_time=end_time,
+                    {
+                        "lane_name": lane_name,
+                        "factor_specs": _event_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
+                        "provider_config": provider_config_path,
+                        "project_root": root,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    },
                 )
                 futures[future] = (lane_name, activation)
                 continue
             if lane_name in {"liquidity_microstructure", "risk_structure"}:
                 future = executor.submit(
+                    _run_qlib_oracle,
                     run_cross_sectional_lane_oracle,
-                    lane_name=lane_name,
-                    factor_specs=_lane_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
-                    contract_path=contract_path,
-                    project_root=root,
-                    start_time=start_time,
-                    end_time=end_time,
+                    {
+                        "lane_name": lane_name,
+                        "factor_specs": _lane_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
+                        "contract_path": contract_path,
+                        "project_root": root,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    },
                 )
                 futures[future] = (lane_name, activation)
                 continue
             if lane_name == "regime":
                 future = executor.submit(
+                    _run_qlib_oracle,
                     run_regime_lane_oracle,
-                    lane_name=lane_name,
-                    provider_config=provider_config_path,
-                    project_root=root,
-                    start_time=start_time,
-                    end_time=end_time,
+                    {
+                        "lane_name": lane_name,
+                        "provider_config": provider_config_path,
+                        "project_root": root,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    },
                 )
                 futures[future] = (lane_name, activation)
                 continue
@@ -108,13 +121,16 @@ def run_multilane_autoresearch(
                 rows.append(_row(lane_name, activation, "unsupported", "", float("nan"), "", "no runner implemented"))
                 continue
             future = executor.submit(
+                _run_qlib_oracle,
                 run_expression_oracle,
-                contract_path=contract_path,
-                space_path=expression_space_path,
-                candidate_path=expression_candidate_path,
-                project_root=root,
-                start_time=start_time,
-                end_time=end_time,
+                {
+                    "contract_path": contract_path,
+                    "space_path": expression_space_path,
+                    "candidate_path": expression_candidate_path,
+                    "project_root": root,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                },
             )
             futures[future] = (lane_name, activation)
         for future in as_completed(futures):
@@ -138,6 +154,13 @@ def run_multilane_autoresearch(
     report = MultiLaneReport(tuple(rows), output_path=_resolve(root, output_path))
     write_multilane_report(report, report.output_path)
     return report
+
+
+def _run_qlib_oracle(oracle_func, kwargs: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    # Qlib keeps process-global config/cache state; serialize oracle calls so
+    # lane-level parallelism does not corrupt dataset/provider state.
+    with _QLIB_ORACLE_LOCK:
+        return oracle_func(**kwargs)
 
 
 def _load_data_governance_activation_overrides(root: Path, report_path: str | Path | None) -> dict[str, str]:

@@ -1,4 +1,6 @@
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -177,6 +179,68 @@ class MultilaneAutoresearchTests(unittest.TestCase):
 
             self.assertEqual([spec["name"] for spec in event_oracle.call_args.kwargs["factor_specs"]], ["quiet_breakout_60"])
             self.assertEqual([spec["name"] for spec in cross_oracle.call_args.kwargs["factor_specs"]], ["downside_vol_20"])
+
+    def test_runner_serializes_qlib_oracle_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump(
+                    {
+                        "lanes": {
+                            "pattern_event": {"activation_status": "active"},
+                            "risk_structure": {"activation_status": "active"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.write_text(
+                yaml.safe_dump(
+                    {
+                        "templates": [
+                            {"name": "wangji-factor1", "expression": "$close", "direction": 1},
+                            {"name": "max_drawdown_{window}", "expression": "$close", "windows": [20], "direction": -1},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            active = 0
+            max_seen = 0
+            lock = threading.Lock()
+
+            def fake_oracle(**kwargs):
+                nonlocal active, max_seen
+                with lock:
+                    active += 1
+                    max_seen = max(max_seen, active)
+                time.sleep(0.02)
+                with lock:
+                    active -= 1
+                return (
+                    {
+                        "candidate": kwargs["factor_specs"][0]["name"],
+                        "status": "review",
+                        "primary_metric": 0.01,
+                        "artifact_dir": "a",
+                    },
+                    "",
+                )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle", side_effect=fake_oracle), patch(
+                "qlib_factor_lab.autoresearch.multilane.run_cross_sectional_lane_oracle", side_effect=fake_oracle
+            ):
+                run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    mining_config_path=mining_config,
+                    max_workers=2,
+                )
+
+            self.assertEqual(max_seen, 1)
 
     def test_runner_dispatches_liquidity_cross_sectional_oracle(self):
         with tempfile.TemporaryDirectory() as tmp:

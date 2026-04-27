@@ -61,7 +61,7 @@ class AutoresearchMultilaneLoopTests(unittest.TestCase):
             self.assertEqual(len(summary["iterations"]), 2)
             self.assertEqual(summary["iterations"][0]["status"], "completed")
 
-    def test_loop_counts_lane_crashes_and_stops_at_crash_budget(self):
+    def test_loop_records_lane_crashes_without_stopping_at_runner_crash_budget(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
 
@@ -96,9 +96,11 @@ class AutoresearchMultilaneLoopTests(unittest.TestCase):
                 runner=fake_runner,
             )
 
-            self.assertEqual(result.iterations_started, 2)
-            self.assertEqual(result.crash_count, 2)
-            self.assertEqual(result.stop_reason, "max_crashes")
+            self.assertEqual(result.iterations_started, 5)
+            self.assertEqual(result.crash_count, 0)
+            self.assertEqual(result.stop_reason, "max_iterations")
+            summary = json.loads((result.log_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["lane_crash_count"], 5)
 
     def test_loop_records_runner_exceptions(self):
         with tempfile.TemporaryDirectory() as tmp:
