@@ -56,6 +56,16 @@ COMPANY_EVENT_COLUMNS = [
     "active_until",
 ]
 
+INDUSTRY_OVERRIDE_COLUMNS = [
+    "证券代码",
+    "证券简称",
+    "行业中类",
+    "行业大类",
+    "行业门类",
+    "行业来源",
+    "更新截止",
+]
+
 FIXED_RESEARCH_UNIVERSES = ("csi300", "csi500")
 
 
@@ -161,6 +171,97 @@ def normalize_security_master_snapshot(raw: pd.DataFrame, as_of_date: str) -> pd
             }
         )
     return pd.DataFrame(rows, columns=SECURITY_MASTER_COLUMNS).drop_duplicates("instrument", keep="last")
+
+
+def enrich_security_master_industries(master: pd.DataFrame, industries: pd.DataFrame) -> pd.DataFrame:
+    """Fill missing industry fields from an offline/alternative industry table."""
+    if master is None or master.empty or industries is None or industries.empty:
+        return master.copy()
+
+    output = master.copy()
+    for column in SECURITY_MASTER_COLUMNS:
+        if column not in output.columns:
+            output[column] = ""
+    code_col = _first_present(
+        industries,
+        ["instrument", "证券代码", "代码", "品种代码", "symbol", "code"],
+        required=False,
+    )
+    if code_col is None:
+        return output
+
+    sw_col = _first_present(
+        industries,
+        ["申万行业", "行业中类", "行业次类", "行业", "industry_sw", "所属行业"],
+        required=False,
+    )
+    csrc_col = _first_present(
+        industries,
+        ["证监会行业", "行业大类", "行业门类", "industry_csrc", "门类"],
+        required=False,
+    )
+    if sw_col is None and csrc_col is None:
+        return output
+
+    sw_by_instrument: dict[str, str] = {}
+    csrc_by_instrument: dict[str, str] = {}
+    for _, row in industries.iterrows():
+        instrument = _industry_row_instrument(row.get(code_col, ""))
+        if not instrument:
+            continue
+        if sw_col is not None:
+            sw_value = _clean_text(row.get(sw_col, ""))
+            if sw_value:
+                sw_by_instrument[instrument] = sw_value
+        if csrc_col is not None:
+            csrc_value = _clean_text(row.get(csrc_col, ""))
+            if csrc_value:
+                csrc_by_instrument[instrument] = csrc_value
+
+    instruments = output["instrument"].astype(str).str.upper()
+    if "industry_sw" not in output.columns:
+        output["industry_sw"] = ""
+    if "industry_csrc" not in output.columns:
+        output["industry_csrc"] = ""
+
+    sw_blank = output["industry_sw"].map(_is_blank_text)
+    csrc_blank = output["industry_csrc"].map(_is_blank_text)
+    output.loc[sw_blank, "industry_sw"] = instruments.loc[sw_blank].map(sw_by_instrument).fillna(
+        output.loc[sw_blank, "industry_sw"]
+    )
+    output.loc[csrc_blank, "industry_csrc"] = instruments.loc[csrc_blank].map(csrc_by_instrument).fillna(
+        output.loc[csrc_blank, "industry_csrc"]
+    )
+    return output.loc[:, [column for column in SECURITY_MASTER_COLUMNS if column in output.columns]]
+
+
+def normalize_cninfo_industry_override(raw: pd.DataFrame, code: str, as_of_date: str) -> dict[str, str]:
+    if raw is None or raw.empty:
+        return {
+            "证券代码": akshare_code_from_qlib(code),
+            "证券简称": "",
+            "行业中类": "",
+            "行业大类": "",
+            "行业门类": "",
+            "行业来源": "cninfo_stock_industry_change",
+            "更新截止": _yyyymmdd(as_of_date),
+        }
+
+    sw = _first_not_none(_pick_latest_industry(raw, "申银万国"), _pick_latest_industry(raw, "中证"), _pick_latest_industry(raw))
+    official = _first_not_none(
+        _pick_latest_industry(raw, "中国上市公司协会"),
+        _pick_latest_industry(raw, "巨潮"),
+        _pick_latest_industry(raw),
+    )
+    return {
+        "证券代码": akshare_code_from_qlib(code),
+        "证券简称": _industry_cell(sw, "新证券简称") or _industry_cell(official, "新证券简称"),
+        "行业中类": _industry_cell(sw, "行业中类") or _industry_cell(sw, "行业大类"),
+        "行业大类": _industry_cell(official, "行业大类") or _industry_cell(sw, "行业大类"),
+        "行业门类": _industry_cell(official, "行业门类") or _industry_cell(sw, "行业门类"),
+        "行业来源": "cninfo_stock_industry_change",
+        "更新截止": _yyyymmdd(as_of_date),
+    }
 
 
 def normalize_akshare_notices(raw: pd.DataFrame) -> pd.DataFrame:
@@ -406,6 +507,43 @@ def fetch_security_master_snapshot(as_of_date: str, limit: int | None = None) ->
     return normalize_security_master_snapshot(raw, as_of_date=as_of_date)
 
 
+def fetch_security_industry_overrides(
+    symbols: Iterable[str],
+    as_of_date: str,
+    *,
+    start_date: str = "20000101",
+    delay: float = 0.1,
+    limit: int | None = None,
+    retries: int = 2,
+) -> pd.DataFrame:
+    ak = _get_akshare()
+    selected = list(symbols)
+    if limit is not None:
+        selected = selected[:limit]
+    end_date = _yyyymmdd(as_of_date)
+    rows = []
+    for i, symbol in enumerate(selected, start=1):
+        code = akshare_code_from_qlib(symbol)
+        raw = None
+        last_error: Exception | None = None
+        for attempt in range(1, retries + 1):
+            try:
+                raw = ak.stock_industry_change_cninfo(symbol=code, start_date=start_date, end_date=end_date)
+                break
+            except Exception as exc:
+                last_error = exc
+                if attempt < retries and delay > 0:
+                    time.sleep(delay * attempt)
+        if raw is None:
+            print(f"skip failed industry: {symbol} ({last_error})")
+            continue
+        rows.append(normalize_cninfo_industry_override(raw, code, as_of_date))
+        print(f"[{i}/{len(selected)}] industry {symbol}")
+        if delay > 0:
+            time.sleep(delay)
+    return pd.DataFrame(rows, columns=INDUSTRY_OVERRIDE_COLUMNS)
+
+
 def fetch_company_notices(start_date: str, end_date: str, delay: float = 0.2) -> pd.DataFrame:
     ak = _get_akshare()
     frames = []
@@ -545,6 +683,59 @@ def _optional_text(row: pd.Series, candidates: list[str]) -> str:
         if column in row.index and not pd.isna(row[column]):
             return str(row[column]).strip()
     return ""
+
+
+def _industry_row_instrument(value) -> str:
+    text = str(value).strip().upper()
+    if not text or text in {"NAN", "NONE", "NULL"}:
+        return ""
+    if text.startswith(("SH", "SZ")) and len(text) >= 8:
+        return text[:8]
+    try:
+        return qlib_symbol_from_code(text)
+    except ValueError:
+        return ""
+
+
+def _clean_text(value) -> str:
+    if pd.isna(value):
+        return ""
+    text = str(value).strip()
+    return "" if text.lower() in {"nan", "none", "null"} else text
+
+
+def _is_blank_text(value) -> bool:
+    return _clean_text(value) == ""
+
+
+def _pick_latest_industry(frame: pd.DataFrame, standard_contains: str | None = None) -> pd.Series | None:
+    data = frame.copy()
+    if standard_contains and "分类标准" in data.columns:
+        data = data[data["分类标准"].astype(str).str.contains(standard_contains, na=False)]
+    if data.empty:
+        return None
+    data = data.copy()
+    if "变更日期" in data.columns:
+        data["变更日期"] = pd.to_datetime(data["变更日期"], errors="coerce")
+        data = data.sort_values("变更日期")
+    return data.iloc[-1]
+
+
+def _industry_cell(row: pd.Series | None, column: str) -> str:
+    if row is None or column not in row.index or pd.isna(row[column]):
+        return ""
+    return str(row[column]).strip()
+
+
+def _first_not_none(*values):
+    for value in values:
+        if value is not None:
+            return value
+    return None
+
+
+def _yyyymmdd(value: str) -> str:
+    return pd.Timestamp(value).strftime("%Y%m%d")
 
 
 def _optional_date(row: pd.Series, candidates: list[str]) -> str:

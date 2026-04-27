@@ -37,6 +37,7 @@ class SignalConfig:
     execution_calendar_path: Path | None = None
     combination_mode: str = "factor_sum"
     family_weights: dict[str, float] = field(default_factory=dict)
+    family_score_cap: float | None = None
 
 
 def load_signal_config(path: str | Path) -> SignalConfig:
@@ -56,6 +57,11 @@ def load_signal_config(path: str | Path) -> SignalConfig:
         },
         combination_mode=str(data.get("combination", {}).get("mode", "factor_sum")),
         family_weights={str(k): float(v) for k, v in data.get("combination", {}).get("family_weights", {}).items()},
+        family_score_cap=(
+            float(data.get("combination", {}).get("family_score_cap"))
+            if data.get("combination", {}).get("family_score_cap") is not None
+            else None
+        ),
         rule_weight=float(ensemble.get("rule_score", 1.0)),
         model_weight=float(ensemble.get("model_score", 0.0)),
         signals_output_path=Path(output.get("signals", "reports/signals_latest.csv")),
@@ -123,7 +129,11 @@ def build_daily_signal(
     if config.combination_mode == "family_first":
         for family, cols in active_family_cols.items():
             family_col = f"family_{_slug(family)}_score"
-            frame[family_col] = frame[cols].mean(axis=1) * config.family_weights.get(family, 1.0)
+            family_score = frame[cols].mean(axis=1) * config.family_weights.get(family, 1.0)
+            if config.family_score_cap is not None:
+                cap = abs(float(config.family_score_cap))
+                family_score = family_score.clip(lower=-cap, upper=cap)
+            frame[family_col] = family_score
             family_score_cols.append(family_col)
         frame["rule_score"] = frame[family_score_cols].sum(axis=1) if family_score_cols else 0.0
     elif contribution_cols:

@@ -12,6 +12,8 @@ from qlib_factor_lab.autoresearch.codex_loop import (
     is_protected_branch,
     parse_until_deadline,
     resolve_max_iterations,
+    select_target_family,
+    validate_candidate_family,
 )
 
 
@@ -82,6 +84,7 @@ class AutoresearchCodexLoopTests(unittest.TestCase):
             candidate_file="configs/autoresearch/candidates/example_expression.yaml",
             ledger_text="discard_candidate: 2",
             allowed_families=["reversal", "turnover"],
+            target_family="reversal",
         )
 
         self.assertIn("第 3 轮", prompt)
@@ -89,6 +92,25 @@ class AutoresearchCodexLoopTests(unittest.TestCase):
         self.assertIn("configs/autoresearch/candidates/example_expression.yaml", prompt)
         self.assertIn("不要运行 make autoresearch-expression", prompt)
         self.assertIn("reversal, turnover", prompt)
+        self.assertIn("family: reversal", prompt)
+
+    def test_select_target_family_rotates_allowed_families(self):
+        families = ["reversal", "volatility", "turnover"]
+
+        selected = [select_target_family(index, families) for index in range(1, 7)]
+
+        self.assertEqual(selected, ["reversal", "volatility", "turnover", "reversal", "volatility", "turnover"])
+
+    def test_validate_candidate_family_rejects_wrong_family(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate = Path(tmp) / "candidate.yaml"
+            candidate.write_text(
+                "name: factor_a\nfamily: turnover\nexpression: \"$close\"\ndirection: 1\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(validate_candidate_family(candidate, "turnover"), "")
+            self.assertIn("expected family reversal", validate_candidate_family(candidate, "reversal"))
 
     def test_ledger_context_limits_recent_rows(self):
         with tempfile.TemporaryDirectory() as tmp:

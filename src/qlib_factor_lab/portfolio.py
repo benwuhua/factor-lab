@@ -120,6 +120,9 @@ def build_target_portfolio(
     for optional in EXPLANATION_COLUMNS:
         if optional in output.columns and optional not in cols:
             cols.append(optional)
+    for optional in _family_score_columns(output):
+        if optional not in cols:
+            cols.append(optional)
     for optional in EXECUTION_PASSTHROUGH_COLUMNS:
         if optional in output.columns and optional not in cols:
             cols.append(optional)
@@ -222,6 +225,10 @@ def _selection_explanation(row: pd.Series, score_column: str) -> str:
     if drivers:
         return f"selected by {score_column} {_format_float(float(row[score_column]))}; main drivers: {', '.join(drivers)}"
     return f"selected by {score_column} {_format_float(float(row[score_column]))}"
+
+
+def _family_score_columns(frame: pd.DataFrame) -> list[str]:
+    return [column for column in frame.columns if column.startswith("family_") and column.endswith("_score")]
 
 
 def _format_float(value: float) -> str:

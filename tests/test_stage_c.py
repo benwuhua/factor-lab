@@ -140,6 +140,31 @@ class StageCTests(unittest.TestCase):
         self.assertIn("min_factor_family_count", set(failed["check"]))
         self.assertIn("max_factor_family_concentration", set(failed["check"]))
 
+    def test_risk_industry_check_uses_industry_sw_fallback(self):
+        portfolio = pd.DataFrame(
+            {
+                "date": ["2026-04-23", "2026-04-23"],
+                "instrument": ["AAA", "BBB"],
+                "target_weight": [0.4, 0.4],
+                "industry_sw": ["证券", "证券"],
+            }
+        )
+
+        report = check_portfolio_risk(
+            portfolio,
+            self._signal(),
+            RiskConfig(
+                max_single_weight=0.5,
+                min_positions=2,
+                min_signal_coverage=0.2,
+                max_industry_weight=0.6,
+            ),
+        )
+
+        failed = report.to_frame().query("status == 'fail'")
+        row = failed[failed["check"] == "max_industry_weight"].iloc[0]
+        self.assertEqual(row["detail"], "证券=0.8")
+
     def test_build_target_portfolio_cli_writes_outputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -128,6 +128,27 @@ class SignalTests(unittest.TestCase):
             self.assertAlmostEqual(first["family_test_family_score"], 0.75)
             self.assertAlmostEqual(first["rule_score"], 0.75)
 
+    def test_family_first_caps_single_family_score(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved_path, config_path = self._write_fixture(root)
+            config_data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            config_data["combination"] = {
+                "mode": "family_first",
+                "family_score_cap": 0.25,
+            }
+            config_path.write_text(yaml.safe_dump(config_data, sort_keys=False), encoding="utf-8")
+
+            signal = build_daily_signal(
+                self._exposures(),
+                load_approved_signal_factors(approved_path),
+                load_signal_config(config_path),
+            )
+
+            first = signal.loc[signal["instrument"] == "AAA"].iloc[0]
+            self.assertAlmostEqual(first["family_test_family_score"], 0.25)
+            self.assertAlmostEqual(first["rule_score"], 0.25)
+
     def test_build_daily_signal_cli_writes_csv_and_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

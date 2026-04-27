@@ -12,6 +12,7 @@ suppress_runtime_warnings()
 add_src_to_path()
 
 from qlib_factor_lab.akshare_data import (
+    enrich_security_master_industries,
     fetch_company_notices,
     fetch_security_master_snapshot,
     fetch_universe_symbols,
@@ -35,6 +36,11 @@ def main() -> int:
     parser.add_argument("--universes", nargs="+", default=["csi300", "csi500"], choices=["csi300", "csi500"])
     parser.add_argument("--universe-symbols-csv", default=None, help="Optional CSV with universe,instrument columns.")
     parser.add_argument("--security-master-source-csv", default=None, help="Offline raw security CSV to normalize instead of AkShare.")
+    parser.add_argument(
+        "--industry-source-csv",
+        default=None,
+        help="Optional industry override/enrichment CSV. Defaults to data/security_industry_overrides.csv when present.",
+    )
     parser.add_argument("--notice-source-csv", default=None, help="Offline raw notice CSV to normalize instead of AkShare.")
     parser.add_argument("--skip-security-master", action="store_true")
     parser.add_argument("--skip-company-events", action="store_true")
@@ -50,6 +56,9 @@ def main() -> int:
             master = normalize_security_master_snapshot(raw_master, as_of_date=args.as_of_date)
         else:
             master = fetch_security_master_snapshot(args.as_of_date, limit=args.limit)
+        industry_source = _default_industry_source(root, args.industry_source_csv)
+        if industry_source is not None:
+            master = enrich_security_master_industries(master, pd.read_csv(industry_source))
         master = filter_frame_to_universes(master, universe_symbols)
         _write_csv(master, _resolve(root, args.security_master_output))
 
@@ -89,6 +98,13 @@ def _resolve(root: Path, path: str | Path) -> Path:
     if candidate.is_absolute():
         return candidate
     return root / candidate
+
+
+def _default_industry_source(root: Path, explicit_path: str | None) -> Path | None:
+    if explicit_path:
+        return _resolve(root, explicit_path)
+    default_path = root / "data/security_industry_overrides.csv"
+    return default_path if default_path.exists() else None
 
 
 def _normalize_date_arg(value: str) -> str:

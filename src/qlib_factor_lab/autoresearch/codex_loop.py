@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Iterable
 from zoneinfo import ZoneInfo
 
+from qlib_factor_lab.config import load_yaml
+
 
 DEFAULT_ALLOWED_FAMILIES = ["reversal", "volatility", "turnover", "price_position", "divergence"]
 
@@ -73,9 +75,17 @@ def build_candidate_prompt(
     candidate_file: str,
     ledger_text: str,
     allowed_families: Iterable[str] = DEFAULT_ALLOWED_FAMILIES,
+    target_family: str | None = None,
 ) -> str:
     families = ", ".join(allowed_families)
     ledger_block = ledger_text.strip() or "暂无 ledger 记录。"
+    family_rule = (
+        f"- 本轮强制家族：{target_family}\n"
+        f"- 候选 YAML 的 family 字段必须严格写成：family: {target_family}\n"
+        "- 不要把同一结构只换 open/high/low/close 或窗口数字当作新类型\n"
+        if target_family
+        else ""
+    )
     return f"""你现在做第 {iteration} 轮 expression autoresearch。
 
 严格遵守 configs/autoresearch/program_expression.md。
@@ -102,6 +112,7 @@ docs/
 - 每轮只试一个因子
 - 低复杂度、可解释
 - 优先家族：{families}
+{family_rule}- 尽量探索和最近 5 轮不同的结构，除非 ledger 显示该方向明显领先
 - 避免重复 ledger 里已经 discard_candidate 或 crash 的思路
 - 表达式必须符合 configs/autoresearch/expression_space.yaml
 
@@ -129,6 +140,25 @@ def find_disallowed_changes(
             continue
         disallowed.append(file_path)
     return disallowed
+
+
+def select_target_family(iteration: int, allowed_families: Iterable[str]) -> str:
+    families = [family for family in allowed_families if str(family).strip()]
+    if not families:
+        raise ValueError("allowed_families must contain at least one family")
+    return families[(iteration - 1) % len(families)]
+
+
+def validate_candidate_family(candidate_path: str | Path, expected_family: str) -> str:
+    try:
+        candidate = load_yaml(candidate_path)
+    except Exception as exc:
+        return f"failed to read candidate YAML: {exc}"
+    actual = str(candidate.get("family", "")).strip()
+    expected = str(expected_family).strip()
+    if actual != expected:
+        return f"expected family {expected}, got {actual or '<missing>'}"
+    return ""
 
 
 def is_protected_branch(branch: str) -> bool:
@@ -175,7 +205,8 @@ def run_codex_autoloop(
         iteration_dir = log_dir / f"iteration_{iteration:03d}"
         iteration_dir.mkdir(parents=True, exist_ok=True)
         ledger_text = _ledger_context(root / ledger_path)
-        prompt = build_candidate_prompt(iteration, candidate_file, ledger_text, allowed_families)
+        target_family = select_target_family(iteration, allowed_families)
+        prompt = build_candidate_prompt(iteration, candidate_file, ledger_text, allowed_families, target_family=target_family)
         (iteration_dir / "prompt.txt").write_text(prompt, encoding="utf-8")
 
         codex_result = _run_capture(
@@ -202,6 +233,21 @@ def run_codex_autoloop(
             (iteration_dir / "no_candidate_change.txt").write_text("Codex did not update the candidate file.\n", encoding="utf-8")
             stop_reason = "no_candidate_change"
             break
+        family_error = validate_candidate_family(root / candidate_file, target_family)
+        if family_error:
+            (iteration_dir / "candidate_family_mismatch.txt").write_text(family_error + "\n", encoding="utf-8")
+            _run_capture(
+                ["git", "restore", "--", candidate_file],
+                root,
+                iteration_dir / "candidate_restore_stdout.txt",
+                iteration_dir / "candidate_restore_stderr.txt",
+            )
+            crash_count += 1
+            if crash_count >= max_crashes:
+                stop_reason = "max_crashes"
+                break
+            time.sleep(sleep_sec)
+            continue
 
         _run_checked(["git", "add", candidate_file], root, iteration_dir / "git_add.txt")
         _run_checked(

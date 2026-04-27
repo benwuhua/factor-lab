@@ -50,10 +50,11 @@ def build_exposure_attribution(
         )
 
     weights = _weights(portfolio, weight_col)
+    resolved_industry_col = _resolve_industry_col(portfolio, industry_col)
     return ExposureAttribution(
         summary=_summary_frame(portfolio, weight_col, weights=weights),
         family=_factor_family_exposure(portfolio, family_map or {}, weights),
-        industry=_industry_exposure(portfolio, weights, industry_col),
+        industry=_industry_exposure(portfolio, weights, resolved_industry_col),
         style=_style_exposure(portfolio, weights, style_cols or _default_style_cols(portfolio)),
     )
 
@@ -127,6 +128,10 @@ def _factor_family_exposure(
     family_map: Mapping[str, str],
     weights: pd.Series,
 ) -> pd.DataFrame:
+    family_score = _family_score_exposure(portfolio, weights)
+    if not family_score.empty:
+        return family_score
+
     rows = []
     for factor_col, contribution_col in FACTOR_DRIVER_COLUMNS:
         if factor_col not in portfolio.columns or contribution_col not in portfolio.columns:
@@ -139,6 +144,27 @@ def _factor_family_exposure(
             family = str(family_map.get(factor, factor))
             weighted = float(weights.loc[index] * contributions.loc[index])
             rows.append({"family": family, "weighted_contribution": weighted})
+    if not rows:
+        return pd.DataFrame(columns=["family", "weighted_contribution", "abs_weighted_contribution", "driver_count"])
+    frame = pd.DataFrame(rows)
+    grouped = frame.groupby("family", as_index=False).agg(
+        weighted_contribution=("weighted_contribution", "sum"),
+        abs_weighted_contribution=("weighted_contribution", lambda values: float(values.abs().sum())),
+        driver_count=("weighted_contribution", "size"),
+    )
+    return grouped.sort_values("abs_weighted_contribution", ascending=False).reset_index(drop=True)
+
+
+def _family_score_exposure(portfolio: pd.DataFrame, weights: pd.Series) -> pd.DataFrame:
+    rows = []
+    family_cols = [column for column in portfolio.columns if column.startswith("family_") and column.endswith("_score")]
+    for column in family_cols:
+        family = column[len("family_") : -len("_score")]
+        scores = pd.to_numeric(portfolio[column], errors="coerce").fillna(0.0)
+        for index, score in scores.items():
+            weighted = float(weights.loc[index] * score)
+            if weighted != 0:
+                rows.append({"family": family, "weighted_contribution": weighted})
     if not rows:
         return pd.DataFrame(columns=["family", "weighted_contribution", "abs_weighted_contribution", "driver_count"])
     frame = pd.DataFrame(rows)
@@ -165,6 +191,19 @@ def _industry_exposure(portfolio: pd.DataFrame, weights: pd.Series, industry_col
         .sort_values("weight", ascending=False)
         .reset_index(drop=True)
     )
+
+
+def _resolve_industry_col(portfolio: pd.DataFrame, preferred: str) -> str:
+    if preferred in portfolio.columns:
+        preferred_values = portfolio[preferred].fillna("").astype(str).str.strip()
+        if preferred_values.ne("").any():
+            return preferred
+    for candidate in ["industry_sw", "industry_csrc", "board", "exchange"]:
+        if candidate in portfolio.columns:
+            values = portfolio[candidate].fillna("").astype(str).str.strip()
+            if values.ne("").any():
+                return candidate
+    return preferred
 
 
 def _style_exposure(portfolio: pd.DataFrame, weights: pd.Series, style_cols: list[str]) -> pd.DataFrame:

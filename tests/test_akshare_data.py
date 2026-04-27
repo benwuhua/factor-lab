@@ -10,12 +10,15 @@ import yaml
 
 from qlib_factor_lab.akshare_data import (
     build_dump_bin_command,
+    enrich_security_master_industries,
     filter_frame_to_universes,
     fetch_company_notices,
+    fetch_security_industry_overrides,
     fetch_universe_symbols,
     normalize_akshare_notices,
     normalize_security_master_snapshot,
     normalize_akshare_history,
+    normalize_cninfo_industry_override,
     qlib_symbol_from_code,
     write_instrument_alias,
     write_provider_config,
@@ -144,6 +147,67 @@ class AkShareDataTests(unittest.TestCase):
         self.assertEqual(result["board"].tolist(), ["main", "ChiNext", "STAR"])
         self.assertEqual(result["valid_from"].tolist(), ["2026-04-24", "2026-04-24", "2026-04-24"])
         self.assertTrue(bool(result[result["instrument"] == "SH688111"]["is_st"].iloc[0]))
+
+    def test_enrich_security_master_industries_fills_blank_industries(self):
+        master = normalize_security_master_snapshot(
+            pd.DataFrame({"代码": ["600000", "300750"], "名称": ["浦发银行", "宁德时代"]}),
+            as_of_date="2026-04-24",
+        )
+        industries = pd.DataFrame(
+            {
+                "证券代码": ["600000", "300750"],
+                "行业中类": ["银行", "电池"],
+                "行业大类": ["金融", "电力设备"],
+            }
+        )
+
+        result = enrich_security_master_industries(master, industries)
+
+        by_instrument = result.set_index("instrument")
+        self.assertEqual(by_instrument.loc["SH600000", "industry_sw"], "银行")
+        self.assertEqual(by_instrument.loc["SZ300750", "industry_csrc"], "电力设备")
+
+    def test_normalize_cninfo_industry_override_prefers_latest_sw_and_official(self):
+        raw = pd.DataFrame(
+            {
+                "新证券简称": ["样本股份", "样本股份", "样本股份"],
+                "行业中类": ["旧行业", "软件开发", None],
+                "行业大类": ["旧大类", "计算机", "软件和信息技术服务业"],
+                "行业门类": ["旧门类", "信息技术", "信息传输、软件和信息技术服务业"],
+                "分类标准": ["申银万国行业分类标准", "申银万国行业分类标准", "中国上市公司协会上市公司行业分类标准"],
+                "证券代码": ["000001", "000001", "000001"],
+                "变更日期": ["2020-01-01", "2024-01-01", "2024-02-01"],
+            }
+        )
+
+        result = normalize_cninfo_industry_override(raw, "SZ000001", "2026-04-23")
+
+        self.assertEqual(result["证券代码"], "000001")
+        self.assertEqual(result["行业中类"], "软件开发")
+        self.assertEqual(result["行业大类"], "软件和信息技术服务业")
+        self.assertEqual(result["行业门类"], "信息传输、软件和信息技术服务业")
+        self.assertEqual(result["更新截止"], "20260423")
+
+    def test_fetch_security_industry_overrides_normalizes_symbols(self):
+        class FakeAkshare:
+            def stock_industry_change_cninfo(self, symbol, start_date, end_date):
+                return pd.DataFrame(
+                    {
+                        "新证券简称": ["样本股份"],
+                        "行业中类": ["软件开发"],
+                        "行业大类": ["软件和信息技术服务业"],
+                        "行业门类": ["信息传输、软件和信息技术服务业"],
+                        "分类标准": ["申银万国行业分类标准"],
+                        "证券代码": [symbol],
+                        "变更日期": ["2024-01-01"],
+                    }
+                )
+
+        with patch("qlib_factor_lab.akshare_data._get_akshare", return_value=FakeAkshare()):
+            result = fetch_security_industry_overrides(["SZ000001"], "2026-04-23", delay=0)
+
+        self.assertEqual(result["证券代码"].tolist(), ["000001"])
+        self.assertEqual(result["行业中类"].tolist(), ["软件开发"])
 
     def test_normalize_akshare_notices_classifies_event_risk(self):
         raw = pd.DataFrame(

@@ -26,6 +26,7 @@ weights:
 
 combination:
   mode: family_first
+  family_score_cap: 0.35
   family_weights:
     divergence_weak_reversal: 1.0
     quiet_range_divergence: 1.0

@@ -49,8 +49,11 @@ RESEARCH_CONTEXT_AS_OF ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
+INDUSTRY_OVERRIDES_OUTPUT ?= data/security_industry_overrides.csv
+INDUSTRY_OVERRIDES_AS_OF ?= $(RUN_DATE)
+INDUSTRY_OVERRIDES_UNIVERSES ?= csi300 csi500
 
-.PHONY: help install test workbench workbench-e2e check-env research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -60,6 +63,7 @@ help:
 	@printf "  make workbench        Start the local Streamlit research workbench\n"
 	@printf "  make workbench-e2e    Run browser E2E checks for the workbench\n"
 	@printf "  make check-env        Check local Qlib provider environment\n"
+	@printf "  make industry-overrides  Refresh CSI300/CSI500 industry override table\n"
 	@printf "  make research-context Refresh security master and company event evidence\n"
 	@printf "  make data-governance Check PIT data-domain coverage and lane readiness\n"
 	@printf "  make factor-research Run the one-command factor research pipeline\n"
@@ -99,6 +103,7 @@ help:
 	@printf "  make execution-calendar RUN_DATE=20260420\n"
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
+	@printf "  make industry-overrides RUN_DATE=20260420\n"
 	@printf "  make research-context RUN_DATE=20260420\n"
 	@printf "  make data-governance RUN_DATE=20260420\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
@@ -127,6 +132,12 @@ workbench-e2e:
 
 check-env:
 	$(PYTHON) scripts/check_env.py --provider-config $(CSI500_PROVIDER)
+
+industry-overrides:
+	$(PYTHON) scripts/build_security_industry_overrides.py \
+		--as-of-date $(INDUSTRY_OVERRIDES_AS_OF) \
+		--output $(INDUSTRY_OVERRIDES_OUTPUT) \
+		--universes $(INDUSTRY_OVERRIDES_UNIVERSES)
 
 research-context:
 	$(PYTHON) scripts/build_research_context_data.py \

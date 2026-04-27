@@ -49,6 +49,24 @@ class ExposureAttributionTests(unittest.TestCase):
         self.assertAlmostEqual(float(industry["tech"]), 0.5, places=7)
         self.assertAlmostEqual(float(industry["bank"]), 0.5, places=7)
 
+    def test_build_exposure_attribution_prefers_family_score_columns(self):
+        portfolio = pd.DataFrame(
+            {
+                "instrument": ["AAA", "BBB"],
+                "target_weight": [0.5, 0.5],
+                "top_factor_1": ["factor_a", "factor_a"],
+                "top_factor_1_contribution": [5.0, 5.0],
+                "family_divergence_weak_reversal_score": [0.25, 0.25],
+                "family_quiet_range_divergence_score": [0.25, -0.25],
+            }
+        )
+
+        result = build_exposure_attribution(portfolio, family_map={"factor_a": "divergence_weak_reversal"})
+
+        family = result.family.set_index("family")
+        self.assertAlmostEqual(float(family.loc["divergence_weak_reversal", "weighted_contribution"]), 0.25)
+        self.assertAlmostEqual(float(family.loc["quiet_range_divergence", "abs_weighted_contribution"]), 0.25)
+
     def test_load_factor_family_map_reads_approved_factors_yaml(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "approved.yaml"
