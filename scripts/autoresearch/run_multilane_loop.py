@@ -27,6 +27,7 @@ def main() -> int:
     parser.add_argument("--contract", default=str(root / "configs/autoresearch/contracts/csi500_current_v1.yaml"))
     parser.add_argument("--expression-space", default=str(root / "configs/autoresearch/expression_space.yaml"))
     parser.add_argument("--expression-candidate", default=str(root / "configs/autoresearch/candidates/example_expression.yaml"))
+    parser.add_argument("--expression-candidate-glob", default="configs/autoresearch/candidates/*.yaml")
     parser.add_argument("--mining-config", default=str(root / "configs/factor_mining.yaml"))
     parser.add_argument("--provider-config", default=str(root / "configs/provider_current.yaml"))
     parser.add_argument("--output-root", default="reports/autoresearch/multilane_loop")
@@ -46,6 +47,7 @@ def main() -> int:
     parser.add_argument("--timezone", default="Asia/Shanghai")
     parser.add_argument("--sleep-sec", type=float, default=60.0)
     parser.add_argument("--max-crashes", type=int, default=5)
+    parser.add_argument("--lane-factor-batch-size", type=int, default=2)
     args = parser.parse_args()
 
     deadline = parse_multilane_deadline(args.until, timezone=args.timezone)
@@ -60,6 +62,7 @@ def main() -> int:
         contract_path=args.contract,
         expression_space_path=args.expression_space,
         expression_candidate_path=args.expression_candidate,
+        expression_candidate_glob=args.expression_candidate_glob,
         mining_config_path=args.mining_config,
         provider_config_path=args.provider_config,
         output_root=args.output_root,
@@ -73,6 +76,7 @@ def main() -> int:
         max_iterations=max_iterations,
         max_crashes=args.max_crashes,
         sleep_sec=args.sleep_sec,
+        lane_factor_batch_size=args.lane_factor_batch_size,
     )
     print(f"iterations_started: {result.iterations_started}")
     print(f"crash_count: {result.crash_count}")

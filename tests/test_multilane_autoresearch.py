@@ -123,6 +123,61 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertEqual(frame.loc["pattern_event", "run_status"], "completed")
             self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "completed")
 
+    def test_runner_applies_lane_factor_name_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump(
+                    {
+                        "lanes": {
+                            "pattern_event": {"activation_status": "active"},
+                            "risk_structure": {"activation_status": "active"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.write_text(
+                yaml.safe_dump(
+                    {
+                        "templates": [
+                            {"name": "wangji-factor1", "expression": "$close", "direction": 1},
+                            {"name": "quiet_breakout_{window}", "expression": "$close", "windows": [20, 60], "direction": 1},
+                            {"name": "max_drawdown_{window}", "expression": "$close", "windows": [20, 60], "direction": -1},
+                            {"name": "downside_vol_{window}", "expression": "$close", "windows": [20], "direction": -1},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle, patch(
+                "qlib_factor_lab.autoresearch.multilane.run_cross_sectional_lane_oracle"
+            ) as cross_oracle:
+                event_oracle.return_value = (
+                    {"candidate": "quiet_breakout_60", "status": "review", "primary_metric": 0.02, "artifact_dir": "a"},
+                    "",
+                )
+                cross_oracle.return_value = (
+                    {"candidate": "downside_vol_20", "status": "review", "primary_metric": 0.03, "artifact_dir": "b"},
+                    "",
+                )
+                run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    mining_config_path=mining_config,
+                    lane_factor_name_overrides={
+                        "pattern_event": ["quiet_breakout_60"],
+                        "risk_structure": ["downside_vol_20"],
+                    },
+                )
+
+            self.assertEqual([spec["name"] for spec in event_oracle.call_args.kwargs["factor_specs"]], ["quiet_breakout_60"])
+            self.assertEqual([spec["name"] for spec in cross_oracle.call_args.kwargs["factor_specs"]], ["downside_vol_20"])
+
     def test_runner_dispatches_liquidity_cross_sectional_oracle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

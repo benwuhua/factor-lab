@@ -14,6 +14,43 @@ from qlib_factor_lab.autoresearch.codex_loop import parse_until_deadline, resolv
 from qlib_factor_lab.autoresearch.multilane import MultiLaneReport, run_multilane_autoresearch
 
 
+DEFAULT_ROTATION_FACTOR_NAMES: dict[str, list[str]] = {
+    "pattern_event": ["wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"],
+    "emotion_atmosphere": [
+        "arbr_26",
+        "breadth_proxy_20",
+        "davol_5",
+        "davol_10",
+        "davol_20",
+        "heat_cooling_5_20",
+        "limit_pressure_5",
+        "turnover_mean_5",
+        "turnover_mean_20",
+    ],
+    "liquidity_microstructure": [
+        "amount_mean_5",
+        "amount_mean_20",
+        "amount_mean_60",
+        "amihud_illiq_10",
+        "amihud_illiq_20",
+        "amihud_illiq_60",
+        "turnover_mean_5",
+        "turnover_mean_20",
+        "turnover_mean_60",
+        "turnover_volatility_20",
+        "vosc_12_26",
+    ],
+    "risk_structure": [
+        "max_drawdown_20",
+        "max_drawdown_60",
+        "downside_vol_20",
+        "downside_vol_60",
+        "gap_risk_20",
+        "intraday_excursion_20",
+    ],
+}
+
+
 @dataclass(frozen=True)
 class MultiLaneLoopResult:
     iterations_started: int
@@ -34,6 +71,7 @@ def run_multilane_loop(
     expression_candidate_path: str | Path,
     mining_config_path: str | Path,
     provider_config_path: str | Path,
+    expression_candidate_glob: str | None = "configs/autoresearch/candidates/*.yaml",
     output_root: str | Path = "reports/autoresearch/multilane_loop",
     data_governance_report_path: str | Path | None = None,
     include_shadow: bool = False,
@@ -45,6 +83,7 @@ def run_multilane_loop(
     max_iterations: int | None = None,
     max_crashes: int = 5,
     sleep_sec: float = 60.0,
+    lane_factor_batch_size: int = 2,
     runner: MultiLaneRunner = run_multilane_autoresearch,
 ) -> MultiLaneLoopResult:
     root = Path(project_root)
@@ -63,6 +102,7 @@ def run_multilane_loop(
     crash_budget = max(1, int(max_crashes))
     stop_reason = "max_iterations"
     iteration = 0
+    expression_candidates = _expression_candidate_paths(root, expression_candidate_path, expression_candidate_glob)
     _write_loop_summary(
         log_dir,
         iterations=iterations,
@@ -83,6 +123,12 @@ def run_multilane_loop(
         iterations_started += 1
         iteration_output = log_dir / f"multilane_iteration_{iteration:03d}.md"
         iteration_started_at = datetime.now(tzinfo)
+        expression_candidate_for_iteration = _rotate_items(expression_candidates, iteration, 1)[0]
+        lane_factor_overrides = _lane_factor_name_overrides(iteration, lane_factor_batch_size)
+        rotation = {
+            "expression_candidate": Path(expression_candidate_for_iteration).name,
+            "lane_factor_name_overrides": lane_factor_overrides,
+        }
         iteration_row: dict[str, Any] = {
             "iteration": iteration,
             "started_at": iteration_started_at.isoformat(timespec="seconds"),
@@ -90,6 +136,7 @@ def run_multilane_loop(
             "status": "completed",
             "lane_crashes": 0,
             "lanes": [],
+            "rotation": rotation,
         }
 
         try:
@@ -98,7 +145,7 @@ def run_multilane_loop(
                 project_root=root,
                 contract_path=contract_path,
                 expression_space_path=expression_space_path,
-                expression_candidate_path=expression_candidate_path,
+                expression_candidate_path=expression_candidate_for_iteration,
                 mining_config_path=mining_config_path,
                 provider_config_path=provider_config_path,
                 output_path=iteration_output,
@@ -107,6 +154,7 @@ def run_multilane_loop(
                 max_workers=max_workers,
                 start_time=start_time,
                 end_time=end_time,
+                lane_factor_name_overrides=lane_factor_overrides,
             )
             frame = report.to_frame()
             lanes = _json_safe(frame.to_dict(orient="records"))
@@ -173,6 +221,35 @@ def resolve_multilane_max_iterations(
         max_hours=max_hours,
         safe_default=1,
     )
+
+
+def _expression_candidate_paths(root: Path, fallback: str | Path, glob_pattern: str | None) -> list[str]:
+    fallback_path = _resolve(root, fallback)
+    candidates: list[Path] = []
+    if glob_pattern:
+        candidates = sorted(_resolve(root, glob_pattern).parent.glob(Path(glob_pattern).name))
+    if fallback_path not in candidates:
+        candidates.insert(0, fallback_path)
+    existing = [path for path in candidates if path.exists()]
+    paths = existing or [fallback_path]
+    return [str(path) for path in paths]
+
+
+def _lane_factor_name_overrides(iteration: int, batch_size: int) -> dict[str, list[str]]:
+    size = max(1, int(batch_size))
+    return {
+        lane: _rotate_items(names, iteration, size)
+        for lane, names in DEFAULT_ROTATION_FACTOR_NAMES.items()
+        if names
+    }
+
+
+def _rotate_items(items: list[Any], iteration: int, batch_size: int) -> list[Any]:
+    if not items:
+        raise ValueError("cannot rotate an empty item list")
+    size = max(1, int(batch_size))
+    start = ((max(1, int(iteration)) - 1) * size) % len(items)
+    return [items[(start + offset) % len(items)] for offset in range(min(size, len(items)))]
 
 
 def _write_loop_summary(

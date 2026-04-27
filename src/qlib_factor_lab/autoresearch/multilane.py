@@ -52,6 +52,7 @@ def run_multilane_autoresearch(
     max_workers: int = 4,
     start_time: str | None = None,
     end_time: str | None = None,
+    lane_factor_name_overrides: dict[str, list[str]] | None = None,
 ) -> MultiLaneReport:
     root = Path(project_root)
     lane_space = load_yaml(_resolve(root, lane_space_path))
@@ -72,7 +73,7 @@ def run_multilane_autoresearch(
                 future = executor.submit(
                     run_event_lane_oracle,
                     lane_name=lane_name,
-                    factor_specs=_event_factor_specs(root, mining_config_path, lane_name),
+                    factor_specs=_event_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
                     provider_config=provider_config_path,
                     project_root=root,
                     start_time=start_time,
@@ -84,7 +85,7 @@ def run_multilane_autoresearch(
                 future = executor.submit(
                     run_cross_sectional_lane_oracle,
                     lane_name=lane_name,
-                    factor_specs=_lane_factor_specs(root, mining_config_path, lane_name),
+                    factor_specs=_lane_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
                     contract_path=contract_path,
                     project_root=root,
                     start_time=start_time,
@@ -234,13 +235,23 @@ def _resolve(root: Path, path: str | Path) -> Path:
     return value if value.is_absolute() else root / value
 
 
-def _event_factor_specs(root: Path, mining_config_path: str | Path, lane_name: str) -> list[dict[str, Any]]:
-    return _lane_factor_specs(root, mining_config_path, lane_name)
+def _event_factor_specs(
+    root: Path,
+    mining_config_path: str | Path,
+    lane_name: str,
+    lane_factor_name_overrides: dict[str, list[str]] | None = None,
+) -> list[dict[str, Any]]:
+    return _lane_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides)
 
 
-def _lane_factor_specs(root: Path, mining_config_path: str | Path, lane_name: str) -> list[dict[str, Any]]:
+def _lane_factor_specs(
+    root: Path,
+    mining_config_path: str | Path,
+    lane_name: str,
+    lane_factor_name_overrides: dict[str, list[str]] | None = None,
+) -> list[dict[str, Any]]:
     factors = generate_candidate_factors(load_mining_config(_resolve(root, mining_config_path)))
-    names = _lane_factor_names(lane_name)
+    names = _lane_factor_names(lane_name, lane_factor_name_overrides)
     specs = [
         {
             "name": factor.name,
@@ -261,7 +272,9 @@ def _event_factor_names(lane_name: str) -> set[str]:
     return _lane_factor_names(lane_name)
 
 
-def _lane_factor_names(lane_name: str) -> set[str]:
+def _lane_factor_names(lane_name: str, lane_factor_name_overrides: dict[str, list[str]] | None = None) -> set[str]:
+    if lane_factor_name_overrides and lane_name in lane_factor_name_overrides:
+        return {str(name) for name in lane_factor_name_overrides[lane_name] if str(name).strip()}
     if lane_name == "pattern_event":
         return {"wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"}
     if lane_name == "emotion_atmosphere":
