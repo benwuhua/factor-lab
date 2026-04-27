@@ -12,6 +12,7 @@ import pandas as pd
 from qlib_factor_lab.autoresearch.cross_sectional_oracle import run_cross_sectional_lane_oracle
 from qlib_factor_lab.autoresearch.event_oracle import run_event_lane_oracle
 from qlib_factor_lab.autoresearch.oracle import run_expression_oracle
+from qlib_factor_lab.autoresearch.regime_oracle import run_regime_lane_oracle
 from qlib_factor_lab.config import load_yaml
 from qlib_factor_lab.factor_mining import generate_candidate_factors, load_mining_config
 
@@ -79,12 +80,23 @@ def run_multilane_autoresearch(
                 )
                 futures[future] = (lane_name, activation)
                 continue
-            if lane_name == "liquidity_microstructure":
+            if lane_name in {"liquidity_microstructure", "risk_structure"}:
                 future = executor.submit(
                     run_cross_sectional_lane_oracle,
                     lane_name=lane_name,
                     factor_specs=_lane_factor_specs(root, mining_config_path, lane_name),
                     contract_path=contract_path,
+                    project_root=root,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+                futures[future] = (lane_name, activation)
+                continue
+            if lane_name == "regime":
+                future = executor.submit(
+                    run_regime_lane_oracle,
+                    lane_name=lane_name,
+                    provider_config=provider_config_path,
                     project_root=root,
                     start_time=start_time,
                     end_time=end_time,
@@ -277,6 +289,15 @@ def _lane_factor_names(lane_name: str) -> set[str]:
             "turnover_mean_60",
             "turnover_volatility_20",
             "vosc_12_26",
+        }
+    if lane_name == "risk_structure":
+        return {
+            "max_drawdown_20",
+            "max_drawdown_60",
+            "downside_vol_20",
+            "downside_vol_60",
+            "gap_risk_20",
+            "intraday_excursion_20",
         }
     return set()
 

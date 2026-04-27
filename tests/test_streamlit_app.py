@@ -1,6 +1,8 @@
 import unittest
 from pathlib import Path
 
+import pandas as pd
+
 from app.streamlit_app import (
     _autoresearch_progress_cards_html,
     _autoresearch_smoke_env_overrides,
@@ -10,6 +12,7 @@ from app.streamlit_app import (
     _evidence_library_rows,
     _event_library_cards_html,
     _factor_research_rows,
+    _multilane_health_cards_html,
     _page_topbar_html,
     _research_context_env_overrides,
     _resolve_nav_page,
@@ -21,6 +24,7 @@ from app.streamlit_app import (
     _task_status_cards_html,
     _workflow_card_grid_html,
 )
+from qlib_factor_lab.workbench import build_multilane_queue
 
 
 class StreamlitAppUiTests(unittest.TestCase):
@@ -119,6 +123,79 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("running", html)
         self.assertIn("alpha_new", html)
         self.assertIn("active", html)
+
+    def test_build_multilane_queue_classifies_health_and_next_actions(self):
+        frame = pd.DataFrame(
+            [
+                {
+                    "lane": "emotion_atmosphere",
+                    "activation_status": "active",
+                    "run_status": "completed",
+                    "candidate": "heat_cooling_5_20",
+                    "primary_metric": 0.018,
+                    "detail": "review",
+                },
+                {
+                    "lane": "liquidity_microstructure",
+                    "activation_status": "active",
+                    "run_status": "unsupported",
+                    "candidate": "",
+                    "primary_metric": float("nan"),
+                    "detail": "no runner implemented",
+                },
+                {
+                    "lane": "regime",
+                    "activation_status": "active",
+                    "run_status": "completed",
+                    "candidate": "",
+                    "primary_metric": 2.0,
+                    "detail": "review",
+                },
+                {
+                    "lane": "fundamental_quality",
+                    "activation_status": "shadow",
+                    "run_status": "shadow_skipped",
+                    "candidate": "",
+                    "primary_metric": float("nan"),
+                    "detail": "lane is shadow",
+                },
+            ]
+        )
+
+        queue = build_multilane_queue(frame)
+
+        self.assertEqual(queue["cards"]["active"], 3)
+        self.assertEqual(queue["cards"]["shadow"], 1)
+        self.assertEqual(queue["cards"]["unsupported"], 1)
+        self.assertEqual(queue["cards"]["review"], 1)
+        rows = queue["rows"].set_index("lane")
+        self.assertEqual(rows.loc["emotion_atmosphere", "health"], "review")
+        self.assertIn("复核", rows.loc["emotion_atmosphere", "next_action"])
+        self.assertEqual(rows.loc["liquidity_microstructure", "health"], "unsupported")
+        self.assertIn("补 runner", rows.loc["liquidity_microstructure", "next_action"])
+        self.assertEqual(rows.loc["regime", "health"], "allocator_review")
+        self.assertIn("family 权重", rows.loc["regime", "next_action"])
+        self.assertNotIn("approved 因子", rows.loc["regime", "next_action"])
+        self.assertEqual(rows.loc["fundamental_quality", "lane_state"], "shadow")
+        self.assertIn("启用 lane", rows.loc["fundamental_quality", "next_action"])
+
+    def test_multilane_health_cards_html_surfaces_lane_states(self):
+        html = _multilane_health_cards_html(
+            {
+                "active": 5,
+                "shadow": 2,
+                "unsupported": 3,
+                "review": 2,
+                "blocked": 1,
+            }
+        )
+
+        self.assertIn('class="multilane-health-grid"', html)
+        self.assertIn("Active Lanes", html)
+        self.assertIn("<strong>5</strong>", html)
+        self.assertIn("Shadow", html)
+        self.assertIn("Unsupported", html)
+        self.assertIn("Next Review", html)
 
     def test_evidence_cards_html_shows_event_and_source_counts(self):
         html = _evidence_cards_html(

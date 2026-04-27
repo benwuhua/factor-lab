@@ -125,6 +125,28 @@ templates:
     direction: 1
     category: candidate_divergence
     description: "{window} day price advance not confirmed by recent volume expansion."
+  - name: max_drawdown_{window}
+    expression: "Max($close, {window}) / $close - 1"
+    windows: [20, 60]
+    direction: -1
+    category: candidate_drawdown_quality
+    description: "{window} day current drawdown from rolling close high; lower drawdown is ranked higher."
+  - name: downside_vol_{window}
+    expression: "Std(Less($close / Ref($close, 1) - 1, 0) * ($close / Ref($close, 1) - 1), {window})"
+    windows: [20, 60]
+    direction: -1
+    category: candidate_downside_volatility
+    description: "{window} day downside-only return volatility; lower downside volatility is ranked higher."
+  - name: gap_risk_20
+    expression: "Mean(Abs($open / Ref($close, 1) - 1), 20)"
+    direction: -1
+    category: candidate_gap_risk
+    description: "20 day average overnight open gap magnitude; lower gap risk is ranked higher."
+  - name: intraday_excursion_20
+    expression: "Mean(($high - $low) / $open, 20)"
+    direction: -1
+    category: candidate_intraday_excursion
+    description: "20 day average intraday high-low excursion relative to open; lower excursion is ranked higher."
   - name: wangji-factor1
     expression: "(4 - Abs((Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1) - 0.08) / 0.04) + (Less(Ref($close, 3) / Ref($close, 4) - 1, 0.12) / 0.06) + (Less(Ref($close, 3) / Ref($open, 3) - 1, 0.12) / 0.06) + (Less(Ref($volume, 3) / (Mean(Ref($volume, 4), 10) + 1), 2.5) / 1.5) - ((Abs(Ref($close, 2) / Ref($close, 3) - 1) + Abs(Ref($close, 1) / Ref($close, 2) - 1) + Abs($close / Ref($close, 1) - 1)) / 0.08) - (2.2 * ((Ref($volume, 2) + Ref($volume, 1) + $volume) / (3 * Ref($volume, 3) + 1)))"
     direction: 1

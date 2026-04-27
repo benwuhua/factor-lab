@@ -243,6 +243,7 @@ class WorkbenchTests(unittest.TestCase):
                 [
                   {"lane": "emotion_atmosphere", "activation_status": "active", "run_status": "completed", "candidate": "heat", "primary_metric": 0.018, "detail": "review"},
                   {"lane": "expression_price_volume", "activation_status": "active", "run_status": "completed", "candidate": "mom", "primary_metric": -0.002, "detail": "discard_candidate"},
+                  {"lane": "regime", "activation_status": "active", "run_status": "completed", "candidate": "", "primary_metric": 2.0, "detail": "review"},
                   {"lane": "liquidity_microstructure", "activation_status": "active", "run_status": "unsupported", "candidate": "", "primary_metric": null, "detail": "no runner implemented"}
                 ]
                 """,
@@ -256,11 +257,11 @@ class WorkbenchTests(unittest.TestCase):
             summary = summarize_multilane_report(frame)
 
         self.assertEqual(path.name, "multilane_smoke_20260425.md")
-        self.assertEqual(list(frame["lane"]), ["emotion_atmosphere", "expression_price_volume", "liquidity_microstructure"])
-        self.assertEqual(summary["lanes"], 3)
-        self.assertEqual(summary["completed"], 2)
+        self.assertEqual(list(frame["lane"]), ["emotion_atmosphere", "expression_price_volume", "regime", "liquidity_microstructure"])
+        self.assertEqual(summary["lanes"], 4)
+        self.assertEqual(summary["completed"], 3)
         self.assertEqual(summary["unsupported"], 1)
-        self.assertEqual(summary["review"], 1)
+        self.assertEqual(summary["review"], 2)
         self.assertEqual(summary["best_lane"], "emotion_atmosphere")
         self.assertAlmostEqual(summary["best_primary_metric"], 0.018)
 

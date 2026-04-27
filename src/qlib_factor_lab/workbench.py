@@ -188,7 +188,7 @@ def find_latest_multilane_report(root: str | Path = ".") -> Path | None:
 
 def load_multilane_report(root: str | Path = ".", path: str | Path | None = None) -> pd.DataFrame:
     report_path = _resolve(Path(root), path) if path is not None else find_latest_multilane_report(root)
-    columns = ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"]
+    columns = ["lane", "activation_status", "run_status", "candidate", "primary_metric", "artifact_dir", "detail"]
     if report_path is None or not report_path.exists():
         return pd.DataFrame(columns=columns)
     json_path = report_path.with_suffix(".json")
@@ -218,7 +218,9 @@ def summarize_multilane_report(frame: pd.DataFrame) -> dict[str, Any]:
     status = frame["run_status"].fillna("").astype(str)
     detail = frame["detail"].fillna("").astype(str)
     metrics = pd.to_numeric(frame["primary_metric"], errors="coerce")
-    best_idx = metrics.idxmax() if metrics.notna().any() else None
+    candidate = frame["candidate"].fillna("").astype(str).str.strip() if "candidate" in frame.columns else pd.Series("", index=frame.index)
+    comparable_metrics = metrics.where(candidate != "")
+    best_idx = comparable_metrics.idxmax() if comparable_metrics.notna().any() else None
     return {
         "lanes": int(len(frame)),
         "completed": int((status == "completed").sum()),
@@ -226,8 +228,61 @@ def summarize_multilane_report(frame: pd.DataFrame) -> dict[str, Any]:
         "unsupported": int((status == "unsupported").sum()),
         "crash": int((status == "crash").sum()),
         "best_lane": str(frame.loc[best_idx, "lane"]) if best_idx is not None else "n/a",
-        "best_primary_metric": float(metrics.loc[best_idx]) if best_idx is not None else float("nan"),
+        "best_primary_metric": float(comparable_metrics.loc[best_idx]) if best_idx is not None else float("nan"),
     }
+
+
+def build_multilane_queue(frame: pd.DataFrame | None) -> dict[str, Any]:
+    source = frame.copy() if frame is not None else pd.DataFrame()
+    columns = [
+        "lane",
+        "lane_state",
+        "health",
+        "run_status",
+        "candidate",
+        "primary_metric",
+        "detail",
+        "next_action",
+        "artifact_dir",
+        "source_path",
+    ]
+    if source.empty:
+        return {
+            "cards": {
+                "lanes": 0,
+                "active": 0,
+                "shadow": 0,
+                "unsupported": 0,
+                "review": 0,
+                "blocked": 0,
+            },
+            "rows": pd.DataFrame(columns=columns),
+        }
+
+    for column in ["lane", "activation_status", "run_status", "candidate", "detail", "artifact_dir", "source_path"]:
+        if column not in source.columns:
+            source[column] = ""
+    if "primary_metric" not in source.columns:
+        source["primary_metric"] = float("nan")
+    source["primary_metric"] = pd.to_numeric(source["primary_metric"], errors="coerce")
+    source["lane_state"] = source.apply(_multilane_lane_state, axis=1)
+    source["health"] = source.apply(_multilane_lane_health, axis=1)
+    source["next_action"] = source.apply(_multilane_next_action, axis=1)
+
+    health = source["health"].fillna("").astype(str)
+    lane_state = source["lane_state"].fillna("").astype(str)
+    cards = {
+        "lanes": int(len(source)),
+        "active": int((lane_state == "active").sum()),
+        "shadow": int((lane_state == "shadow").sum()),
+        "unsupported": int((health == "unsupported").sum()),
+        "review": int((health == "review").sum()),
+        "blocked": int(health.isin({"unsupported", "crash", "stalled"}).sum()),
+    }
+    sort_order = {"review": 0, "unsupported": 1, "crash": 2, "stalled": 3, "explored": 4, "healthy": 5, "shadow": 6}
+    source["_health_sort"] = health.map(sort_order).fillna(9)
+    source = source.sort_values(["_health_sort", "lane"], na_position="last")
+    return {"cards": cards, "rows": source.loc[:, columns].reset_index(drop=True)}
 
 
 def _parse_multilane_markdown(path: Path) -> pd.DataFrame:
@@ -249,6 +304,62 @@ def _parse_multilane_markdown(path: Path) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def _multilane_lane_state(row: pd.Series) -> str:
+    activation = str(row.get("activation_status", "") or "").strip().lower()
+    run_status = str(row.get("run_status", "") or "").strip().lower()
+    if activation == "shadow" or run_status == "shadow_skipped":
+        return "shadow"
+    if activation == "active":
+        return "active"
+    return activation or "unknown"
+
+
+def _multilane_lane_health(row: pd.Series) -> str:
+    lane_state = _multilane_lane_state(row)
+    run_status = str(row.get("run_status", "") or "").strip().lower()
+    detail = str(row.get("detail", "") or "").strip().lower()
+    candidate = str(row.get("candidate", "") or "").strip()
+    if lane_state == "shadow":
+        return "shadow"
+    if run_status == "unsupported":
+        return "unsupported"
+    if run_status == "crash":
+        return "crash"
+    if run_status in {"queued", "running"}:
+        return "stalled"
+    if run_status == "completed" and detail == "review" and not candidate:
+        return "allocator_review"
+    if run_status == "completed" and detail == "review":
+        return "review"
+    if run_status == "completed" and detail == "discard_candidate":
+        return "explored"
+    if run_status == "completed":
+        return "healthy"
+    return run_status or "missing"
+
+
+def _multilane_next_action(row: pd.Series) -> str:
+    health = _multilane_lane_health(row)
+    detail = str(row.get("detail", "") or "")
+    if health == "review":
+        return "打开 artifact，复核候选并决定是否进入 approved 因子筛选。"
+    if health == "allocator_review":
+        return "查看 regime artifact，确认当前市场状态只作为 family 权重/启停 overlay。"
+    if health == "unsupported":
+        return "补 runner 或把 lane 调成 shadow，避免把未覆盖方向误读为空进展。"
+    if health == "shadow":
+        return "启用 lane config 后重跑 multilane，或保持 shadow 作为观察车道。"
+    if health == "crash":
+        return "查看 artifact/log，修复失败后只重跑该 lane。"
+    if health == "stalled":
+        return "等待后台任务完成；超时后检查 workbench task manifest。"
+    if health == "explored":
+        return "记录失败模式，换表达式族或参数窗口继续探索。"
+    if health == "healthy":
+        return "比较指标与稳定性，决定是否纳入候选池。"
+    return detail or "运行 make autoresearch-multilane 刷新多车道状态。"
 
 
 def summarize_stock_cards(cards: list[dict[str, Any]]) -> dict[str, int]:

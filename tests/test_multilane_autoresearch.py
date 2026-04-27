@@ -171,6 +171,85 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertEqual(frame.loc["liquidity_microstructure", "run_status"], "completed")
             self.assertEqual(frame.loc["liquidity_microstructure", "candidate"], "amount_mean_5")
 
+    def test_runner_dispatches_risk_cross_sectional_oracle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"risk_structure": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.write_text(
+                yaml.safe_dump(
+                    {
+                        "templates": [
+                            {"name": "max_drawdown_{window}", "expression": "$close", "windows": [20], "direction": -1, "category": "candidate_drawdown_quality"},
+                            {"name": "downside_vol_{window}", "expression": "$close", "windows": [20], "direction": -1, "category": "candidate_downside_volatility"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_cross_sectional_lane_oracle") as oracle:
+                oracle.return_value = (
+                    {
+                        "candidate": "max_drawdown_20",
+                        "status": "review",
+                        "primary_metric": 0.021,
+                        "artifact_dir": "reports/autoresearch/runs/risk",
+                    },
+                    "",
+                )
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    mining_config_path=mining_config,
+                )
+
+            oracle.assert_called_once()
+            self.assertEqual(oracle.call_args.kwargs["lane_name"], "risk_structure")
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["risk_structure", "run_status"], "completed")
+            self.assertEqual(frame.loc["risk_structure", "candidate"], "max_drawdown_20")
+
+    def test_runner_dispatches_regime_oracle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"regime": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_regime_lane_oracle") as oracle:
+                oracle.return_value = (
+                    {
+                        "candidate": "",
+                        "status": "review",
+                        "primary_metric": 3.0,
+                        "artifact_dir": "reports/autoresearch/runs/regime",
+                    },
+                    "",
+                )
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    provider_config_path="configs/provider_current.yaml",
+                    start_time="2026-01-01",
+                    end_time="2026-04-20",
+                )
+
+            oracle.assert_called_once()
+            self.assertEqual(oracle.call_args.kwargs["lane_name"], "regime")
+            self.assertEqual(oracle.call_args.kwargs["start_time"], "2026-01-01")
+            self.assertEqual(oracle.call_args.kwargs["end_time"], "2026-04-20")
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["regime", "run_status"], "completed")
+
     def test_runner_applies_data_governance_activation_override(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -345,6 +424,16 @@ class MultilaneAutoresearchTests(unittest.TestCase):
         self.assertIn("amihud_illiq_20", names)
         self.assertIn("turnover_mean_20", names)
         self.assertIn("turnover_volatility_20", names)
+
+    def test_risk_lane_includes_drawdown_downside_gap_and_excursion_factors(self):
+        repo_root = Path(__file__).resolve().parents[1]
+
+        names = {spec["name"] for spec in _lane_factor_specs(repo_root, "configs/factor_mining.yaml", "risk_structure")}
+
+        self.assertIn("max_drawdown_20", names)
+        self.assertIn("downside_vol_20", names)
+        self.assertIn("gap_risk_20", names)
+        self.assertIn("intraday_excursion_20", names)
 
 
 if __name__ == "__main__":

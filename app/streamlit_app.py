@@ -20,6 +20,7 @@ from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
     build_event_evidence_library,
     build_gate_review_items,
+    build_multilane_queue,
     build_portfolio_gate_explanation,
     build_pretrade_review,
     build_portfolio_gate_trend,
@@ -237,6 +238,7 @@ def render_data_governance() -> None:
 def render_factor_research() -> None:
     queue = load_autoresearch_queue(ROOT)
     multilane = load_multilane_report(ROOT)
+    multilane_queue = build_multilane_queue(multilane)
     multilane_summary = summarize_multilane_report(multilane)
     latest_multilane = find_latest_multilane_report(ROOT)
     approved = _approved_factor_rows()
@@ -281,6 +283,7 @@ def render_factor_research() -> None:
             )
             st.info("还没有 multilane smoke/nightly 报告。先点击 Smoke 或运行 make autoresearch-multilane。")
         else:
+            st.markdown(_multilane_health_cards_html(multilane_queue["cards"]), unsafe_allow_html=True)
             st.markdown(
                 _detail_card_html(
                     "Multilane Summary",
@@ -294,8 +297,7 @@ def render_factor_research() -> None:
                 ),
                 unsafe_allow_html=True,
             )
-            keep = [column for column in ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"] if column in multilane.columns]
-            st.dataframe(multilane.loc[:, keep], width="stretch", hide_index=True)
+            st.dataframe(multilane_queue["rows"], width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("Approved 因子清单", "governed factor set"), unsafe_allow_html=True)
         if approved.empty:
@@ -739,6 +741,7 @@ def render_autoresearch_queue() -> None:
     )
     queue = load_autoresearch_queue(ROOT)
     multilane = load_multilane_report(ROOT)
+    multilane_queue = build_multilane_queue(multilane)
     multilane_summary = summarize_multilane_report(multilane)
     latest_multilane = find_latest_multilane_report(ROOT)
     task_runs = latest_workbench_task_runs(ROOT, limit=12)
@@ -787,6 +790,7 @@ def render_autoresearch_queue() -> None:
         if multilane.empty:
             st.info("暂无 multilane 报告。运行 make autoresearch-multilane 或在因子研究页点击 Smoke。")
         else:
+            st.markdown(_multilane_health_cards_html(multilane_queue["cards"]), unsafe_allow_html=True)
             st.markdown(
                 _detail_card_html(
                     "Latest Multilane",
@@ -803,8 +807,7 @@ def render_autoresearch_queue() -> None:
                 ),
                 unsafe_allow_html=True,
             )
-            lane_cols = [column for column in ["lane", "activation_status", "run_status", "candidate", "primary_metric", "detail"] if column in multilane.columns]
-            st.dataframe(multilane.loc[:, lane_cols], width="stretch", hide_index=True)
+            st.dataframe(multilane_queue["rows"], width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("研究队列", "nightly ledger"), unsafe_allow_html=True)
         display_cols = [
@@ -1144,6 +1147,23 @@ def _autoresearch_progress_cards_html(progress: dict[str, object]) -> str:
         for label, value, note, klass in cards
     )
     return f'<section class="autoresearch-progress-grid">{html}</section>'
+
+
+def _multilane_health_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("Active Lanes", cards.get("active", 0), "可执行车道", "active"),
+        ("Shadow", cards.get("shadow", 0), "观察/暂不执行", "shadow"),
+        ("Unsupported", cards.get("unsupported", 0), "缺 runner", "bad"),
+        ("Next Review", cards.get("review", 0), "候选待复核", "active"),
+        ("Blocked", cards.get("blocked", 0), "需处理后推进", "bad"),
+    ]
+    html = "".join(
+        '<div class="multilane-health-card {klass}">'
+        f"<label>{_html(label)}</label><strong>{_html(value)}</strong><span>{_html(note)}</span>"
+        "</div>".format(klass=klass)
+        for label, value, note, klass in items
+    )
+    return f'<section class="multilane-health-grid">{html}</section>'
 
 
 def _evidence_cards_html(cards: dict[str, object]) -> str:
@@ -1924,6 +1944,45 @@ def _style() -> None:
             font-size: 12px;
             overflow-wrap: anywhere;
           }
+          .multilane-health-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            margin: 0 0 14px;
+          }
+          .multilane-health-card {
+            border: 1px solid var(--fl-line);
+            border-radius: 8px;
+            background: #f8f9f6;
+            padding: 12px;
+            display: grid;
+            gap: 6px;
+            min-width: 0;
+          }
+          .multilane-health-card.active {
+            border-color: #9ec9b7;
+            background: #ecf5f0;
+          }
+          .multilane-health-card.shadow {
+            border-color: #c8ced8;
+            background: #f0f2f4;
+          }
+          .multilane-health-card.bad {
+            border-color: #e1b2a9;
+            background: #f8e8e4;
+          }
+          .multilane-health-card label {
+            color: var(--fl-muted);
+            font-size: 12px;
+          }
+          .multilane-health-card strong {
+            font-size: 22px;
+            line-height: 1.12;
+          }
+          .multilane-health-card span {
+            color: #59645e;
+            font-size: 12px;
+          }
           .evidence-grid {
             display: grid;
             grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2146,7 +2205,7 @@ def _style() -> None:
           }
           @media (max-width: 1180px) {
             .metrics { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
-            .ops-grid, .steps { grid-template-columns: 1fr; }
+            .ops-grid, .steps, .multilane-health-grid { grid-template-columns: 1fr; }
             .flow-row { grid-template-columns: 1fr; }
             div[data-testid="stHorizontalBlock"]:has(aside.right-rail) {
               display: grid !important;

@@ -84,6 +84,29 @@ class CrossSectionalLaneOracleTests(unittest.TestCase):
             self.assertTrue((artifact_dir / "summary.json").exists())
             self.assertTrue((artifact_dir / "factor_summaries.csv").exists())
 
+    def test_cross_sectional_lane_oracle_uses_lane_name_in_discard_reason(self):
+        frame = pd.DataFrame(
+            {
+                "candidate": ["downside_vol_20"],
+                "status": ["discard_candidate"],
+                "primary_metric": [0.01],
+            }
+        )
+
+        from qlib_factor_lab.autoresearch.cross_sectional_oracle import _lane_payload
+
+        payload = _lane_payload(
+            lane_name="risk_structure",
+            run_id="run1",
+            factor_specs=[{"name": "downside_vol_20"}],
+            factors_frame=frame,
+            artifact_dir=Path("reports/autoresearch/runs/risk_structure_run1"),
+            elapsed_sec=0.1,
+        )
+
+        self.assertEqual(payload["status"], "discard_candidate")
+        self.assertEqual(payload["decision_reason"], "no reviewed risk_structure candidate")
+
 
 if __name__ == "__main__":
     unittest.main()

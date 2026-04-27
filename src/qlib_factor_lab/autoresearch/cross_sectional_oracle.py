@@ -136,7 +136,7 @@ def _lane_payload(
         "candidate": candidate,
         "factor_count": len(factor_specs),
         "status": status,
-        "decision_reason": "" if status == "review" else "no reviewed liquidity candidate",
+        "decision_reason": "" if status == "review" else f"no reviewed {lane_name} candidate",
         "primary_metric": primary,
         "artifact_dir": str(artifact_dir),
         "elapsed_sec": elapsed_sec,
