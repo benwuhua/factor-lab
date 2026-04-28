@@ -1,0 +1,6 @@
+name: open_norm_selling_pressure_reversal_20_v1
+family: reversal
+expression: "Mean(($open - $close) / $open, 20)"
+direction: 1
+description: "Measures persistent 20 day selling pressure by averaging how often the close finishes below the open."
+expected_behavior: "Stocks with sustained open-to-close selling pressure may become temporarily oversold and rebound over the next medium horizon."

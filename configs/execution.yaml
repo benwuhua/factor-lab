@@ -5,6 +5,10 @@ orders:
   lot_size: 100
   price_column: last_price
 
+broker_adapter:
+  mode: paper
+  real_enabled: false
+
 paper_broker:
   fill_ratio: 1.0
   slippage_bps: 5

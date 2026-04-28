@@ -27,10 +27,11 @@ from .expert_review import (
     run_expert_review_command,
     write_expert_review_result,
 )
+from .broker_adapter import load_broker_adapter
 from .orders import build_order_suggestions, load_order_config, write_orders
-from .paper_broker import load_paper_fill_config, simulate_paper_fills, write_fills
+from .paper_broker import write_fills
 from .portfolio import build_target_portfolio, load_portfolio_config, write_portfolio_summary, write_target_portfolio
-from .reconcile import load_reconcile_config, reconcile_positions, write_reconciliation_report
+from .reconcile import write_reconciliation_report
 from .risk import (
     check_portfolio_risk,
     load_configured_factor_family_map,
@@ -47,7 +48,7 @@ from .signal import (
     write_daily_signal,
     write_signal_summary,
 )
-from .state import apply_fills_to_positions, write_positions_state
+from .state import write_positions_state
 from .stock_cards import build_stock_cards, write_stock_cards
 from .tradability import apply_tradability_filter, load_trading_config
 
@@ -274,6 +275,13 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     )
     risk_path = write_risk_report(risk_report, run_dir / "risk_report.md")
     artifacts["risk_report"] = str(risk_path)
+    portfolio_gate_path = _write_portfolio_gate_explanation(
+        run_dir / "portfolio_gate_explanation.md",
+        risk_report=risk_report,
+        risk_report_path=risk_path,
+        expert_review_gate=expert_review_gate,
+    )
+    artifacts["portfolio_gate_explanation"] = str(portfolio_gate_path)
     if not risk_report.passed:
         block_report_path = _write_block_report(
             run_dir / "block_report.md",
@@ -307,10 +315,11 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         return DailyPipelineResult(run_date, run_dir, "risk_failed", False, manifest_path, artifacts)
 
     execution_path = _resolve(root_path, inputs.execution_config_path)
-    orders = build_order_suggestions(portfolio, current_positions, load_order_config(execution_path))
-    fills = simulate_paper_fills(orders, load_paper_fill_config(execution_path))
-    expected = apply_fills_to_positions(current_positions, fills)
-    reconcile_report = reconcile_positions(expected, expected.copy(), load_reconcile_config(execution_path))
+    broker = load_broker_adapter(load_yaml(execution_path), run_id=f"{run_date.replace('-', '')}-paper")
+    orders = broker.submit_orders(broker.validate_orders(build_order_suggestions(portfolio, current_positions, load_order_config(execution_path))))
+    fills = broker.fetch_fills(orders)
+    expected = broker.fetch_positions(current_positions, fills)
+    reconcile_report = broker.reconcile(expected, expected.copy())
     orders_path = write_orders(orders, run_dir / "orders.csv")
     fills_path = write_fills(fills, run_dir / "fills.csv")
     expected_path = write_positions_state(expected, run_dir / "positions_expected.csv")
@@ -595,6 +604,93 @@ def _write_block_report(
     )
     output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return output
+
+
+def _write_portfolio_gate_explanation(
+    path: str | Path,
+    *,
+    risk_report: Any,
+    risk_report_path: str | Path,
+    expert_review_gate: dict[str, str] | None = None,
+) -> Path:
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    failed = [row for row in risk_report.rows if row["status"] != "pass"]
+    expert_review_gate = expert_review_gate or {}
+    decision = _portfolio_gate_decision(failed, expert_review_gate)
+    lines = [
+        "# Portfolio Gate Explanation",
+        "",
+        f"- decision: {decision}",
+        f"- risk_report: {risk_report_path}",
+        f"- expert_gate_status: {expert_review_gate.get('status', '')}",
+        f"- expert_gate_action: {expert_review_gate.get('action', '')}",
+        f"- expert_gate_detail: {expert_review_gate.get('detail', '')}",
+        "",
+        "## Failed Checks",
+        "",
+    ]
+    if not failed:
+        lines.append("- No failed portfolio gate checks.")
+    else:
+        lines.extend(["| check | measured_value | threshold | affected_instruments | next_action | artifact |", "|---|---:|---:|---|---|---|"])
+        for row in failed:
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        str(row.get("check", "")),
+                        _format_gate_value(row.get("value")),
+                        _format_gate_value(row.get("threshold")),
+                        _affected_instruments(row.get("detail", "")),
+                        _next_action_for_gate(str(row.get("check", ""))),
+                        str(risk_report_path),
+                    ]
+                )
+                + " |"
+            )
+    output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return output
+
+
+def _portfolio_gate_decision(failed_rows: list[dict[str, Any]], expert_review_gate: dict[str, str]) -> str:
+    if expert_review_gate.get("status") in {"blocked", "manual_confirmation_required"}:
+        return "reject"
+    failed = {str(row.get("check", "")) for row in failed_rows}
+    if not failed:
+        return "pass"
+    caution_checks = {
+        "max_industry_weight",
+        "min_factor_family_count",
+        "max_factor_family_concentration",
+        "min_factor_logic_count",
+        "max_factor_logic_concentration",
+    }
+    return "caution" if failed <= caution_checks else "reject"
+
+
+def _format_gate_value(value: Any) -> str:
+    try:
+        return f"{float(value):.6g}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _affected_instruments(detail: Any) -> str:
+    text = str(detail or "").strip()
+    if not text:
+        return ""
+    return "; ".join(part.split(":", 1)[0].strip() for part in text.split(";") if part.strip())
+
+
+def _next_action_for_gate(check_name: str) -> str:
+    if check_name == "event_blocked_positions":
+        return "remove affected instruments or wait for event risk to clear"
+    if check_name in {"max_single_weight", "min_positions", "no_negative_weights"}:
+        return "rebalance portfolio construction inputs"
+    if check_name.startswith("max_") or check_name.startswith("min_factor"):
+        return "reduce concentration or add independent factor families"
+    return "review gate inputs and rerun daily pipeline"
 
 
 def _write_run_summary(

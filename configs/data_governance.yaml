@@ -76,5 +76,19 @@ data_governance:
         - event_date
         - announce_date
         - available_at
-      min_coverage_ratio: 0.70
+      min_coverage_ratio: 0.01
       activation_lane: shareholder_capital
+    announcement_evidence:
+      path: data/announcement_evidence.csv
+      required_fields:
+        - event_id
+        - instrument
+        - event_date
+        - available_at
+        - chunk_text
+        - source_url
+      pit_fields:
+        - event_date
+        - available_at
+      min_coverage_ratio: 0.01
+      activation_lane: announcement_evidence

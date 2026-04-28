@@ -11,11 +11,12 @@ from _bootstrap import add_src_to_path, project_root
 
 add_src_to_path()
 
+from qlib_factor_lab.broker_adapter import load_broker_adapter
 from qlib_factor_lab.config import load_yaml
 from qlib_factor_lab.orders import build_order_suggestions, load_order_config, write_orders
-from qlib_factor_lab.paper_broker import load_paper_fill_config, simulate_paper_fills, write_fills
-from qlib_factor_lab.reconcile import reconcile_positions, load_reconcile_config, write_reconciliation_report
-from qlib_factor_lab.state import apply_fills_to_positions, write_positions_state
+from qlib_factor_lab.paper_broker import write_fills
+from qlib_factor_lab.reconcile import write_reconciliation_report
+from qlib_factor_lab.state import write_positions_state
 
 
 def main() -> int:
@@ -37,12 +38,11 @@ def main() -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
 
     order_config = load_order_config(execution_path)
-    fill_config = load_paper_fill_config(execution_path)
-    reconcile_config = load_reconcile_config(execution_path)
-    orders = build_order_suggestions(target, current, order_config)
-    fills = simulate_paper_fills(orders, fill_config)
-    expected = apply_fills_to_positions(current, fills)
-    reconcile_report = reconcile_positions(expected, expected.copy(), reconcile_config)
+    broker = load_broker_adapter(load_yaml(execution_path), run_id=f"{run_date.replace('-', '')}-paper")
+    orders = broker.submit_orders(broker.validate_orders(build_order_suggestions(target, current, order_config)))
+    fills = broker.fetch_fills(orders)
+    expected = broker.fetch_positions(current, fills)
+    reconcile_report = broker.reconcile(expected, expected.copy())
 
     orders_path = write_orders(orders, run_dir / "orders.csv")
     fills_path = write_fills(fills, run_dir / "fills.csv")

@@ -1,0 +1,6 @@
+name: high_mean60_close5_discount_reversal_v1
+family: reversal
+expression: "Mean($high, 60) / Mean($close, 5) - 1"
+direction: 1
+description: "Measures how far the recent 5 day average close sits below the stock's 60 day average high, using a long horizon upper price anchor and a short horizon closing baseline to capture persistent markdowns that may mean revert."
+expected_behavior: "Stocks whose 5 day average close remains materially below their 60 day average high should score higher, indicating a sustained discount to a long horizon upper anchor and more room for reversal. Stocks whose recent closes are already close to that anchor should score lower."

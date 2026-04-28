@@ -11,6 +11,7 @@ import yaml
 
 from .exposure_attribution import build_exposure_attribution, load_factor_family_map, load_factor_logic_map
 from .company_events import COMPANY_EVENT_COLUMNS, load_company_events, load_event_risk_config
+from .evidence_library import summarize_announcement_evidence
 from .expert_review import parse_expert_review_manual_items
 from .risk import RiskConfig, check_portfolio_risk
 
@@ -648,11 +649,13 @@ def build_research_evidence_summary(portfolio: pd.DataFrame) -> dict[str, Any]:
 def build_event_evidence_library(
     root: str | Path = ".",
     event_risk_config_path: str | Path = EVENT_RISK_CONFIG,
+    announcement_evidence_path: str | Path = "data/announcement_evidence.csv",
 ) -> dict[str, Any]:
     root_path = Path(root)
     config = load_event_risk_config(_resolve(root_path, event_risk_config_path))
     events_path = _resolve_optional(root_path, config.events_path)
     events = load_company_events(events_path)
+    evidence_path = _resolve(root_path, announcement_evidence_path)
     detail = _event_evidence_detail(events)
     return {
         "cards": {
@@ -665,6 +668,8 @@ def build_event_evidence_library(
         "severity": _value_counts_frame(events, "severity"),
         "detail": detail,
         "events_path": str(events_path) if events_path is not None else "",
+        "announcement_evidence": summarize_announcement_evidence(evidence_path),
+        "announcement_evidence_path": str(evidence_path),
     }
 
 

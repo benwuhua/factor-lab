@@ -1,0 +1,32 @@
+description: "Theme-event research lane for same-theme shortlist discovery. It is research-only until portfolio and execution gates pass."
+allowed_inputs:
+  - configs/themes/*.yaml
+  - data/announcement_evidence.csv
+  - data/security_master.csv
+  - reports/theme_scans/*.csv
+families:
+  - supply_chain_theme
+  - policy_theme
+  - industry_heat
+  - event_catalyst
+logic_buckets:
+  theme_membership:
+    description: "Instrument belongs to the researched supply-chain, policy, or industry theme."
+    required_evidence:
+      - theme_config
+      - industry_or_keyword_match
+  evidence_support:
+    description: "Announcement or event evidence supports the theme thesis."
+    required_evidence:
+      - announcement_evidence
+      - source_url
+  tradable_signal:
+    description: "Theme candidate has usable factor or market signal coverage before portfolio construction."
+    required_evidence:
+      - signal_score
+      - liquidity_context
+guards:
+  research_only_until_portfolio_gate: true
+  same_theme_shortlist_allowed: true
+  executable_portfolio_still_needs_concentration_caps: true
+  min_research_candidates: 3

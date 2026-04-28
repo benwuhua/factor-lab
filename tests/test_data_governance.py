@@ -113,6 +113,48 @@ class DataGovernanceTests(unittest.TestCase):
             self.assertEqual(row["activation_status"], "shadow")
             self.assertTrue(report.passed)
 
+    def test_blank_pit_fields_are_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame({"instrument": ["AAA"]}).to_csv(root / "data/universe.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA"],
+                    "report_period": ["2026-03-31"],
+                    "announce_date": [""],
+                    "available_at": ["2026-04-20"],
+                }
+            ).to_csv(root / "data/fundamental_quality.csv", index=False)
+            config_path = root / "configs/data_governance.yaml"
+            config_path.parent.mkdir()
+            config_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "data_governance": {
+                            "expected_universe_path": "data/universe.csv",
+                            "domains": {
+                                "fundamental_quality": {
+                                    "path": "data/fundamental_quality.csv",
+                                    "required_fields": ["instrument", "report_period", "announce_date", "available_at"],
+                                    "pit_fields": ["report_period", "announce_date", "available_at"],
+                                    "min_coverage_ratio": 0.7,
+                                }
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = build_data_governance_report(load_data_governance_config(config_path), project_root=root)
+
+            row = report.to_frame().iloc[0]
+            self.assertEqual(row["status"], "fail")
+            self.assertEqual(row["activation_status"], "shadow")
+            self.assertLess(row["pit_field_completeness"], 1.0)
+            self.assertIn("pit_incomplete", row["detail"])
+
     def test_blocking_activation_failure_marks_report_failed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

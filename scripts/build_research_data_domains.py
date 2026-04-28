@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from _bootstrap import add_src_to_path, project_root, suppress_runtime_warnings
+
+suppress_runtime_warnings()
+add_src_to_path()
+
+from qlib_factor_lab.akshare_data import today_for_daily_data
+from qlib_factor_lab.research_data_domains import write_research_data_domains
+
+
+def main() -> int:
+    default_root = project_root()
+    parser = argparse.ArgumentParser(description="Build fundamental, shareholder-capital, and announcement evidence data domains.")
+    parser.add_argument("--project-root", default=str(default_root))
+    parser.add_argument("--as-of-date", default=today_for_daily_data())
+    parser.add_argument("--fundamental-source", default=None, help="Optional offline raw fundamental CSV to normalize.")
+    parser.add_argument("--fetch-fundamentals", action="store_true", help="Fetch fundamental quality data from AkShare.")
+    parser.add_argument("--limit", type=int, default=None, help="Limit instruments for smoke tests.")
+    parser.add_argument("--delay", type=float, default=0.2)
+    args = parser.parse_args()
+
+    manifest = write_research_data_domains(
+        Path(args.project_root),
+        as_of_date=args.as_of_date,
+        fundamental_source=args.fundamental_source,
+        fetch_fundamentals=args.fetch_fundamentals,
+        limit=args.limit,
+        delay=args.delay,
+    )
+    for key, path in manifest.items():
+        print(f"{key}: {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

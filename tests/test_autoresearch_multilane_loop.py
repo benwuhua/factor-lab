@@ -196,6 +196,8 @@ class AutoresearchMultilaneLoopTests(unittest.TestCase):
             summary = json.loads(calls[0]["output_path"].parent.joinpath("summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["iterations"][0]["rotation"]["expression_candidate"], "candidate_momentum.yaml")
             self.assertEqual(summary["iterations"][0]["rotation"]["policy"], "non_reversal_priority")
+            self.assertEqual(summary["skipped_expression_candidates"][0]["candidate"], "candidate_reversal.yaml")
+            self.assertEqual(summary["skipped_expression_candidates"][0]["reason"], "reversal_priority_filter")
 
     def test_loop_can_include_reversal_expression_candidates_when_explicitly_requested(self):
         with tempfile.TemporaryDirectory() as tmp:

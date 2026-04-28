@@ -1,0 +1,86 @@
+description: "Point-in-time fundamental quality lane. The lane reads data/fundamental_quality.csv; agent edits should change this spec, not evaluator code."
+data_domain: fundamental_quality
+source_path: data/fundamental_quality.csv
+logic_buckets:
+  - profitability_quality
+  - balance_sheet_risk
+  - quality_low_leverage
+candidate_factors:
+  - name: roe
+    family: quality
+    category: candidate_quality
+    logic_bucket: profitability_quality
+    direction: 1
+    active: true
+    review_status: candidate
+    description: "Point-in-time return on equity; higher quality is ranked higher."
+  - name: debt_ratio
+    family: value_risk
+    category: candidate_quality
+    logic_bucket: balance_sheet_risk
+    direction: -1
+    active: true
+    review_status: candidate
+    description: "Point-in-time debt ratio; lower leverage is ranked higher."
+  - name: quality_low_leverage
+    family: quality_low_leverage
+    category: candidate_fundamental_combo
+    logic_bucket: quality_low_leverage
+    direction: 1
+    active: true
+    review_status: candidate
+    components:
+      - field: roe
+        direction: 1
+        weight: 1.0
+      - field: debt_ratio
+        direction: -1
+        weight: 0.25
+    description: "ROE quality score with a low-weight low-leverage stabilizer. Debt ratio is deliberately small because standalone neutralized debt_ratio decays after size/industry control."
+  - name: gross_margin
+    family: quality
+    category: candidate_quality
+    logic_bucket: profitability_quality
+    direction: 1
+    active: false
+    review_status: shadow
+    description: "Gross margin is available for part of the universe, but first-pass IC was weak; keep as shadow."
+pit_rules:
+  date_column: available_at
+  fallback_date_column: announce_date
+  cannot_use_unannounced_report_period: true
+families:
+  quality:
+    fields:
+      - roe
+      - gross_margin
+      - operating_cashflow_to_net_profit
+    direction: 1
+  value_risk:
+    fields:
+      - debt_ratio
+    direction: -1
+  quality_low_leverage:
+    fields:
+      - roe
+      - debt_ratio
+    direction: 1
+    component_weights:
+      roe: 1.0
+      debt_ratio: 0.25
+  growth:
+    fields:
+      - revenue_growth_yoy
+      - net_profit_growth_yoy
+    direction: 1
+evaluation:
+  horizons:
+    - 20
+    - 60
+  primary_metric: rank_ic_mean
+  minimum_observations: 500000
+guards:
+  min_coverage_ratio: 0.70
+  require_available_at: true
+  require_announce_date: true
+  max_refresh_frequency: weekly

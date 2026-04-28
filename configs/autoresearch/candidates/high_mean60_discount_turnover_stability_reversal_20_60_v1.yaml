@@ -1,0 +1,6 @@
+name: high_mean60_discount_turnover_stability_reversal_20_60_v1
+family: reversal
+expression: "((Mean($high, 60) - $close) / Mean($high, 60)) - (Std($turnover, 20) / Mean($turnover, 20))"
+direction: 1
+description: "Measures whether a stock is trading at a meaningful discount to its 60 day average high while recent turnover stays stable rather than erratic. A larger value highlights orderly pullbacks that may be more likely to mean revert than high-churn selloffs."
+expected_behavior: "Stocks with a large discount versus their 60 day average high and low 20 day turnover volatility should rank better because they combine visible pullback distance with calmer participation. Stocks with small discount or unstable turnover should rank worse because they either lack reversal room or may still be in noisy distribution."

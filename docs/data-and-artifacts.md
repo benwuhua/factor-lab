@@ -56,6 +56,73 @@ python scripts/build_akshare_qlib_data.py \
 
 Use `--limit` for smoke tests and `--delay`/`--retries` if the free data source throttles requests.
 
+Daily incremental refresh for the fixed CSI300 + CSI500 research universe:
+
+```bash
+make daily-data-update DAILY_DATA_AS_OF=20260427
+```
+
+Preview the update plan without touching data:
+
+```bash
+make daily-data-update DAILY_DATA_AS_OF=20260427 DAILY_DATA_DRY_RUN=1
+```
+
+Run only the research context/data-domain refresh when the market providers are already current:
+
+```bash
+make daily-data-update DAILY_DATA_AS_OF=20260427 DAILY_DATA_SKIP_MARKET=1
+```
+
+Replay and audit a completed daily run bundle:
+
+```bash
+make replay-daily-run RUN_DATE=20260427
+```
+
+This reads `runs/<date>/manifest.json`, verifies required artifacts, checks summary consistency, and writes:
+
+```text
+runs/<date>/replay_report.md
+runs/<date>/replay_report.json
+```
+
+Execution outputs are generated through `BrokerAdapter` implementations:
+
+- `paper`: default simulated fills, positions, and reconciliation.
+- `dry_run`: validates/submits orders but creates no fills.
+- `manual_ticket`: marks orders for human ticket review.
+- `real`: reserved for future broker APIs and disabled unless explicitly enabled in config.
+
+The active mode is configured in `configs/execution.yaml` under `broker_adapter.mode`; real execution should stay disabled until paper/manual flows pass the same replay and gate checks.
+
+The daily update does these steps in order:
+
+- Incrementally update CSI500 Qlib bars in `data/qlib/cn_data_current`.
+- Incrementally update CSI300 Qlib bars in `data/qlib/cn_data_csi300_current`.
+- Refresh `data/security_master.csv` and `data/company_events.csv`.
+- Build `data/fundamental_quality.csv`, `data/shareholder_capital.csv`, and `data/announcement_evidence.csv`.
+- Write `reports/data_governance_<date>.md` and `reports/daily_data_update_<date>.md`.
+
+`fundamental_quality.csv` has a stable PIT schema but is only populated when an offline source is supplied or AkShare fundamentals are explicitly enabled:
+
+```bash
+make daily-data-update DAILY_DATA_AS_OF=20260427 DAILY_DATA_FETCH_FUNDAMENTALS=1
+```
+
+When the upstream fundamental source does not expose an announcement date, Factor Lab uses a conservative PIT fallback:
+
+- Q1 reports become available on `YYYY-04-30`.
+- Half-year reports become available on `YYYY-08-31`.
+- Q3 reports become available on `YYYY-10-31`.
+- Annual reports become available on next year `YYYY-04-30`.
+
+For a curated offline fundamental file:
+
+```bash
+make daily-data-update DAILY_DATA_AS_OF=20260427 DAILY_DATA_FUNDAMENTAL_SOURCE=/path/to/fundamental_source.csv
+```
+
 ## Rebuild Common Reports
 
 Generate the current candidate-factor table:

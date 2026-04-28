@@ -41,7 +41,7 @@ data_governance:
         - suspended
         - buy_blocked
     fundamental_quality:
-      current_status: missing
+      current_status: ready
       pit_fields:
         - report_period
         - announce_date
@@ -202,11 +202,35 @@ lanes:
       ic_is_secondary: true
       cannot_use_unannounced_report_period: true
 
+  theme_event:
+    cadence: daily_research
+    editable_space: configs/autoresearch/theme_space.yaml
+    factor_type: research_shortlist
+    activation_status: shadow
+    required_data_domains:
+      - security_master
+      - announcement_evidence
+    families:
+      - supply_chain_theme
+      - policy_theme
+      - industry_heat
+      - event_catalyst
+    primary_metrics:
+      - theme_score
+      - signal_coverage
+      - theme_gate_decision
+      - evidence_coverage
+    guards:
+      research_only_until_portfolio_gate: true
+      same_theme_shortlist_allowed: true
+      executable_portfolio_still_needs_concentration_caps: true
+      require_evidence_or_theme_config: true
+
   fundamental_quality:
     cadence: weekly
     editable_space: configs/autoresearch/fundamental_space.yaml
     factor_type: cross_sectional
-    activation_status: shadow
+    activation_status: active
     required_data_domains:
       - fundamental_quality
     families:

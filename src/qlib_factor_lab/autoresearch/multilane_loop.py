@@ -109,7 +109,7 @@ def run_multilane_loop(
     crash_budget = max(1, int(max_crashes))
     stop_reason = "max_iterations"
     iteration = 0
-    expression_candidates = _expression_candidate_paths(
+    expression_candidates, skipped_expression_candidates = _expression_candidate_paths_with_skips(
         root,
         expression_candidate_path,
         expression_candidate_glob,
@@ -122,6 +122,7 @@ def run_multilane_loop(
         crash_count=crash_count,
         lane_crash_count=lane_crash_count,
         stop_reason="running",
+        skipped_expression_candidates=skipped_expression_candidates,
     )
 
     while True:
@@ -197,6 +198,7 @@ def run_multilane_loop(
             crash_count=crash_count,
             lane_crash_count=lane_crash_count,
             stop_reason="running",
+            skipped_expression_candidates=skipped_expression_candidates,
         )
 
         if crash_count >= crash_budget:
@@ -212,6 +214,7 @@ def run_multilane_loop(
         crash_count=crash_count,
         lane_crash_count=lane_crash_count,
         stop_reason=stop_reason,
+        skipped_expression_candidates=skipped_expression_candidates,
     )
     return MultiLaneLoopResult(
         iterations_started=iterations_started,
@@ -246,6 +249,17 @@ def _expression_candidate_paths(
     *,
     include_reversal: bool = False,
 ) -> list[str]:
+    paths, _ = _expression_candidate_paths_with_skips(root, fallback, glob_pattern, include_reversal=include_reversal)
+    return paths
+
+
+def _expression_candidate_paths_with_skips(
+    root: Path,
+    fallback: str | Path,
+    glob_pattern: str | None,
+    *,
+    include_reversal: bool = False,
+) -> tuple[list[str], list[dict[str, str]]]:
     fallback_path = _resolve(root, fallback)
     candidates: list[Path] = []
     if glob_pattern:
@@ -253,12 +267,18 @@ def _expression_candidate_paths(
     if fallback_path not in candidates:
         candidates.insert(0, fallback_path)
     existing = [path for path in candidates if path.exists()]
+    skipped: list[dict[str, str]] = []
     if not include_reversal:
-        non_reversal = [path for path in existing if not _is_reversal_expression_candidate(path)]
+        non_reversal = []
+        for path in existing:
+            if _is_reversal_expression_candidate(path):
+                skipped.append({"candidate": path.name, "reason": "reversal_priority_filter"})
+            else:
+                non_reversal.append(path)
         if non_reversal:
             existing = non_reversal
     paths = existing or [fallback_path]
-    return [str(path) for path in paths]
+    return [str(path) for path in paths], skipped
 
 
 def _lane_factor_name_overrides(iteration: int, batch_size: int) -> dict[str, list[str]]:
@@ -301,12 +321,14 @@ def _write_loop_summary(
     crash_count: int,
     lane_crash_count: int,
     stop_reason: str,
+    skipped_expression_candidates: list[dict[str, str]] | None = None,
 ) -> None:
     payload = {
         "iterations_started": iterations_started,
         "crash_count": crash_count,
         "lane_crash_count": lane_crash_count,
         "stop_reason": stop_reason,
+        "skipped_expression_candidates": skipped_expression_candidates or [],
         "iterations": iterations,
     }
     (log_dir / "summary.json").write_text(json.dumps(_json_safe(payload), ensure_ascii=False, indent=2), encoding="utf-8")
@@ -315,6 +337,7 @@ def _write_loop_summary(
         f"crash_count: {crash_count}",
         f"lane_crash_count: {lane_crash_count}",
         f"stop_reason: {stop_reason}",
+        f"skipped_expression_candidates: {len(skipped_expression_candidates or [])}",
         "",
         "| iteration | status | lane_crashes | output |",
         "|---:|---|---:|---|",

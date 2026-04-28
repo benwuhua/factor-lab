@@ -60,7 +60,7 @@ def neutralize_signal(
 
         design_parts = []
         if exposure_cols:
-            design_parts.append(usable[exposure_cols].astype(float))
+            design_parts.append(_standardize_exposures(usable[exposure_cols].astype(float)))
         if group_col is not None:
             dummies = pd.get_dummies(usable[group_col].astype(str), prefix=group_col, drop_first=True, dtype=float)
             if not dummies.empty:
@@ -75,6 +75,12 @@ def neutralize_signal(
         y = usable[signal_col].astype(float).to_numpy()
         x = design.astype(float).to_numpy()
         beta, *_ = np.linalg.lstsq(x, y, rcond=None)
-        residual = y - x @ beta
+        residual = y - np.dot(x, beta)
         result.loc[usable.index, output_col] = residual
     return result
+
+
+def _standardize_exposures(frame: pd.DataFrame) -> pd.DataFrame:
+    centered = frame - frame.mean()
+    scale = frame.std(ddof=0).replace(0, np.nan)
+    return (centered / scale).fillna(0.0)

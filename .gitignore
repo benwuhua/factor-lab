@@ -27,4 +27,5 @@ reports/autoresearch/*
 runs/
 state/
 mlruns/
+logs/
 Users/

@@ -413,6 +413,33 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(library["severity"].set_index("severity").loc["block", "count"], 1)
         self.assertEqual(list(library["detail"]["instrument"]), ["BBB", "AAA"])
 
+    def test_event_evidence_library_includes_announcement_evidence_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame(
+                [
+                    {
+                        "event_id": "e1",
+                        "instrument": "AAA",
+                        "event_type": "buyback",
+                        "event_date": "2026-04-20",
+                        "available_at": "2026-04-21",
+                        "severity": "watch",
+                        "title": "Buyback",
+                        "source_url": "https://example.test/a",
+                        "chunk_id": "e1_000",
+                        "chunk_text": "buyback evidence",
+                        "keywords": "buyback",
+                    }
+                ]
+            ).to_csv(root / "data/announcement_evidence.csv", index=False)
+
+            library = build_event_evidence_library(root)
+
+        self.assertEqual(library["announcement_evidence"]["chunks"], 1)
+        self.assertEqual(library["announcement_evidence_path"], str(root / "data/announcement_evidence.csv"))
+
     def test_research_context_health_reports_master_event_and_source_coverage(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

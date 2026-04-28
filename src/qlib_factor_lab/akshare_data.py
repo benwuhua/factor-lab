@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import yaml
@@ -83,10 +84,17 @@ def validate_research_universe(universe: str) -> str:
     return normalized
 
 
-def today_for_daily_data(now: dt.date | None = None) -> str:
-    today = now or dt.date.today()
-    # Use the previous calendar day by default. It avoids mixing incomplete current-day bars.
-    return (today - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+def today_for_daily_data(now: dt.date | dt.datetime | None = None) -> str:
+    shanghai = ZoneInfo("Asia/Shanghai")
+    if now is None:
+        current = dt.datetime.now(shanghai)
+    elif isinstance(now, dt.datetime):
+        current = now.replace(tzinfo=shanghai) if now.tzinfo is None else now.astimezone(shanghai)
+    else:
+        current = dt.datetime.combine(now, dt.time(23, 59), tzinfo=shanghai)
+    market_close = dt.time(15, 0)
+    target = current.date() if current.time() >= market_close else current.date() - dt.timedelta(days=1)
+    return target.strftime("%Y-%m-%d")
 
 
 def qlib_symbol_from_code(code: str) -> str:
@@ -564,8 +572,12 @@ def fetch_company_notices(start_date: str, end_date: str, delay: float = 0.2) ->
         date_text = day.strftime("%Y%m%d")
         try:
             raw = ak.stock_notice_report(symbol="全部", date=date_text)
-        except TypeError:
-            raw = ak.stock_notice_report(date=date_text)
+        except TypeError as exc:
+            try:
+                raw = ak.stock_notice_report(date=date_text)
+            except Exception as fallback_exc:
+                print(f"skip failed notices: {date_text} ({fallback_exc}; fallback after {exc})")
+                raw = None
         except Exception as exc:
             print(f"skip failed notices: {date_text} ({exc})")
             raw = None

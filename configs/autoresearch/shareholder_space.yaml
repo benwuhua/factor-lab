@@ -1,0 +1,31 @@
+description: "Shareholder and capital event lane. Kept shadow until shareholder_capital governance passes with enough event coverage."
+allowed_fields:
+  - event_type
+  - event_date
+  - announce_date
+  - active_until
+  - severity
+families:
+  - buyback
+  - pledge_risk
+  - unlock_overhang
+  - shareholder_reduction
+  - shareholder_increase
+  - capital_structure_change
+logic_buckets:
+  capital_support:
+    description: "Buyback or increase events that may support price after announcement."
+    event_types:
+      - buyback
+      - shareholder_increase
+  overhang_risk:
+    description: "Reduction, unlock, or pledge-risk events that can suppress follow-through."
+    event_types:
+      - shareholder_reduction
+      - large_unlock
+      - pledge_risk
+guards:
+  min_event_count: 50
+  require_announce_date: true
+  require_active_until_for_risk_events: true
+  portfolio_activation: shadow_until_governance_pass

@@ -2,8 +2,10 @@ import tempfile
 import subprocess
 import sys
 import unittest
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import yaml
@@ -22,6 +24,7 @@ from qlib_factor_lab.akshare_data import (
     normalize_cninfo_industry_override,
     qlib_symbol_from_code,
     read_latest_qlib_calendar_date,
+    today_for_daily_data,
     write_instrument_alias,
     write_provider_config,
 )
@@ -34,6 +37,19 @@ class AkShareDataTests(unittest.TestCase):
         self.assertEqual(qlib_symbol_from_code("1"), "SZ000001")
         self.assertEqual(qlib_symbol_from_code("300750"), "SZ300750")
         self.assertEqual(qlib_symbol_from_code("688111"), "SH688111")
+
+    def test_today_for_daily_data_uses_current_day_after_a_share_close(self):
+        now = datetime(2026, 4, 28, 15, 1, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+        self.assertEqual(today_for_daily_data(now), "2026-04-28")
+
+    def test_today_for_daily_data_uses_previous_day_before_a_share_close(self):
+        now = datetime(2026, 4, 28, 14, 59, tzinfo=ZoneInfo("Asia/Shanghai"))
+
+        self.assertEqual(today_for_daily_data(now), "2026-04-27")
+
+    def test_today_for_daily_data_treats_date_input_as_closed_session(self):
+        self.assertEqual(today_for_daily_data(date(2026, 4, 28)), "2026-04-28")
 
     def test_normalize_akshare_history_maps_columns_and_computes_vwap(self):
         raw = pd.DataFrame(
@@ -279,6 +295,19 @@ class AkShareDataTests(unittest.TestCase):
         class FakeAkshare:
             def stock_notice_report(self, symbol, date):
                 raise KeyError("代码")
+
+        with patch("qlib_factor_lab.akshare_data._get_akshare", return_value=FakeAkshare()):
+            result = fetch_company_notices("2026-04-20", "2026-04-20", delay=0)
+
+        self.assertTrue(result.empty)
+        self.assertIn("instrument", result.columns)
+
+    def test_fetch_company_notices_skips_failed_legacy_fallback_call(self):
+        class FakeAkshare:
+            def stock_notice_report(self, **kwargs):
+                if "symbol" in kwargs:
+                    raise TypeError("legacy signature")
+                raise ConnectionError("stream interrupted")
 
         with patch("qlib_factor_lab.akshare_data._get_akshare", return_value=FakeAkshare()):
             result = fetch_company_notices("2026-04-20", "2026-04-20", delay=0)

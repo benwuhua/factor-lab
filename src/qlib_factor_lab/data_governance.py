@@ -196,7 +196,9 @@ def _pit_completeness(frame: pd.DataFrame, pit_fields: tuple[str, ...]) -> float
         if field_name not in frame.columns:
             values.append(0.0)
             continue
-        values.append(float(frame[field_name].notna().mean()))
+        series = frame[field_name]
+        non_blank = series.notna() & series.astype(str).str.strip().ne("")
+        values.append(float(non_blank.mean()))
     return sum(values) / len(values)
 
 

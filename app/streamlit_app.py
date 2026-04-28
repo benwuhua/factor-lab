@@ -622,6 +622,7 @@ def render_evidence_library() -> None:
     detail = library["detail"]
     event_types = library["event_types"]
     severity = library["severity"]
+    announcement_evidence = library.get("announcement_evidence", {})
 
     st.markdown(
         _page_topbar_html(
@@ -700,6 +701,15 @@ def render_evidence_library() -> None:
                     ("severity", len(severity)),
                 ],
                 note="source_url 是后续证据追踪和人工复核的关键入口。",
+            )
+            + _detail_card_html(
+                "Announcement Evidence",
+                [
+                    ("chunks", announcement_evidence.get("chunks", 0)),
+                    ("events", announcement_evidence.get("events", 0)),
+                    ("names", announcement_evidence.get("instruments", 0)),
+                ],
+                note="公告证据块来自 data/announcement_evidence.csv，可用于后续 RAG 和专家复核。",
             )
             + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">python scripts/build_research_context_data.py<br>make target-portfolio<br>make exposure-attribution</div></section>'
             + "</aside>",

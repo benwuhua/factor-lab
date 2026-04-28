@@ -12,6 +12,7 @@ import pandas as pd
 
 from qlib_factor_lab.autoresearch.cross_sectional_oracle import run_cross_sectional_lane_oracle
 from qlib_factor_lab.autoresearch.event_oracle import run_event_lane_oracle
+from qlib_factor_lab.autoresearch.fundamental_oracle import run_fundamental_lane_oracle
 from qlib_factor_lab.autoresearch.oracle import run_expression_oracle
 from qlib_factor_lab.autoresearch.regime_oracle import run_regime_lane_oracle
 from qlib_factor_lab.config import load_yaml
@@ -110,6 +111,20 @@ def run_multilane_autoresearch(
                     {
                         "lane_name": lane_name,
                         "provider_config": provider_config_path,
+                        "project_root": root,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    },
+                )
+                futures[future] = (lane_name, activation)
+                continue
+            if lane_name == "fundamental_quality":
+                future = executor.submit(
+                    _run_qlib_oracle,
+                    run_fundamental_lane_oracle,
+                    {
+                        "lane_name": lane_name,
+                        "contract_path": contract_path,
                         "project_root": root,
                         "start_time": start_time,
                         "end_time": end_time,

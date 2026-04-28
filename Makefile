@@ -68,15 +68,29 @@ ORDERS_CSV ?= runs/$(RUN_DATE)/orders.csv
 FILLS_CSV ?= runs/$(RUN_DATE)/fills.csv
 HISTORICAL_DAYS ?= 30
 EXECUTION_CALENDAR_OUTPUT ?= reports/execution_calendar_$(RUN_DATE).csv
+REPLAY_RUN_DIR ?= runs/$(RUN_DATE)
+REPLAY_OUTPUT ?= $(REPLAY_RUN_DIR)/replay_report.md
 RESEARCH_CONTEXT_AS_OF ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
+DAILY_DATA_AS_OF ?= $(shell PYTHONPATH=src $(PYTHON) -c "from qlib_factor_lab.akshare_data import today_for_daily_data; print(today_for_daily_data().replace('-', ''))")
+DAILY_DATA_SKIP_MARKET ?= 0
+DAILY_DATA_SKIP_MARKET_ARG = $(if $(filter 1 true yes TRUE YES,$(DAILY_DATA_SKIP_MARKET)),--skip-market-data,)
+DAILY_DATA_FETCH_FUNDAMENTALS ?= 0
+DAILY_DATA_FETCH_FUNDAMENTALS_ARG = $(if $(filter 1 true yes TRUE YES,$(DAILY_DATA_FETCH_FUNDAMENTALS)),--fetch-fundamentals,)
+DAILY_DATA_FUNDAMENTAL_SOURCE ?=
+DAILY_DATA_FUNDAMENTAL_SOURCE_ARG = $(if $(DAILY_DATA_FUNDAMENTAL_SOURCE),--fundamental-source $(DAILY_DATA_FUNDAMENTAL_SOURCE),)
+DAILY_DATA_LIMIT ?=
+DAILY_DATA_LIMIT_ARG = $(if $(DAILY_DATA_LIMIT),--limit $(DAILY_DATA_LIMIT),)
+DAILY_DATA_DRY_RUN ?= 0
+DAILY_DATA_DRY_RUN_ARG = $(if $(filter 1 true yes TRUE YES,$(DAILY_DATA_DRY_RUN)),--dry-run,)
+DAILY_DATA_MANIFEST ?= reports/daily_data_update_$(DAILY_DATA_AS_OF).md
 INDUSTRY_OVERRIDES_OUTPUT ?= data/security_industry_overrides.csv
 INDUSTRY_OVERRIDES_AS_OF ?= $(RUN_DATE)
 INDUSTRY_OVERRIDES_UNIVERSES ?= csi300 csi500
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards theme-scan exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards theme-scan exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -88,6 +102,8 @@ help:
 	@printf "  make check-env        Check local Qlib provider environment\n"
 	@printf "  make industry-overrides  Refresh CSI300/CSI500 industry override table\n"
 	@printf "  make research-context Refresh security master and company event evidence\n"
+	@printf "  make research-data-domains Build fundamental/shareholder/evidence data domains\n"
+	@printf "  make daily-data-update Incrementally refresh market data and research data domains\n"
 	@printf "  make data-governance Check PIT data-domain coverage and lane readiness\n"
 	@printf "  make factor-research Run the one-command factor research pipeline\n"
 	@printf "  make candidates       Generate candidate factor table for CSI500 config\n"
@@ -113,6 +129,7 @@ help:
 	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
 	@printf "  make paper-batch     Run rolling paper batch over target portfolios\n"
 	@printf "  make historical-paper-batch  Generate historical targets and run paper batch\n"
+	@printf "  make replay-daily-run  Replay and audit a daily run bundle\n"
 	@printf "  make manual-ticket   Generate human-reviewed manual order ticket\n"
 	@printf "  make lgb-dry-run      Render Qlib LightGBM workflow config\n"
 	@printf "  make clean-pyc        Remove Python bytecode caches\n"
@@ -131,6 +148,8 @@ help:
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make industry-overrides RUN_DATE=20260420\n"
 	@printf "  make research-context RUN_DATE=20260420\n"
+	@printf "  make research-data-domains RUN_DATE=20260420\n"
+	@printf "  make daily-data-update DAILY_DATA_AS_OF=20260420 DAILY_DATA_DRY_RUN=1\n"
 	@printf "  make data-governance RUN_DATE=20260420\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv\n"
@@ -139,6 +158,7 @@ help:
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
 	@printf "  make paper-batch TARGET_GLOB='reports/paper_batch_targets/target_portfolio_*.csv'\n"
 	@printf "  make historical-paper-batch HISTORICAL_DAYS=30\n"
+	@printf "  make replay-daily-run RUN_DATE=20260420\n"
 	@printf "  make manual-ticket RUN_DATE=20260420\n"
 	@printf "  make mine-csi500 HORIZONS='--horizon 5 --horizon 20 --horizon 60'\n"
 
@@ -172,6 +192,23 @@ research-context:
 		--notice-start $(RESEARCH_CONTEXT_NOTICE_START) \
 		--notice-end $(RESEARCH_CONTEXT_NOTICE_END) \
 		--universes $(RESEARCH_CONTEXT_UNIVERSES)
+
+research-data-domains:
+	$(PYTHON) scripts/build_research_data_domains.py \
+		--as-of-date $(RESEARCH_CONTEXT_AS_OF) \
+		$(DAILY_DATA_FETCH_FUNDAMENTALS_ARG) \
+		$(DAILY_DATA_FUNDAMENTAL_SOURCE_ARG) \
+		$(DAILY_DATA_LIMIT_ARG)
+
+daily-data-update:
+	$(PYTHON) scripts/update_daily_data.py \
+		--as-of-date $(DAILY_DATA_AS_OF) \
+		--manifest $(DAILY_DATA_MANIFEST) \
+		$(DAILY_DATA_SKIP_MARKET_ARG) \
+		$(DAILY_DATA_FETCH_FUNDAMENTALS_ARG) \
+		$(DAILY_DATA_FUNDAMENTAL_SOURCE_ARG) \
+		$(DAILY_DATA_LIMIT_ARG) \
+		$(DAILY_DATA_DRY_RUN_ARG)
 
 data-governance:
 	$(PYTHON) scripts/check_data_governance.py \
@@ -368,6 +405,11 @@ historical-paper-batch:
 		--risk-config $(RISK_CONFIG) \
 		--execution-config $(EXECUTION_CONFIG) \
 		--current-positions $(CURRENT_POSITIONS)
+
+replay-daily-run:
+	$(PYTHON) scripts/replay_daily_run.py \
+		--run-dir $(REPLAY_RUN_DIR) \
+		--output $(REPLAY_OUTPUT)
 
 manual-ticket:
 	$(PYTHON) scripts/generate_manual_ticket.py \

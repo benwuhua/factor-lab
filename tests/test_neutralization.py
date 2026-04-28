@@ -1,5 +1,7 @@
 import unittest
+import warnings
 
+import numpy as np
 import pandas as pd
 
 from qlib_factor_lab.neutralization import neutralize_signal
@@ -57,6 +59,25 @@ class NeutralizationTests(unittest.TestCase):
         means = result.groupby("industry")["signal_neutral"].mean()
         self.assertAlmostEqual(means["bank"], 0.0, places=6)
         self.assertAlmostEqual(means["tech"], 0.0, places=6)
+
+    def test_neutralize_signal_handles_large_exposure_scales_without_runtime_warning(self):
+        instrument_count = 281
+        index = pd.MultiIndex.from_product([["2020-01-01"], [f"s{i}" for i in range(instrument_count)]], names=["datetime", "instrument"])
+        frame = pd.DataFrame(
+            {
+                "signal": np.linspace(-35.0, 13.0, instrument_count),
+                "size_proxy": np.linspace(13.0, 23.0, instrument_count),
+                "industry": [f"industry_{i % 155}" for i in range(instrument_count)],
+            },
+            index=index,
+        )
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", RuntimeWarning)
+            result = neutralize_signal(frame, exposure_cols=["size_proxy"], group_col="industry")
+
+        self.assertEqual([], [item for item in caught if issubclass(item.category, RuntimeWarning)])
+        self.assertTrue(np.isfinite(result["signal_neutral"].dropna()).all())
 
 
 if __name__ == "__main__":

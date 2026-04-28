@@ -554,6 +554,36 @@ class MultilaneAutoresearchTests(unittest.TestCase):
         self.assertIn("gap_risk_20", names)
         self.assertIn("intraday_excursion_20", names)
 
+    def test_runner_dispatches_fundamental_quality_oracle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lane_space = root / "configs/autoresearch/lane_space.yaml"
+            lane_space.parent.mkdir(parents=True)
+            lane_space.write_text(
+                yaml.safe_dump({"lanes": {"fundamental_quality": {"activation_status": "active"}}}),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.autoresearch.multilane.run_fundamental_lane_oracle") as oracle:
+                oracle.return_value = (
+                    {"candidate": "roe", "status": "review", "primary_metric": 0.04, "artifact_dir": "fund"},
+                    "",
+                )
+
+                report = run_multilane_autoresearch(
+                    lane_space_path=lane_space,
+                    project_root=root,
+                    start_time="2026-01-01",
+                    end_time="2026-04-20",
+                )
+
+            oracle.assert_called_once()
+            self.assertEqual(oracle.call_args.kwargs["lane_name"], "fundamental_quality")
+            self.assertEqual(oracle.call_args.kwargs["start_time"], "2026-01-01")
+            self.assertEqual(oracle.call_args.kwargs["end_time"], "2026-04-20")
+            frame = report.to_frame().set_index("lane")
+            self.assertEqual(frame.loc["fundamental_quality", "run_status"], "completed")
+
 
 if __name__ == "__main__":
     unittest.main()
