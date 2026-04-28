@@ -18,6 +18,7 @@ FACTOR_DRIVER_COLUMNS = (
 class ExposureAttribution:
     summary: pd.DataFrame
     family: pd.DataFrame
+    logic: pd.DataFrame
     industry: pd.DataFrame
     style: pd.DataFrame
 
@@ -33,10 +34,44 @@ def load_factor_family_map(path: str | Path) -> dict[str, str]:
     return result
 
 
+def load_factor_logic_map(path: str | Path) -> dict[str, str]:
+    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    result: dict[str, str] = {}
+    for item in data.get("approved_factors", []):
+        name = str(item.get("name", "")).strip()
+        if not name:
+            continue
+        logic = str(item.get("logic_bucket", "")).strip()
+        if not logic:
+            logic = infer_logic_bucket(str(item.get("family", "")).strip() or name)
+        result[name] = logic
+    return result
+
+
+def infer_logic_bucket(value: str) -> str:
+    text = str(value).strip().lower()
+    if any(token in text for token in ("reversal", "repair", "washout", "discount", "divergence", "convergence")):
+        return "reversal_repair"
+    if any(token in text for token in ("liquidity", "turnover", "volume_dry", "amount_shock")):
+        return "liquidity_quality"
+    if any(token in text for token in ("volatility", "excursion", "drawdown", "downside", "gap")):
+        return "risk_structure"
+    if any(token in text for token in ("momentum", "trend", "relative_strength")):
+        return "trend_following"
+    if any(token in text for token in ("emotion", "crowding", "breadth", "limit_pressure", "heat", "panic", "mood")):
+        return "emotion_atmosphere"
+    if any(token in text for token in ("value", "quality", "growth", "earnings", "roe", "profit")):
+        return "fundamental_quality"
+    if any(token in text for token in ("holder", "buyback", "pledge", "unlock", "capital", "shareholder")):
+        return "shareholder_capital"
+    return _slug(text or "unknown")
+
+
 def build_exposure_attribution(
     portfolio: pd.DataFrame,
     *,
     family_map: Mapping[str, str] | None = None,
+    logic_map: Mapping[str, str] | None = None,
     weight_col: str = "target_weight",
     industry_col: str = "industry",
     style_cols: list[str] | None = None,
@@ -45,15 +80,21 @@ def build_exposure_attribution(
         return ExposureAttribution(
             summary=_summary_frame(portfolio, weight_col),
             family=pd.DataFrame(columns=["family", "weighted_contribution", "abs_weighted_contribution", "driver_count"]),
+            logic=pd.DataFrame(
+                columns=["logic_bucket", "weighted_contribution", "abs_weighted_contribution", "driver_count"]
+            ),
             industry=pd.DataFrame(columns=["industry", "weight", "position_count"]),
             style=pd.DataFrame(columns=["style", "weighted_average", "available_weight"]),
         )
 
     weights = _weights(portfolio, weight_col)
     resolved_industry_col = _resolve_industry_col(portfolio, industry_col)
+    family_map = family_map or {}
+    logic_map = logic_map or {}
     return ExposureAttribution(
         summary=_summary_frame(portfolio, weight_col, weights=weights),
-        family=_factor_family_exposure(portfolio, family_map or {}, weights),
+        family=_factor_family_exposure(portfolio, family_map, weights),
+        logic=_factor_logic_exposure(portfolio, family_map, logic_map, weights),
         industry=_industry_exposure(portfolio, weights, resolved_industry_col),
         style=_style_exposure(portfolio, weights, style_cols or _default_style_cols(portfolio)),
     )
@@ -66,6 +107,7 @@ def write_exposure_attribution_csv(result: ExposureAttribution, output_dir: str 
     for name, frame in [
         ("summary", result.summary),
         ("families", result.family),
+        ("logic", result.logic),
         ("industry", result.industry),
         ("style", result.style),
     ]:
@@ -88,6 +130,10 @@ def write_exposure_attribution_markdown(result: ExposureAttribution, output_path
         "## Factor Families",
         "",
         _markdown_table(result.family),
+        "",
+        "## Factor Logic",
+        "",
+        _markdown_table(result.logic),
         "",
         "## Industry",
         "",
@@ -176,6 +222,88 @@ def _family_score_exposure(portfolio: pd.DataFrame, weights: pd.Series) -> pd.Da
     return grouped.sort_values("abs_weighted_contribution", ascending=False).reset_index(drop=True)
 
 
+def _factor_logic_exposure(
+    portfolio: pd.DataFrame,
+    family_map: Mapping[str, str],
+    logic_map: Mapping[str, str],
+    weights: pd.Series,
+) -> pd.DataFrame:
+    logic_score = _score_column_exposure(portfolio, weights, prefix="logic_", suffix="_score", label_col="logic_bucket")
+    if not logic_score.empty:
+        return logic_score
+
+    family_score = _logic_from_family_score_exposure(portfolio, family_map, logic_map, weights)
+    if not family_score.empty:
+        return family_score
+
+    rows = []
+    for factor_col, contribution_col in FACTOR_DRIVER_COLUMNS:
+        if factor_col not in portfolio.columns or contribution_col not in portfolio.columns:
+            continue
+        factors = portfolio[factor_col].fillna("").astype(str).str.strip()
+        contributions = pd.to_numeric(portfolio[contribution_col], errors="coerce").fillna(0.0)
+        for index, factor in factors.items():
+            if not factor:
+                continue
+            family = str(family_map.get(factor, factor))
+            logic = str(logic_map.get(factor) or logic_map.get(family) or infer_logic_bucket(family))
+            weighted = float(weights.loc[index] * contributions.loc[index])
+            rows.append({"logic_bucket": logic, "weighted_contribution": weighted})
+    return _group_weighted_rows(rows, "logic_bucket")
+
+
+def _logic_from_family_score_exposure(
+    portfolio: pd.DataFrame,
+    family_map: Mapping[str, str],
+    logic_map: Mapping[str, str],
+    weights: pd.Series,
+) -> pd.DataFrame:
+    rows = []
+    family_cols = [column for column in portfolio.columns if column.startswith("family_") and column.endswith("_score")]
+    for column in family_cols:
+        family = column[len("family_") : -len("_score")]
+        logic = str(logic_map.get(family) or infer_logic_bucket(family_map.get(family, family)))
+        scores = pd.to_numeric(portfolio[column], errors="coerce").fillna(0.0)
+        for index, score in scores.items():
+            weighted = float(weights.loc[index] * score)
+            if weighted != 0:
+                rows.append({"logic_bucket": logic, "weighted_contribution": weighted})
+    return _group_weighted_rows(rows, "logic_bucket")
+
+
+def _score_column_exposure(
+    portfolio: pd.DataFrame,
+    weights: pd.Series,
+    *,
+    prefix: str,
+    suffix: str,
+    label_col: str,
+) -> pd.DataFrame:
+    rows = []
+    score_cols = [column for column in portfolio.columns if column.startswith(prefix) and column.endswith(suffix)]
+    for column in score_cols:
+        label = column[len(prefix) : -len(suffix)]
+        scores = pd.to_numeric(portfolio[column], errors="coerce").fillna(0.0)
+        for index, score in scores.items():
+            weighted = float(weights.loc[index] * score)
+            if weighted != 0:
+                rows.append({label_col: label, "weighted_contribution": weighted})
+    return _group_weighted_rows(rows, label_col)
+
+
+def _group_weighted_rows(rows: list[dict[str, object]], label_col: str) -> pd.DataFrame:
+    columns = [label_col, "weighted_contribution", "abs_weighted_contribution", "driver_count"]
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    frame = pd.DataFrame(rows)
+    grouped = frame.groupby(label_col, as_index=False).agg(
+        weighted_contribution=("weighted_contribution", "sum"),
+        abs_weighted_contribution=("weighted_contribution", lambda values: float(values.abs().sum())),
+        driver_count=("weighted_contribution", "size"),
+    )
+    return grouped.sort_values("abs_weighted_contribution", ascending=False).reset_index(drop=True)
+
+
 def _industry_exposure(portfolio: pd.DataFrame, weights: pd.Series, industry_col: str) -> pd.DataFrame:
     if industry_col not in portfolio.columns:
         return pd.DataFrame(columns=["industry", "weight", "position_count"])
@@ -230,6 +358,10 @@ def _style_exposure(portfolio: pd.DataFrame, weights: pd.Series, style_cols: lis
 def _default_style_cols(portfolio: pd.DataFrame) -> list[str]:
     candidates = ["amount_20d", "turnover_20d", "last_price", "ensemble_score", "rule_score", "model_score"]
     return [column for column in candidates if column in portfolio.columns]
+
+
+def _slug(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in str(value)).strip("_").lower() or "unknown"
 
 
 def _markdown_table(frame: pd.DataFrame) -> str:

@@ -1,0 +1,37 @@
+lane: liquidity_microstructure
+description: "Liquidity and microstructure proxies separated from reversal logic."
+logic_buckets:
+  - liquidity_quality
+  - liquidity_recovery
+  - volume_dry_up
+editable_fields:
+  - amount_window
+  - turnover_window
+  - dry_up_window
+  - shock_window
+  - liquidity_proxy_formula
+guards:
+  max_liquidity_proxy_exposure: 0.35
+  max_top_quantile_turnover: 0.30
+  max_logic_bucket_concentration: 0.50
+templates:
+  - name: amihud_illiq
+    logic_bucket: liquidity_quality
+    family: liquidity_microstructure
+    windows: [10, 20, 60]
+    direction: -1
+  - name: amount_stability
+    logic_bucket: liquidity_quality
+    family: amount_stability
+    windows: [20, 60]
+    direction: 1
+  - name: volume_dry_up
+    logic_bucket: volume_dry_up
+    family: volume_dry_up
+    windows: [5, 20]
+    direction: 1
+  - name: liquidity_recovery
+    logic_bucket: liquidity_recovery
+    family: liquidity_recovery
+    windows: [5, 20, 60]
+    direction: 1

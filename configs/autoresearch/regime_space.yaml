@@ -1,0 +1,33 @@
+lane: regime
+description: "Market regime overlay; this lane may gate or reweight factors but cannot select stocks directly."
+logic_buckets:
+  - regime_overlay
+  - breadth_mood
+  - volatility_regime
+editable_fields:
+  - index_window
+  - breadth_window
+  - volatility_window
+  - activation_weight
+  - deactivation_weight
+guards:
+  cannot_select_stocks_directly: true
+  only_controls_weights: true
+  max_switch_turnover: 0.25
+templates:
+  - name: index_trend_state
+    logic_bucket: regime_overlay
+    family: index_trend
+    windows: [20, 60, 120]
+  - name: breadth_state
+    logic_bucket: breadth_mood
+    family: breadth
+    windows: [20, 60]
+  - name: volatility_state
+    logic_bucket: volatility_regime
+    family: volatility_regime
+    windows: [20, 60]
+  - name: liquidity_state
+    logic_bucket: liquidity_quality
+    family: liquidity_regime
+    windows: [20, 60]

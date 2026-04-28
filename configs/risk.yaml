@@ -6,7 +6,10 @@ risk:
   max_industry_weight: 0.35
   min_factor_family_count: 2
   max_factor_family_concentration: 0.85
+  min_factor_logic_count: 3
+  max_factor_logic_concentration: 0.65
   factor_family_map_path: reports/approved_factors.yaml
+  factor_logic_map_path: reports/approved_factors.yaml
 
 output:
   report: reports/portfolio_risk_{run_yyyymmdd}.md

@@ -1,0 +1,36 @@
+lane: risk_structure
+description: "Risk structure factors that should improve downside behavior, not just chase reversal IC."
+logic_buckets:
+  - risk_structure
+  - downside_quality
+  - gap_control
+editable_fields:
+  - risk_window
+  - downside_return_definition
+  - gap_formula
+  - intraday_excursion_formula
+guards:
+  max_top_quantile_turnover: 0.20
+  require_positive_in_down_regime: true
+  max_logic_bucket_concentration: 0.50
+templates:
+  - name: max_drawdown_quality
+    logic_bucket: downside_quality
+    family: drawdown_quality
+    windows: [20, 60, 120]
+    direction: -1
+  - name: downside_volatility
+    logic_bucket: downside_quality
+    family: downside_volatility
+    windows: [20, 60]
+    direction: -1
+  - name: overnight_gap_risk
+    logic_bucket: gap_control
+    family: gap_risk
+    windows: [10, 20]
+    direction: -1
+  - name: intraday_excursion_stability
+    logic_bucket: risk_structure
+    family: intraday_excursion
+    windows: [10, 20, 60]
+    direction: -1

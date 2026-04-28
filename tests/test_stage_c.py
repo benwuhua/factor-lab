@@ -140,6 +140,38 @@ class StageCTests(unittest.TestCase):
         self.assertIn("min_factor_family_count", set(failed["check"]))
         self.assertIn("max_factor_family_concentration", set(failed["check"]))
 
+    def test_risk_checks_report_factor_logic_concentration_failure(self):
+        portfolio = pd.DataFrame(
+            {
+                "date": ["2026-04-23", "2026-04-23", "2026-04-23"],
+                "instrument": ["AAA", "BBB", "CCC"],
+                "target_weight": [0.2, 0.2, 0.2],
+                "family_reversal_a_score": [0.5, 0.3, 0.2],
+                "family_reversal_b_score": [0.4, 0.2, 0.1],
+                "family_liquidity_score": [0.02, -0.01, 0.0],
+            }
+        )
+
+        report = check_portfolio_risk(
+            portfolio,
+            self._signal(),
+            RiskConfig(
+                max_single_weight=0.5,
+                min_positions=2,
+                min_signal_coverage=0.2,
+                min_factor_logic_count=2,
+                max_factor_logic_concentration=0.55,
+            ),
+            factor_logic_map={
+                "reversal_a": "reversal_repair",
+                "reversal_b": "reversal_repair",
+                "liquidity": "liquidity_quality",
+            },
+        )
+
+        failed = report.to_frame().query("status == 'fail'")
+        self.assertIn("max_factor_logic_concentration", set(failed["check"]))
+
     def test_risk_industry_check_uses_industry_sw_fallback(self):
         portfolio = pd.DataFrame(
             {

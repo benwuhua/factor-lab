@@ -7,6 +7,7 @@ import pandas as pd
 from qlib_factor_lab.exposure_attribution import (
     build_exposure_attribution,
     load_factor_family_map,
+    load_factor_logic_map,
     write_exposure_attribution_markdown,
 )
 
@@ -67,6 +68,22 @@ class ExposureAttributionTests(unittest.TestCase):
         self.assertAlmostEqual(float(family.loc["divergence_weak_reversal", "weighted_contribution"]), 0.25)
         self.assertAlmostEqual(float(family.loc["quiet_range_divergence", "abs_weighted_contribution"]), 0.25)
 
+    def test_build_exposure_attribution_reports_logic_bucket_exposure(self):
+        portfolio = pd.DataFrame(
+            {
+                "instrument": ["AAA", "BBB"],
+                "target_weight": [0.5, 0.5],
+                "logic_reversal_repair_score": [0.4, 0.2],
+                "logic_liquidity_quality_score": [0.1, -0.1],
+            }
+        )
+
+        result = build_exposure_attribution(portfolio)
+
+        logic = result.logic.set_index("logic_bucket")
+        self.assertAlmostEqual(float(logic.loc["reversal_repair", "weighted_contribution"]), 0.3)
+        self.assertAlmostEqual(float(logic.loc["liquidity_quality", "abs_weighted_contribution"]), 0.1)
+
     def test_load_factor_family_map_reads_approved_factors_yaml(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "approved.yaml"
@@ -82,6 +99,23 @@ class ExposureAttributionTests(unittest.TestCase):
             result = load_factor_family_map(path)
 
         self.assertEqual(result, {"mom_20": "momentum", "rev_20": "reversal"})
+
+    def test_load_factor_logic_map_reads_approved_factors_yaml(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "approved.yaml"
+            path.write_text(
+                "approved_factors:\n"
+                "  - name: mom_20\n"
+                "    family: momentum\n"
+                "    logic_bucket: trend_following\n"
+                "  - name: rev_20\n"
+                "    family: divergence_weak_reversal\n",
+                encoding="utf-8",
+            )
+
+            result = load_factor_logic_map(path)
+
+        self.assertEqual(result, {"mom_20": "trend_following", "rev_20": "reversal_repair"})
 
     def test_write_exposure_attribution_markdown(self):
         result = build_exposure_attribution(_portfolio_frame(), family_map={"mom_20": "momentum"})

@@ -7,7 +7,7 @@ from typing import Any
 import pandas as pd
 
 from .config import load_yaml
-from .exposure_attribution import build_exposure_attribution, load_factor_family_map
+from .exposure_attribution import build_exposure_attribution, load_factor_family_map, load_factor_logic_map
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,10 @@ class RiskConfig:
     max_industry_weight: float | None = None
     min_factor_family_count: int | None = None
     max_factor_family_concentration: float | None = None
+    min_factor_logic_count: int | None = None
+    max_factor_logic_concentration: float | None = None
     factor_family_map_path: Path | None = None
+    factor_logic_map_path: Path | None = None
     report_output_path: Path = Path("reports/portfolio_risk_{run_yyyymmdd}.md")
 
 
@@ -43,7 +46,10 @@ def load_risk_config(path: str | Path) -> RiskConfig:
     max_industry_weight = raw.get("max_industry_weight")
     min_factor_family_count = raw.get("min_factor_family_count")
     max_factor_family_concentration = raw.get("max_factor_family_concentration")
+    min_factor_logic_count = raw.get("min_factor_logic_count")
+    max_factor_logic_concentration = raw.get("max_factor_logic_concentration")
     factor_family_map_path = raw.get("factor_family_map_path")
+    factor_logic_map_path = raw.get("factor_logic_map_path", factor_family_map_path)
     return RiskConfig(
         max_single_weight=float(raw.get("max_single_weight", 0.1)),
         min_positions=int(raw.get("min_positions", 10)),
@@ -54,7 +60,12 @@ def load_risk_config(path: str | Path) -> RiskConfig:
         max_factor_family_concentration=(
             float(max_factor_family_concentration) if max_factor_family_concentration is not None else None
         ),
+        min_factor_logic_count=int(min_factor_logic_count) if min_factor_logic_count is not None else None,
+        max_factor_logic_concentration=(
+            float(max_factor_logic_concentration) if max_factor_logic_concentration is not None else None
+        ),
         factor_family_map_path=Path(str(factor_family_map_path)) if factor_family_map_path else None,
+        factor_logic_map_path=Path(str(factor_logic_map_path)) if factor_logic_map_path else None,
         report_output_path=Path(output.get("report", "reports/portfolio_risk_{run_yyyymmdd}.md")),
     )
 
@@ -65,6 +76,7 @@ def check_portfolio_risk(
     config: RiskConfig = RiskConfig(),
     current_positions: pd.DataFrame | None = None,
     factor_family_map: dict[str, str] | None = None,
+    factor_logic_map: dict[str, str] | None = None,
 ) -> RiskReport:
     rows = []
     max_weight = float(portfolio["target_weight"].max()) if not portfolio.empty and "target_weight" in portfolio else 0.0
@@ -94,7 +106,7 @@ def check_portfolio_risk(
             "; ".join(blocked_detail),
         )
     )
-    rows.extend(_exposure_maturity_rows(portfolio, config, factor_family_map or {}))
+    rows.extend(_exposure_maturity_rows(portfolio, config, factor_family_map or {}, factor_logic_map or {}))
     return RiskReport(tuple(rows))
 
 
@@ -166,10 +178,21 @@ def load_configured_factor_family_map(config: RiskConfig, root: str | Path = "."
     return load_factor_family_map(resolved)
 
 
+def load_configured_factor_logic_map(config: RiskConfig, root: str | Path = ".") -> dict[str, str]:
+    if config.factor_logic_map_path is None:
+        return {}
+    path = config.factor_logic_map_path
+    resolved = path if path.is_absolute() else Path(root) / path
+    if not resolved.exists():
+        return {}
+    return load_factor_logic_map(resolved)
+
+
 def _exposure_maturity_rows(
     portfolio: pd.DataFrame,
     config: RiskConfig,
     factor_family_map: dict[str, str],
+    factor_logic_map: dict[str, str],
 ) -> list[dict[str, Any]]:
     checks_enabled = any(
         value is not None
@@ -177,12 +200,14 @@ def _exposure_maturity_rows(
             config.max_industry_weight,
             config.min_factor_family_count,
             config.max_factor_family_concentration,
+            config.min_factor_logic_count,
+            config.max_factor_logic_concentration,
         )
     )
     if not checks_enabled:
         return []
 
-    attribution = build_exposure_attribution(portfolio, family_map=factor_family_map)
+    attribution = build_exposure_attribution(portfolio, family_map=factor_family_map, logic_map=factor_logic_map)
     rows: list[dict[str, Any]] = []
     if config.max_industry_weight is not None:
         max_industry_weight = float(attribution.industry["weight"].max()) if not attribution.industry.empty else 0.0
@@ -217,6 +242,31 @@ def _exposure_maturity_rows(
                 concentration,
                 config.max_factor_family_concentration,
                 top_family,
+            )
+        )
+    if config.min_factor_logic_count is not None:
+        logic_count = (
+            int((attribution.logic["weighted_contribution"].abs() > 0).sum()) if not attribution.logic.empty else 0
+        )
+        rows.append(
+            _row(
+                "min_factor_logic_count",
+                logic_count >= config.min_factor_logic_count,
+                logic_count,
+                config.min_factor_logic_count,
+                "",
+            )
+        )
+    if config.max_factor_logic_concentration is not None:
+        concentration = _family_concentration(attribution.logic.rename(columns={"logic_bucket": "family"}))
+        top_logic = _top_label(attribution.logic, "logic_bucket", "abs_weighted_contribution")
+        rows.append(
+            _row(
+                "max_factor_logic_concentration",
+                concentration <= config.max_factor_logic_concentration,
+                concentration,
+                config.max_factor_logic_concentration,
+                top_logic,
             )
         )
     return rows

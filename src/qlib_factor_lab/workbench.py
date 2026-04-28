@@ -9,7 +9,7 @@ import json
 import pandas as pd
 import yaml
 
-from .exposure_attribution import build_exposure_attribution, load_factor_family_map
+from .exposure_attribution import build_exposure_attribution, load_factor_family_map, load_factor_logic_map
 from .company_events import COMPANY_EVENT_COLUMNS, load_company_events, load_event_risk_config
 from .expert_review import parse_expert_review_manual_items
 from .risk import RiskConfig, check_portfolio_risk
@@ -28,6 +28,7 @@ class PortfolioGateExplanation:
     checks: pd.DataFrame
     industry: pd.DataFrame
     family: pd.DataFrame
+    logic: pd.DataFrame
     style: pd.DataFrame
 
 
@@ -399,11 +400,19 @@ def load_factor_family_map_safe(root: str | Path = ".", approved_path: str | Pat
     return load_factor_family_map(path)
 
 
+def load_factor_logic_map_safe(root: str | Path = ".", approved_path: str | Path = APPROVED_FACTORS) -> dict[str, str]:
+    path = _resolve(Path(root), approved_path)
+    if not path.exists():
+        return {}
+    return load_factor_logic_map(path)
+
+
 def build_portfolio_gate_explanation(
     portfolio: pd.DataFrame,
     *,
     risk_config: dict[str, Any] | RiskConfig | None = None,
     factor_family_map: dict[str, str] | None = None,
+    factor_logic_map: dict[str, str] | None = None,
     signal: pd.DataFrame | None = None,
 ) -> PortfolioGateExplanation:
     config = _risk_config(risk_config or {})
@@ -413,8 +422,13 @@ def build_portfolio_gate_explanation(
         signal_frame,
         config,
         factor_family_map=factor_family_map or {},
+        factor_logic_map=factor_logic_map or {},
     )
-    attribution = build_exposure_attribution(portfolio, family_map=factor_family_map or {})
+    attribution = build_exposure_attribution(
+        portfolio,
+        family_map=factor_family_map or {},
+        logic_map=factor_logic_map or {},
+    )
     checks = risk_report.to_frame()
     decision = classify_gate_decision(checks)
     return PortfolioGateExplanation(
@@ -422,6 +436,7 @@ def build_portfolio_gate_explanation(
         checks=checks,
         industry=attribution.industry,
         family=attribution.family,
+        logic=attribution.logic,
         style=attribution.style,
     )
 
@@ -435,6 +450,7 @@ def load_portfolio_gate_explanation(root: str | Path = ".") -> PortfolioGateExpl
         portfolio,
         risk_config=risk_config,
         factor_family_map=load_factor_family_map_safe(root_path),
+        factor_logic_map=load_factor_logic_map_safe(root_path),
     )
 
 
@@ -456,6 +472,8 @@ def classify_gate_decision(checks: pd.DataFrame) -> str:
         "max_industry_weight",
         "min_factor_family_count",
         "max_factor_family_concentration",
+        "min_factor_logic_count",
+        "max_factor_logic_concentration",
     }
     if failed and failed <= caution_checks:
         return "caution"
@@ -487,6 +505,7 @@ def build_portfolio_gate_trend(root: str | Path = ".", *, limit: int = 20) -> pd
             portfolio,
             risk_config=load_risk_config_dict(root_path),
             factor_family_map=load_factor_family_map_safe(root_path),
+            factor_logic_map=load_factor_logic_map_safe(root_path),
         )
         rows.append(
             {
@@ -734,6 +753,7 @@ def load_execution_gate_card(root: str | Path = ".") -> dict[str, Any]:
         portfolio,
         risk_config=load_risk_config_dict(root_path),
         factor_family_map=load_factor_family_map_safe(root_path),
+        factor_logic_map=load_factor_logic_map_safe(root_path),
     )
     latest_run = find_latest_run_dir(root_path)
     expert_path = latest_run / "expert_review_result.md" if latest_run is not None else None
@@ -770,6 +790,7 @@ def build_research_pipeline_status(root: str | Path = ".") -> pd.DataFrame:
         target,
         risk_config=load_risk_config_dict(root_path),
         factor_family_map=load_factor_family_map_safe(root_path),
+        factor_logic_map=load_factor_logic_map_safe(root_path),
     )
     expert_path = latest_run / "expert_review_result.md" if latest_run is not None else None
     paper_path = latest_run / "orders.csv" if latest_run is not None else None
@@ -827,6 +848,12 @@ def _risk_config(raw: dict[str, Any] | RiskConfig) -> RiskConfig:
         max_factor_family_concentration=(
             float(raw["max_factor_family_concentration"])
             if raw.get("max_factor_family_concentration") is not None
+            else None
+        ),
+        min_factor_logic_count=int(raw["min_factor_logic_count"]) if raw.get("min_factor_logic_count") is not None else None,
+        max_factor_logic_concentration=(
+            float(raw["max_factor_logic_concentration"])
+            if raw.get("max_factor_logic_concentration") is not None
             else None
         ),
     )
@@ -891,6 +918,8 @@ def _review_focus_for_check(check: str) -> str:
         "max_industry_weight": "降低行业集中，或要求人工确认该行业主题暴露是有意为之。",
         "min_factor_family_count": "增加不同因子家族的来源，避免组合只押单一量价逻辑。",
         "max_factor_family_concentration": "降低主导因子家族权重，检查组合是否只是单因子变体。",
+        "min_factor_logic_count": "补充趋势、流动性、风险结构、情绪等非同类逻辑，避免只靠反转修复。",
+        "max_factor_logic_concentration": "降低主导交易逻辑暴露，避免多个不同名字的因子其实押同一件事。",
         "max_single_weight": "降低单票权重，避免个股流动性和事件风险放大。",
         "min_positions": "增加持仓数量，避免样本太窄导致组合不可解释。",
         "min_signal_coverage": "检查信号覆盖率，避免用缺失数据生成组合。",

@@ -126,6 +126,7 @@ class SignalTests(unittest.TestCase):
             self.assertAlmostEqual(first["challenger_alpha_contribution"], 0.5)
             self.assertAlmostEqual(first["shadow_alpha_contribution"], 0.0)
             self.assertAlmostEqual(first["family_test_family_score"], 0.75)
+            self.assertAlmostEqual(first["logic_reversal_repair_score"], 0.75)
             self.assertAlmostEqual(first["rule_score"], 0.75)
 
     def test_family_first_caps_single_family_score(self):
@@ -230,6 +231,7 @@ class SignalTests(unittest.TestCase):
                             "expression": "$close",
                             "direction": 1,
                             "family": "test_family",
+                            "logic_bucket": "reversal_repair",
                             "approval_status": "core",
                             "regime_profile": "down_sideways",
                         },
@@ -238,6 +240,7 @@ class SignalTests(unittest.TestCase):
                             "expression": "$volume",
                             "direction": 1,
                             "family": "test_family",
+                            "logic_bucket": "reversal_repair",
                             "approval_status": "challenger",
                             "regime_profile": "down_sideways",
                         },

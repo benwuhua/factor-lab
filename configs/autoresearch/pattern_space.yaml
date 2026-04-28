@@ -1,0 +1,41 @@
+lane: pattern_event
+description: "Event-like shape search space; IC is secondary and event payoff is primary."
+logic_buckets:
+  - pattern_confirmation
+  - reversal_repair
+  - quiet_breakout
+editable_fields:
+  - base_window
+  - confirmation_window
+  - price_move_threshold
+  - volume_ratio_threshold
+  - pullback_threshold
+  - score_weights
+guards:
+  min_trade_count: 80
+  max_event_overlap: 0.35
+  max_logic_bucket_concentration: 0.55
+templates:
+  - name: wangji_like_relaxed
+    logic_bucket: pattern_confirmation
+    family: wangji_like
+    windows: [10, 14, 20]
+    params:
+      base_range_max: [0.06, 0.08, 0.10]
+      ignition_return_min: [0.05, 0.07]
+      ignition_volume_ratio_min: [1.5, 2.0]
+      washout_return_floor: [-0.03, -0.05]
+  - name: quiet_breakout_pullback
+    logic_bucket: quiet_breakout
+    family: quiet_breakout
+    windows: [20, 60]
+    params:
+      breakout_position_min: [0.70, 0.80]
+      pullback_volume_ratio_max: [0.75, 0.90]
+  - name: washout_repair
+    logic_bucket: reversal_repair
+    family: washout_repair
+    windows: [10, 20]
+    params:
+      drawdown_min: [0.05, 0.10]
+      recovery_min: [0.03, 0.05]

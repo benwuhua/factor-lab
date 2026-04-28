@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from .config import ProjectConfig, load_yaml
+from .exposure_attribution import infer_logic_bucket
 from .qlib_bootstrap import init_qlib
 
 
@@ -18,8 +19,9 @@ class SignalFactor:
     expression: str
     direction: int
     family: str
-    approval_status: str
-    regime_profile: str
+    logic_bucket: str = ""
+    approval_status: str = ""
+    regime_profile: str = "all_weather"
 
 
 @dataclass(frozen=True)
@@ -74,12 +76,14 @@ def load_approved_signal_factors(path: str | Path) -> list[SignalFactor]:
     data = load_yaml(path)
     factors = []
     for raw in data.get("approved_factors", []):
+        family = str(raw.get("family", ""))
         factors.append(
             SignalFactor(
                 name=str(raw["name"]),
                 expression=str(raw["expression"]),
                 direction=int(raw.get("direction", 1)),
-                family=str(raw.get("family", "")),
+                family=family,
+                logic_bucket=str(raw.get("logic_bucket") or infer_logic_bucket(family or str(raw.get("name", "")))),
                 approval_status=str(raw.get("approval_status", "")),
                 regime_profile=str(raw.get("regime_profile", "all_weather")),
             )
@@ -111,6 +115,7 @@ def build_daily_signal(
 
     contribution_cols: list[str] = []
     active_family_cols: dict[str, list[str]] = {}
+    active_logic_cols: dict[str, list[str]] = {}
     active_factor_count = 0
     for factor in factors:
         if factor.name not in frame.columns:
@@ -122,10 +127,14 @@ def build_daily_signal(
         if multiplier != 0:
             active_factor_count += 1
             active_family_cols.setdefault(factor.family or factor.name, []).append(contribution_col)
+            active_logic_cols.setdefault(factor.logic_bucket or infer_logic_bucket(factor.family or factor.name), []).append(
+                contribution_col
+            )
         frame[contribution_col] = _zscore(frame[factor.name].astype(float) * factor.direction) * multiplier
         contribution_cols.append(contribution_col)
 
     family_score_cols: list[str] = []
+    logic_score_cols: list[str] = []
     if config.combination_mode == "family_first":
         for family, cols in active_family_cols.items():
             family_col = f"family_{_slug(family)}_score"
@@ -135,6 +144,10 @@ def build_daily_signal(
                 family_score = family_score.clip(lower=-cap, upper=cap)
             frame[family_col] = family_score
             family_score_cols.append(family_col)
+        for logic_bucket, cols in active_logic_cols.items():
+            logic_col = f"logic_{_slug(logic_bucket)}_score"
+            frame[logic_col] = frame[cols].mean(axis=1)
+            logic_score_cols.append(logic_col)
         frame["rule_score"] = frame[family_score_cols].sum(axis=1) if family_score_cols else 0.0
     elif contribution_cols:
         frame["rule_score"] = frame[contribution_cols].sum(axis=1)
@@ -160,6 +173,7 @@ def build_daily_signal(
         "top_factor_2",
         "top_factor_2_contribution",
         "risk_flags",
+        *logic_score_cols,
         *family_score_cols,
         *contribution_cols,
     ]

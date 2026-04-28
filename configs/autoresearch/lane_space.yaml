@@ -248,6 +248,8 @@ portfolio_combination:
   default_family_caps:
     max_single_family_weight: 0.35
     max_single_factor_weight: 0.20
+    min_factor_logic_count: 3
+    max_single_logic_bucket_weight: 0.65
   initial_family_weights:
     expression_price_volume: 0.22
     pattern_event: 0.16
