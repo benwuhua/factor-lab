@@ -54,6 +54,8 @@ THEME_CONFIG ?= configs/themes/deepseek_ascend_semiconductor.yaml
 THEME_SCAN_OUTPUT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE).csv
 THEME_SCAN_REPORT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE).md
 THEME_SCAN_TOP_K ?= 30
+THEME_SCAN_FILL_MISSING ?= 0
+THEME_SCAN_FILL_MISSING_ARG = $(if $(filter 1 true yes TRUE YES,$(THEME_SCAN_FILL_MISSING)),--fill-missing-from-provider,)
 EXPOSURE_INPUT ?= $(TARGET_PORTFOLIO)
 EXPOSURE_OUTPUT_DIR ?= reports/exposure_attribution
 EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
@@ -129,7 +131,7 @@ help:
 	@printf "  make data-governance RUN_DATE=20260420\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv\n"
-	@printf "  make theme-scan SIGNAL_CSV=runs/20260427/signals.csv RUN_DATE=20260427\n"
+	@printf "  make theme-scan SIGNAL_CSV=runs/20260427/signals.csv RUN_DATE=20260427 THEME_SCAN_FILL_MISSING=1\n"
 	@printf "  make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv\n"
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
 	@printf "  make paper-batch TARGET_GLOB='reports/paper_batch_targets/target_portfolio_*.csv'\n"
@@ -324,7 +326,8 @@ theme-scan:
 		--signal-csv $(SIGNAL_CSV) \
 		--top-k $(THEME_SCAN_TOP_K) \
 		--output-csv $(THEME_SCAN_OUTPUT) \
-		--output-md $(THEME_SCAN_REPORT)
+		--output-md $(THEME_SCAN_REPORT) \
+		$(THEME_SCAN_FILL_MISSING_ARG)
 
 exposure-attribution:
 	$(PYTHON) scripts/build_exposure_attribution.py \

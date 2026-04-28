@@ -186,6 +186,7 @@ def fetch_daily_factor_exposures(
     run_date: str,
     *,
     initialize: bool = True,
+    instruments: list[str] | None = None,
 ) -> pd.DataFrame:
     if not factors:
         raise ValueError("at least one approved factor is required to build daily signal exposures")
@@ -202,8 +203,9 @@ def fetch_daily_factor_exposures(
     names.append("amount_20d")
     fields.append("$close")
     names.append("last_price")
+    instrument_scope = D.instruments(project_config.market) if instruments is None else sorted(set(map(str, instruments)))
     frame = D.features(
-        D.instruments(project_config.market),
+        instrument_scope,
         fields,
         start_time=effective_run_date,
         end_time=effective_run_date,

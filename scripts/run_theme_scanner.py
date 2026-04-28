@@ -2,17 +2,32 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 from _bootstrap import add_src_to_path, project_root
 
 add_src_to_path()
 
+from qlib_factor_lab.config import load_project_config
+from qlib_factor_lab.signal import (
+    build_daily_signal,
+    fetch_daily_factor_exposures,
+    load_approved_signal_factors,
+    load_signal_config,
+)
 from qlib_factor_lab.theme_scanner import (
     build_theme_candidates,
+    combine_signal_with_supplemental,
     load_theme_universe,
+    missing_theme_instruments,
     write_theme_candidate_report,
     write_theme_candidates,
 )
@@ -23,6 +38,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Scan a hot theme universe with the latest daily signal.")
     parser.add_argument("--theme-config", required=True, help="Theme universe YAML.")
     parser.add_argument("--signal-csv", required=True, help="Daily signal CSV.")
+    parser.add_argument("--supplemental-signal-csv", default=None, help="Optional extra signal CSV for theme-only names.")
+    parser.add_argument("--fill-missing-from-provider", action="store_true")
+    parser.add_argument("--signal-config", default="configs/signal.yaml")
+    parser.add_argument("--provider-config", default=None)
     parser.add_argument("--top-k", type=int, default=30)
     parser.add_argument("--output-csv", default="reports/theme_scans/{theme_id}_{run_yyyymmdd}.csv")
     parser.add_argument("--output-md", default="reports/theme_scans/{theme_id}_{run_yyyymmdd}.md")
@@ -33,6 +52,18 @@ def main() -> int:
     universe = load_theme_universe(_resolve(root, args.theme_config))
     signal = pd.read_csv(_resolve(root, args.signal_csv))
     run_date = _infer_run_date(signal)
+    if args.supplemental_signal_csv:
+        supplemental = pd.read_csv(_resolve(root, args.supplemental_signal_csv))
+        signal = combine_signal_with_supplemental(signal, supplemental)
+    if args.fill_missing_from_provider:
+        signal = _fill_missing_signal_from_provider(
+            root=root,
+            signal=signal,
+            universe=universe,
+            run_date=run_date,
+            signal_config_path=args.signal_config,
+            provider_config_path=args.provider_config,
+        )
     candidates = build_theme_candidates(signal, universe, top_k=args.top_k)
     csv_path = write_theme_candidates(
         candidates,
@@ -49,6 +80,34 @@ def main() -> int:
     print(f"wrote: {csv_path}")
     print(f"wrote: {md_path}")
     return 0
+
+
+def _fill_missing_signal_from_provider(
+    *,
+    root: Path,
+    signal: pd.DataFrame,
+    universe,
+    run_date: str,
+    signal_config_path: str | Path,
+    provider_config_path: str | Path | None,
+) -> pd.DataFrame:
+    missing = missing_theme_instruments(signal, universe)
+    if not missing:
+        return signal
+    config = load_signal_config(_resolve(root, signal_config_path))
+    if config.execution_calendar_path is not None:
+        config = replace(config, execution_calendar_path=_resolve(root, config.execution_calendar_path))
+    config = replace(config, run_date=run_date)
+    factors = load_approved_signal_factors(_resolve(root, config.approved_factors_path))
+    provider_path = Path(provider_config_path) if provider_config_path is not None else config.provider_config
+    project_config = load_project_config(_resolve(root, provider_path))
+    try:
+        exposures = fetch_daily_factor_exposures(project_config, factors, run_date, instruments=missing)
+    except ValueError as exc:
+        print(f"warning: theme provider fill skipped: {exc}")
+        return signal
+    supplemental_signal = build_daily_signal(exposures, factors, config)
+    return combine_signal_with_supplemental(signal, supplemental_signal)
 
 
 def _resolve(root: Path, path: str | Path) -> Path:

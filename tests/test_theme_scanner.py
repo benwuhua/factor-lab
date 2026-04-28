@@ -6,7 +6,9 @@ import pandas as pd
 
 from qlib_factor_lab.theme_scanner import (
     build_theme_candidates,
+    combine_signal_with_supplemental,
     load_theme_universe,
+    missing_theme_instruments,
     write_theme_candidate_report,
     write_theme_candidates,
 )
@@ -78,6 +80,63 @@ members:
         self.assertEqual(candidates.loc[1, "research_status"], "risk_review")
         self.assertEqual(candidates.loc[0, "recommendation_type"], "research_candidate_not_advice")
         self.assertGreater(candidates.loc[0, "theme_research_score"], candidates.loc[1, "theme_research_score"])
+
+    def test_missing_theme_instruments_and_supplemental_signal_fill_watch_only_names(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            theme_path = Path(tmp) / "theme.yaml"
+            theme_path.write_text(
+                """
+theme_id: deepseek_ascend_semiconductor
+display_name: DeepSeek / Ascend semiconductor supply chain
+members:
+  - instrument: SH688981
+    name: 中芯国际
+    supply_chain_role: 晶圆代工
+    theme_exposure: 1.0
+  - instrument: SZ300456
+    name: 赛微电子
+    supply_chain_role: OCS 光交换
+    theme_exposure: 0.5
+""",
+                encoding="utf-8",
+            )
+            universe = load_theme_universe(theme_path)
+            primary = pd.DataFrame(
+                [
+                    {
+                        "date": "2026-04-27",
+                        "instrument": "SH688981",
+                        "ensemble_score": 0.4,
+                        "event_blocked": False,
+                    }
+                ]
+            )
+            supplemental = pd.DataFrame(
+                [
+                    {
+                        "date": "2026-04-27",
+                        "instrument": "SZ300456",
+                        "ensemble_score": 0.9,
+                        "event_blocked": False,
+                    },
+                    {
+                        "date": "2026-04-27",
+                        "instrument": "SH688981",
+                        "ensemble_score": -1.0,
+                        "event_blocked": False,
+                    },
+                ]
+            )
+
+            self.assertEqual(missing_theme_instruments(primary, universe), ["SZ300456"])
+            combined = combine_signal_with_supplemental(primary, supplemental)
+            candidates = build_theme_candidates(combined, universe, top_k=10)
+
+            self.assertEqual(
+                candidates[candidates["instrument"] == "SZ300456"]["research_status"].iloc[0],
+                "research_candidate",
+            )
+            self.assertEqual(candidates[candidates["instrument"] == "SH688981"]["ensemble_score"].iloc[0], 0.4)
 
     def test_write_theme_outputs_csv_and_markdown_report(self):
         candidates = pd.DataFrame(

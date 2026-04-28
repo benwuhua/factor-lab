@@ -92,6 +92,30 @@ def build_theme_candidates(
     return ordered.loc[:, _candidate_columns(ordered)].reset_index(drop=True)
 
 
+def missing_theme_instruments(signal: pd.DataFrame, universe: ThemeUniverse) -> list[str]:
+    if "instrument" not in signal.columns:
+        raise ValueError("signal must include instrument")
+    existing = set(signal["instrument"].dropna().astype(str).str.strip())
+    members = universe.members["instrument"].dropna().astype(str).str.strip()
+    return [instrument for instrument in members.tolist() if instrument and instrument not in existing]
+
+
+def combine_signal_with_supplemental(signal: pd.DataFrame, supplemental: pd.DataFrame | None) -> pd.DataFrame:
+    if supplemental is None or supplemental.empty:
+        return signal.copy()
+    if "instrument" not in signal.columns or "instrument" not in supplemental.columns:
+        raise ValueError("signal and supplemental signal must include instrument")
+    primary = signal.copy()
+    extra = supplemental.copy()
+    primary["instrument"] = primary["instrument"].astype(str).str.strip()
+    extra["instrument"] = extra["instrument"].astype(str).str.strip()
+    existing = set(primary["instrument"])
+    extra = extra[~extra["instrument"].isin(existing)]
+    if extra.empty:
+        return primary.reset_index(drop=True)
+    return pd.concat([primary, extra], ignore_index=True, sort=False)
+
+
 def write_theme_candidates(candidates: pd.DataFrame, output_path: str | Path) -> Path:
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)

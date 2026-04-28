@@ -1,14 +1,18 @@
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import yaml
 
+from qlib_factor_lab.config import ProjectConfig
 from qlib_factor_lab.signal import (
     build_daily_signal,
+    fetch_daily_factor_exposures,
     load_approved_signal_factors,
     load_signal_config,
 )
@@ -216,6 +220,39 @@ class SignalTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             output = pd.read_csv(root / "reports/signals_20260423.csv")
             self.assertTrue(bool(output.set_index("instrument").loc["AAA", "suspended"]))
+
+    def test_fetch_daily_factor_exposures_can_limit_to_explicit_instruments(self):
+        class FakeD:
+            requested_instruments = None
+
+            @classmethod
+            def features(cls, instruments, fields, start_time, end_time, freq):
+                cls.requested_instruments = instruments
+                index = pd.MultiIndex.from_product(
+                    [["SH688981", "SZ300456"], [pd.Timestamp("2026-04-27")]],
+                    names=["instrument", "datetime"],
+                )
+                return pd.DataFrame([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]], index=index)
+
+        fake_qlib_data = types.SimpleNamespace(D=FakeD)
+        with tempfile.TemporaryDirectory() as tmp:
+            factor = load_approved_signal_factors(self._write_fixture(Path(tmp))[0])[0]
+            project_config = ProjectConfig(provider_uri=Path("/tmp/qlib"), market="csi500", end_time="2026-04-27")
+
+            with patch.dict(sys.modules, {"qlib.data": fake_qlib_data}):
+                with patch("qlib_factor_lab.signal.init_qlib"), patch(
+                    "qlib_factor_lab.signal.resolve_run_date",
+                    return_value="2026-04-27",
+                ):
+                    exposures = fetch_daily_factor_exposures(
+                        project_config,
+                        [factor],
+                        "latest",
+                        instruments=["SZ300456", "SH688981", "SH688981"],
+                    )
+
+        self.assertEqual(FakeD.requested_instruments, ["SH688981", "SZ300456"])
+        self.assertEqual(set(exposures["instrument"]), {"SH688981", "SZ300456"})
 
     def _write_fixture(self, root: Path, active_regime: str = "down"):
         approved_path = root / "reports/approved_factors.yaml"
