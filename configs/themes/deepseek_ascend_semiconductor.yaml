@@ -1,0 +1,105 @@
+theme_id: deepseek_ascend_semiconductor
+display_name: DeepSeek / Ascend semiconductor supply chain
+as_of_date: 2026-04-28
+thesis: >
+  DeepSeek V4 and Ascend/国产算力叙事可能提升半导体、先进封装、存储、
+  光通信和整机集成链条的研究关注度。本主题池只用于热点研究候选筛选，
+  需要继续经过因子、事件风险、流动性、组合门禁和人工复核，不构成投资建议。
+
+score:
+  signal_weight: 0.7
+  theme_weight: 0.3
+
+sources:
+  - https://apnews.com/article/d2ed33f2521917193616e061674d5f92
+  - https://www.tomshardware.com/tech-industry/artificial-intelligence/deepseek-launches-1-6-trillion-parameter-v4-on-huawei-chips-as-us-escalates-ai-theft-accusations
+  - https://www.scmp.com/business/china-business/article/3351328/investors-rotate-chinas-chipmakers-deepseek-intensifies-ai-competition
+  - https://huawei-supply-chain.vercel.app/
+
+members:
+  - instrument: SH688981
+    name: 中芯国际
+    supply_chain_role: 晶圆代工
+    theme_exposure: 1.0
+    confidence: high
+    notes: screenshot supply-chain board marks 100%
+  - instrument: SZ002436
+    name: 兴森科技
+    supply_chain_role: 先进封装
+    theme_exposure: 0.4
+    confidence: medium
+  - instrument: SH600584
+    name: 长电科技
+    supply_chain_role: 先进封装
+    theme_exposure: 0.4
+    confidence: medium
+  - instrument: SZ002156
+    name: 通富微电
+    supply_chain_role: 先进封装
+    theme_exposure: 0.2
+    confidence: medium
+  - instrument: SZ300456
+    name: 赛微电子
+    supply_chain_role: OCS 光交换
+    theme_exposure: 0.5
+    confidence: medium
+  - instrument: SZ300620
+    name: 光库科技
+    supply_chain_role: OCS 光交换
+    theme_exposure: 0.3
+    confidence: medium
+  - instrument: SZ000988
+    name: 华工科技
+    supply_chain_role: 光模块
+    theme_exposure: 0.4
+    confidence: medium
+  - instrument: SZ002281
+    name: 光迅科技
+    supply_chain_role: 光模块
+    theme_exposure: 0.15
+    confidence: medium
+  - instrument: SZ002429
+    name: 兆驰股份
+    supply_chain_role: 光模块
+    theme_exposure: 0.12
+    confidence: low
+  - instrument: SH688205
+    name: 德科立
+    supply_chain_role: 光模块
+    theme_exposure: 0.08
+    confidence: low
+  - instrument: SH688629
+    name: 华丰科技
+    supply_chain_role: 高速连接器
+    theme_exposure: 0.6
+    confidence: medium
+  - instrument: SZ002897
+    name: 意华股份
+    supply_chain_role: 高速连接器
+    theme_exposure: 0.4
+    confidence: medium
+  - instrument: SZ000021
+    name: 深科技
+    supply_chain_role: 长鑫存储生态
+    theme_exposure: 0.25
+    confidence: medium
+  - instrument: SZ002409
+    name: 雅克科技
+    supply_chain_role: 长鑫存储生态
+    theme_exposure: 0.2
+    confidence: medium
+  - instrument: SZ301308
+    name: 江波龙
+    supply_chain_role: 长鑫存储生态
+    theme_exposure: 0.1
+    confidence: low
+  - instrument: SH603986
+    name: 兆易创新
+    supply_chain_role: 存储
+    theme_exposure: 1.0
+    confidence: high
+  - instrument: SZ002261
+    name: 拓维信息
+    supply_chain_role: 整机集成
+    theme_exposure: 0.3
+    confidence: medium

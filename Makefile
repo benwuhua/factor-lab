@@ -50,6 +50,10 @@ CURRENT_POSITIONS ?= state/current_positions.csv
 RUN_DATE ?= 20260420
 TARGET_PORTFOLIO ?= reports/target_portfolio_$(RUN_DATE).csv
 STOCK_CARDS_OUTPUT ?= reports/stock_cards_$(RUN_DATE).jsonl
+THEME_CONFIG ?= configs/themes/deepseek_ascend_semiconductor.yaml
+THEME_SCAN_OUTPUT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE).csv
+THEME_SCAN_REPORT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE).md
+THEME_SCAN_TOP_K ?= 30
 EXPOSURE_INPUT ?= $(TARGET_PORTFOLIO)
 EXPOSURE_OUTPUT_DIR ?= reports/exposure_attribution
 EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
@@ -67,7 +71,7 @@ INDUSTRY_OVERRIDES_OUTPUT ?= data/security_industry_overrides.csv
 INDUSTRY_OVERRIDES_AS_OF ?= $(RUN_DATE)
 INDUSTRY_OVERRIDES_UNIVERSES ?= csi300 csi500
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards theme-scan exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -98,6 +102,7 @@ help:
 	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
 	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
 	@printf "  make stock-cards      Build JSONL stock research cards from target portfolio\n"
+	@printf "  make theme-scan       Scan a hot theme universe with latest daily signal\n"
 	@printf "  make exposure-attribution  Explain factor-family, industry, and style exposures\n"
 	@printf "  make paper-orders    Generate paper orders/fills from target portfolio\n"
 	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
@@ -124,6 +129,7 @@ help:
 	@printf "  make data-governance RUN_DATE=20260420\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv\n"
+	@printf "  make theme-scan SIGNAL_CSV=runs/20260427/signals.csv RUN_DATE=20260427\n"
 	@printf "  make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv\n"
 	@printf "  make paper-orders TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv CURRENT_POSITIONS=state/current_positions.csv\n"
 	@printf "  make paper-batch TARGET_GLOB='reports/paper_batch_targets/target_portfolio_*.csv'\n"
@@ -311,6 +317,14 @@ stock-cards:
 		--target-portfolio $(TARGET_PORTFOLIO) \
 		--as-of-date $(RUN_DATE) \
 		--output $(STOCK_CARDS_OUTPUT)
+
+theme-scan:
+	$(PYTHON) scripts/run_theme_scanner.py \
+		--theme-config $(THEME_CONFIG) \
+		--signal-csv $(SIGNAL_CSV) \
+		--top-k $(THEME_SCAN_TOP_K) \
+		--output-csv $(THEME_SCAN_OUTPUT) \
+		--output-md $(THEME_SCAN_REPORT)
 
 exposure-attribution:
 	$(PYTHON) scripts/build_exposure_attribution.py \
