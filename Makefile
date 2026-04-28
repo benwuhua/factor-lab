@@ -53,6 +53,7 @@ STOCK_CARDS_OUTPUT ?= reports/stock_cards_$(RUN_DATE).jsonl
 THEME_CONFIG ?= configs/themes/deepseek_ascend_semiconductor.yaml
 THEME_SCAN_OUTPUT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE).csv
 THEME_SCAN_REPORT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE).md
+THEME_GATE_REPORT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE)_theme_gate.md
 THEME_SCAN_TOP_K ?= 30
 THEME_SCAN_FILL_MISSING ?= 0
 THEME_SCAN_FILL_MISSING_ARG = $(if $(filter 1 true yes TRUE YES,$(THEME_SCAN_FILL_MISSING)),--fill-missing-from-provider,)
@@ -329,6 +330,7 @@ theme-scan:
 		--top-k $(THEME_SCAN_TOP_K) \
 		--output-csv $(THEME_SCAN_OUTPUT) \
 		--output-md $(THEME_SCAN_REPORT) \
+		--theme-gate-output $(THEME_GATE_REPORT) \
 		$(THEME_SCAN_FILL_MISSING_ARG) \
 		$(THEME_SCAN_PROVIDER_ARGS)
 

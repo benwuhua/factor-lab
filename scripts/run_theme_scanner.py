@@ -23,6 +23,7 @@ from qlib_factor_lab.signal import (
     load_approved_signal_factors,
     load_signal_config,
 )
+from qlib_factor_lab.theme_gate import ThemeGateConfig, check_theme_gate, write_theme_gate_report
 from qlib_factor_lab.theme_scanner import (
     build_theme_candidates,
     combine_signal_with_supplemental,
@@ -50,6 +51,10 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=30)
     parser.add_argument("--output-csv", default="reports/theme_scans/{theme_id}_{run_yyyymmdd}.csv")
     parser.add_argument("--output-md", default="reports/theme_scans/{theme_id}_{run_yyyymmdd}.md")
+    parser.add_argument("--theme-gate-output", default="reports/theme_scans/{theme_id}_{run_yyyymmdd}_theme_gate.md")
+    parser.add_argument("--theme-gate-min-candidates", type=int, default=3)
+    parser.add_argument("--theme-gate-min-signal-coverage", type=float, default=0.5)
+    parser.add_argument("--theme-gate-min-amount-20d", type=float, default=100_000_000.0)
     parser.add_argument("--project-root", default=str(default_root))
     args = parser.parse_args()
 
@@ -81,9 +86,23 @@ def main() -> int:
         thesis=universe.thesis,
         sources=universe.sources,
     )
+    theme_gate = check_theme_gate(
+        candidates,
+        ThemeGateConfig(
+            min_research_candidates=args.theme_gate_min_candidates,
+            min_signal_coverage=args.theme_gate_min_signal_coverage,
+            min_amount_20d=args.theme_gate_min_amount_20d,
+        ),
+    )
+    theme_gate_path = write_theme_gate_report(
+        theme_gate,
+        _resolve(root, _materialize(args.theme_gate_output, universe.theme_id, run_date)),
+    )
     print(candidates.head(args.top_k).to_string(index=False))
     print(f"wrote: {csv_path}")
     print(f"wrote: {md_path}")
+    print(f"theme_gate: {theme_gate.decision}")
+    print(f"wrote: {theme_gate_path}")
     return 0
 
 

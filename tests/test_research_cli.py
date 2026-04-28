@@ -42,6 +42,18 @@ class ResearchCliTests(unittest.TestCase):
 
         self.assertTrue(callable(module.main))
 
+    def test_run_theme_scanner_script_exposes_theme_gate_helpers(self):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "run_theme_scanner.py"
+
+        spec = importlib.util.spec_from_file_location("run_theme_scanner", script)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+
+        self.assertTrue(callable(module.check_theme_gate))
+        self.assertTrue(callable(module.write_theme_gate_report))
+
     def test_theme_scanner_provider_fill_keeps_original_signal_when_provider_has_no_factor_coverage(self):
         root = Path(__file__).resolve().parents[1]
         script = root / "scripts" / "run_theme_scanner.py"
