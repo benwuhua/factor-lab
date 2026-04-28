@@ -86,6 +86,52 @@ class ResearchCliTests(unittest.TestCase):
 
         self.assertEqual(filled.to_dict(orient="records"), signal.to_dict(orient="records"))
 
+    def test_theme_scanner_provider_fill_tries_multiple_providers_until_missing_names_are_filled(self):
+        root = Path(__file__).resolve().parents[1]
+        script = root / "scripts" / "run_theme_scanner.py"
+        spec = importlib.util.spec_from_file_location("run_theme_scanner", script)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        universe = type("Universe", (), {"members": pd.DataFrame([{"instrument": "AAA"}, {"instrument": "BBB"}])})()
+        signal = pd.DataFrame([{"date": "2026-04-27", "instrument": "AAA", "ensemble_score": 1.0}])
+        supplemental = pd.DataFrame([{"date": "2026-04-27", "instrument": "BBB", "ensemble_score": 0.8}])
+
+        with patch.object(module, "load_signal_config") as load_config, patch.object(
+            module,
+            "load_approved_signal_factors",
+            return_value=[object()],
+        ), patch.object(module, "load_project_config", side_effect=["provider-1", "provider-2"]) as load_project, patch.object(
+            module,
+            "fetch_daily_factor_exposures",
+            side_effect=[ValueError("no factor exposures"), pd.DataFrame([{"instrument": "BBB"}])],
+        ) as fetch, patch.object(module, "build_daily_signal", return_value=supplemental):
+            load_config.return_value = SignalConfig(
+                approved_factors_path=Path("reports/approved_factors.yaml"),
+                provider_config=Path("configs/provider_current.yaml"),
+                run_date="latest",
+                active_regime="sideways",
+                status_weights={},
+                regime_weights={},
+                rule_weight=1.0,
+                model_weight=0.0,
+                signals_output_path=Path("reports/signals.csv"),
+                summary_output_path=Path("reports/signal_summary.md"),
+            )
+
+            filled = module._fill_missing_signal_from_providers(
+                root=root,
+                signal=signal,
+                universe=universe,
+                run_date="2026-04-27",
+                signal_config_path="configs/signal.yaml",
+                provider_config_paths=["configs/provider_current.yaml", "configs/provider_csi300_current.yaml"],
+            )
+
+        self.assertEqual(load_project.call_count, 2)
+        self.assertEqual(fetch.call_count, 2)
+        self.assertEqual(filled["instrument"].tolist(), ["AAA", "BBB"])
+
 
 if __name__ == "__main__":
     unittest.main()

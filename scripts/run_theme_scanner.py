@@ -41,7 +41,12 @@ def main() -> int:
     parser.add_argument("--supplemental-signal-csv", default=None, help="Optional extra signal CSV for theme-only names.")
     parser.add_argument("--fill-missing-from-provider", action="store_true")
     parser.add_argument("--signal-config", default="configs/signal.yaml")
-    parser.add_argument("--provider-config", default=None)
+    parser.add_argument(
+        "--provider-config",
+        action="append",
+        default=None,
+        help="Provider config used to fill missing theme names. Repeat to try multiple datasets.",
+    )
     parser.add_argument("--top-k", type=int, default=30)
     parser.add_argument("--output-csv", default="reports/theme_scans/{theme_id}_{run_yyyymmdd}.csv")
     parser.add_argument("--output-md", default="reports/theme_scans/{theme_id}_{run_yyyymmdd}.md")
@@ -56,13 +61,13 @@ def main() -> int:
         supplemental = pd.read_csv(_resolve(root, args.supplemental_signal_csv))
         signal = combine_signal_with_supplemental(signal, supplemental)
     if args.fill_missing_from_provider:
-        signal = _fill_missing_signal_from_provider(
+        signal = _fill_missing_signal_from_providers(
             root=root,
             signal=signal,
             universe=universe,
             run_date=run_date,
             signal_config_path=args.signal_config,
-            provider_config_path=args.provider_config,
+            provider_config_paths=args.provider_config,
         )
     candidates = build_theme_candidates(signal, universe, top_k=args.top_k)
     csv_path = write_theme_candidates(
@@ -91,23 +96,50 @@ def _fill_missing_signal_from_provider(
     signal_config_path: str | Path,
     provider_config_path: str | Path | None,
 ) -> pd.DataFrame:
-    missing = missing_theme_instruments(signal, universe)
+    paths = [provider_config_path] if provider_config_path is not None else None
+    return _fill_missing_signal_from_providers(
+        root=root,
+        signal=signal,
+        universe=universe,
+        run_date=run_date,
+        signal_config_path=signal_config_path,
+        provider_config_paths=paths,
+    )
+
+
+def _fill_missing_signal_from_providers(
+    *,
+    root: Path,
+    signal: pd.DataFrame,
+    universe,
+    run_date: str,
+    signal_config_path: str | Path,
+    provider_config_paths: list[str | Path] | None,
+) -> pd.DataFrame:
+    output = signal
+    missing = missing_theme_instruments(output, universe)
     if not missing:
-        return signal
+        return output
     config = load_signal_config(_resolve(root, signal_config_path))
     if config.execution_calendar_path is not None:
         config = replace(config, execution_calendar_path=_resolve(root, config.execution_calendar_path))
     config = replace(config, run_date=run_date)
     factors = load_approved_signal_factors(_resolve(root, config.approved_factors_path))
-    provider_path = Path(provider_config_path) if provider_config_path is not None else config.provider_config
-    project_config = load_project_config(_resolve(root, provider_path))
-    try:
-        exposures = fetch_daily_factor_exposures(project_config, factors, run_date, instruments=missing)
-    except ValueError as exc:
-        print(f"warning: theme provider fill skipped: {exc}")
-        return signal
-    supplemental_signal = build_daily_signal(exposures, factors, config)
-    return combine_signal_with_supplemental(signal, supplemental_signal)
+    paths = provider_config_paths or [config.provider_config]
+    for raw_provider_path in paths:
+        missing = missing_theme_instruments(output, universe)
+        if not missing:
+            break
+        provider_path = Path(raw_provider_path) if raw_provider_path is not None else config.provider_config
+        project_config = load_project_config(_resolve(root, provider_path))
+        try:
+            exposures = fetch_daily_factor_exposures(project_config, factors, run_date, instruments=missing)
+        except ValueError as exc:
+            print(f"warning: theme provider fill skipped for {provider_path}: {exc}")
+            continue
+        supplemental_signal = build_daily_signal(exposures, factors, config)
+        output = combine_signal_with_supplemental(output, supplemental_signal)
+    return output
 
 
 def _resolve(root: Path, path: str | Path) -> Path:

@@ -56,6 +56,8 @@ THEME_SCAN_REPORT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DAT
 THEME_SCAN_TOP_K ?= 30
 THEME_SCAN_FILL_MISSING ?= 0
 THEME_SCAN_FILL_MISSING_ARG = $(if $(filter 1 true yes TRUE YES,$(THEME_SCAN_FILL_MISSING)),--fill-missing-from-provider,)
+THEME_SCAN_PROVIDER_CONFIGS ?= $(CSI500_PROVIDER) $(CSI300_PROVIDER)
+THEME_SCAN_PROVIDER_ARGS = $(foreach provider,$(THEME_SCAN_PROVIDER_CONFIGS),--provider-config $(provider))
 EXPOSURE_INPUT ?= $(TARGET_PORTFOLIO)
 EXPOSURE_OUTPUT_DIR ?= reports/exposure_attribution
 EXPECTED_POSITIONS ?= runs/$(RUN_DATE)/positions_expected.csv
@@ -327,7 +329,8 @@ theme-scan:
 		--top-k $(THEME_SCAN_TOP_K) \
 		--output-csv $(THEME_SCAN_OUTPUT) \
 		--output-md $(THEME_SCAN_REPORT) \
-		$(THEME_SCAN_FILL_MISSING_ARG)
+		$(THEME_SCAN_FILL_MISSING_ARG) \
+		$(THEME_SCAN_PROVIDER_ARGS)
 
 exposure-attribution:
 	$(PYTHON) scripts/build_exposure_attribution.py \
