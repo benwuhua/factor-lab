@@ -8,8 +8,69 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from qlib_factor_lab.daily_pipeline import check_provider_data_freshness
+
 
 class DailyPipelineTests(unittest.TestCase):
+    def test_provider_data_freshness_fails_when_latest_calendar_is_stale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "configs").mkdir()
+            qlib_dir = root / "data/qlib/cn_data_current"
+            (qlib_dir / "calendars").mkdir(parents=True)
+            (qlib_dir / "calendars/day.txt").write_text("2026-04-22\n2026-04-23\n", encoding="utf-8")
+            (root / "configs/provider_current.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "provider_uri": "data/qlib/cn_data_current",
+                        "freq": "day",
+                        "end_time": "2026-04-23",
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            report = check_provider_data_freshness(
+                root,
+                Path("configs/provider_current.yaml"),
+                now=pd.Timestamp("2026-04-28 09:00:00"),
+                max_age_days=3,
+            )
+
+            self.assertFalse(report["passed"])
+            self.assertEqual(report["latest_calendar_date"], "2026-04-23")
+            self.assertIn("stale", report["detail"])
+
+    def test_provider_data_freshness_passes_for_latest_complete_daily_bar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "configs").mkdir()
+            qlib_dir = root / "data/qlib/cn_data_current"
+            (qlib_dir / "calendars").mkdir(parents=True)
+            (qlib_dir / "calendars/day.txt").write_text("2026-04-24\n2026-04-27\n", encoding="utf-8")
+            (root / "configs/provider_current.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "provider_uri": "data/qlib/cn_data_current",
+                        "freq": "day",
+                        "end_time": "2026-04-27",
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            report = check_provider_data_freshness(
+                root,
+                Path("configs/provider_current.yaml"),
+                now=pd.Timestamp("2026-04-28 09:00:00"),
+                max_age_days=3,
+            )
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["provider_end_time"], "2026-04-27")
+
     def test_daily_pipeline_cli_writes_run_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

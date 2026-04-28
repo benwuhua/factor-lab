@@ -389,11 +389,14 @@ def build_dump_bin_command(
     qlib_dir: str | Path,
     python_bin: str = sys.executable,
     max_workers: int = 4,
+    mode: str = "dump_all",
 ) -> list[str]:
+    if mode not in {"dump_all", "dump_update"}:
+        raise ValueError("mode must be dump_all or dump_update")
     return [
         python_bin,
         str(dump_bin_path),
-        "dump_all",
+        mode,
         "--data_path",
         str(source_dir),
         "--qlib_dir",
@@ -407,6 +410,16 @@ def build_dump_bin_command(
         "--max_workers",
         str(max_workers),
     ]
+
+
+def read_latest_qlib_calendar_date(qlib_dir: str | Path, freq: str = "day") -> str | None:
+    calendar_path = Path(qlib_dir).expanduser() / "calendars" / f"{freq}.txt"
+    if not calendar_path.exists():
+        return None
+    lines = [line.strip() for line in calendar_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not lines:
+        return None
+    return lines[-1]
 
 
 def write_provider_config(
@@ -636,11 +649,19 @@ def dump_csvs_to_qlib(
     dump_bin_path: str | Path,
     python_bin: str = sys.executable,
     max_workers: int = 4,
+    update: bool = False,
 ) -> None:
     qlib_path = Path(qlib_dir)
-    if qlib_path.exists():
+    if qlib_path.exists() and not update:
         shutil.rmtree(qlib_path)
-    command = build_dump_bin_command(dump_bin_path, source_dir, qlib_path, python_bin=python_bin, max_workers=max_workers)
+    command = build_dump_bin_command(
+        dump_bin_path,
+        source_dir,
+        qlib_path,
+        python_bin=python_bin,
+        max_workers=max_workers,
+        mode="dump_update" if update else "dump_all",
+    )
     print("+", " ".join(command))
     subprocess.run(command, check=True)
 

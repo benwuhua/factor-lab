@@ -10,6 +10,7 @@ from typing import Any
 
 import pandas as pd
 
+from .akshare_data import read_latest_qlib_calendar_date
 from .company_events import (
     EVENT_RISK_SNAPSHOT_COLUMNS,
     build_event_risk_snapshot,
@@ -85,6 +86,30 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     execution_config = load_yaml(_resolve(root_path, inputs.execution_config_path))
     artifacts: dict[str, str] = {}
     run_dir: Path | None = None
+    freshness_config = execution_config.get("data_freshness", {}) or {}
+    if _should_check_provider_freshness(signal_config.run_date, inputs.exposures_csv, freshness_config):
+        freshness_report = check_provider_data_freshness(
+            root_path,
+            signal_config.provider_config,
+            max_age_days=int(freshness_config.get("max_age_days", 3)),
+        )
+        freshness_run_date = str(freshness_report.get("provider_end_time") or datetime.now().date())
+        run_dir = _resolve(root_path, _run_dir(execution_config, freshness_run_date))
+        run_dir.mkdir(parents=True, exist_ok=True)
+        freshness_path = write_provider_data_freshness_report(freshness_report, run_dir / "data_freshness.md")
+        artifacts["data_freshness"] = str(freshness_path)
+        if not freshness_report["passed"]:
+            _copy_configs(root_path, run_dir, inputs, artifacts)
+            run_summary_path = _write_run_summary(
+                run_dir / "run_summary.md",
+                run_date=freshness_run_date,
+                status="data_freshness_failed",
+                risk_passed=False,
+                artifacts=artifacts,
+            )
+            artifacts["run_summary"] = str(run_summary_path)
+            manifest_path = _write_manifest(root_path, run_dir, freshness_run_date, "data_freshness_failed", False, artifacts, inputs)
+            return DailyPipelineResult(freshness_run_date, run_dir, "data_freshness_failed", False, manifest_path, artifacts)
     governance_checked = False
     preflight_run_date = _preflight_run_date(signal_config.run_date)
     if preflight_run_date is not None:
@@ -313,6 +338,87 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         expert_review_gate=expert_review_gate,
     )
     return DailyPipelineResult(run_date, run_dir, "pass", True, manifest_path, artifacts)
+
+
+def check_provider_data_freshness(
+    root: str | Path,
+    provider_config_path: str | Path,
+    *,
+    now: pd.Timestamp | datetime | None = None,
+    max_age_days: int = 3,
+) -> dict[str, Any]:
+    root_path = Path(root).expanduser().resolve()
+    config_path = _resolve(root_path, provider_config_path)
+    project_config = load_project_config(config_path)
+    latest_calendar_date = read_latest_qlib_calendar_date(project_config.provider_uri, freq=project_config.freq)
+    current = pd.Timestamp(now or datetime.now()).normalize()
+    provider_end = _normalize_date_text(project_config.end_time)
+    calendar_end = _normalize_date_text(latest_calendar_date)
+    failures: list[str] = []
+    age_days: int | None = None
+
+    if calendar_end is None:
+        failures.append("missing_calendar")
+    else:
+        age_days = int((current - pd.Timestamp(calendar_end)).days)
+        if age_days < 0:
+            failures.append("calendar_after_current_date")
+        if age_days > max_age_days:
+            failures.append(f"stale_calendar_age_{age_days}d_gt_{max_age_days}d")
+
+    if provider_end is None:
+        failures.append("missing_provider_end_time")
+    elif calendar_end is not None and pd.Timestamp(provider_end) != pd.Timestamp(calendar_end):
+        failures.append(f"provider_end_time_mismatch_calendar:{provider_end}!={calendar_end}")
+
+    return {
+        "passed": not failures,
+        "provider_config": str(config_path),
+        "provider_uri": str(project_config.provider_uri),
+        "provider_end_time": provider_end or "",
+        "latest_calendar_date": calendar_end or "",
+        "current_date": str(current.date()),
+        "max_age_days": max_age_days,
+        "age_days": "" if age_days is None else age_days,
+        "detail": "; ".join(failures),
+    }
+
+
+def write_provider_data_freshness_report(report: dict[str, Any], output_path: str | Path) -> Path:
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "# Data Freshness Report",
+        "",
+        f"- status: {'pass' if report.get('passed') else 'fail'}",
+        f"- provider_config: {report.get('provider_config', '')}",
+        f"- provider_uri: {report.get('provider_uri', '')}",
+        f"- provider_end_time: {report.get('provider_end_time', '')}",
+        f"- latest_calendar_date: {report.get('latest_calendar_date', '')}",
+        f"- current_date: {report.get('current_date', '')}",
+        f"- max_age_days: {report.get('max_age_days', '')}",
+        f"- age_days: {report.get('age_days', '')}",
+        f"- detail: {report.get('detail', '')}",
+    ]
+    output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return output
+
+
+def _should_check_provider_freshness(run_date: str, exposures_csv: Path | None, data: dict[str, Any]) -> bool:
+    if data.get("enabled", True) is False:
+        return False
+    if exposures_csv is not None:
+        return False
+    return str(run_date).lower() == "latest"
+
+
+def _normalize_date_text(value: Any) -> str | None:
+    if value is None or str(value).strip() == "":
+        return None
+    timestamp = pd.Timestamp(value)
+    if pd.isna(timestamp):
+        return None
+    return str(timestamp.date())
 
 
 def _load_exposures(root: Path, exposures_csv: Path | None, signal_config: Any, factors: Any) -> pd.DataFrame:

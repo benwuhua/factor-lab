@@ -15,6 +15,10 @@ paper_broker:
 reconcile:
   weight_tolerance: 0.0001
 
+data_freshness:
+  enabled: true
+  max_age_days: 3
+
 expert_review:
   enabled: true
   command:

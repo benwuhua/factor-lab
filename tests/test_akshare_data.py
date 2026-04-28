@@ -10,6 +10,7 @@ import yaml
 
 from qlib_factor_lab.akshare_data import (
     build_dump_bin_command,
+    dump_csvs_to_qlib,
     enrich_security_master_industries,
     filter_frame_to_universes,
     fetch_company_notices,
@@ -20,6 +21,7 @@ from qlib_factor_lab.akshare_data import (
     normalize_akshare_history,
     normalize_cninfo_industry_override,
     qlib_symbol_from_code,
+    read_latest_qlib_calendar_date,
     write_instrument_alias,
     write_provider_config,
 )
@@ -88,6 +90,48 @@ class AkShareDataTests(unittest.TestCase):
         self.assertIn("--qlib_dir", command)
         self.assertIn("--exclude_fields", command)
         self.assertIn("date,symbol", command)
+
+    def test_build_dump_bin_command_can_use_qlib_dump_update(self):
+        command = build_dump_bin_command(
+            dump_bin_path=Path("scripts/dump_bin.py"),
+            source_dir=Path("data/akshare/incremental"),
+            qlib_dir=Path("data/qlib/cn_data_current"),
+            python_bin="python",
+            max_workers=2,
+            mode="dump_update",
+        )
+
+        self.assertEqual(command[0:3], ["python", "scripts/dump_bin.py", "dump_update"])
+
+    def test_dump_csvs_to_qlib_update_preserves_existing_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            qlib_dir = root / "qlib"
+            qlib_dir.mkdir()
+            sentinel = qlib_dir / "keep.txt"
+            sentinel.write_text("keep", encoding="utf-8")
+
+            with patch("qlib_factor_lab.akshare_data.subprocess.run") as run:
+                dump_csvs_to_qlib(
+                    root / "source",
+                    qlib_dir,
+                    root / "dump_bin.py",
+                    python_bin="python",
+                    max_workers=1,
+                    update=True,
+                )
+
+            self.assertTrue(sentinel.exists())
+            self.assertEqual(run.call_args.args[0][1], str(root / "dump_bin.py"))
+            self.assertEqual(run.call_args.args[0][2], "dump_update")
+
+    def test_read_latest_qlib_calendar_date_reads_last_calendar_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            calendar = Path(tmp) / "calendars"
+            calendar.mkdir()
+            calendar.joinpath("day.txt").write_text("2026-04-23\n2026-04-24\n", encoding="utf-8")
+
+            self.assertEqual(read_latest_qlib_calendar_date(Path(tmp)), "2026-04-24")
 
     def test_write_provider_config_points_to_current_data(self):
         with tempfile.TemporaryDirectory() as tmp:
