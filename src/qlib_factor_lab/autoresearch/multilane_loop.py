@@ -10,9 +10,14 @@ from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
+import yaml
+
 from qlib_factor_lab.autoresearch.codex_loop import parse_until_deadline, resolve_max_iterations
 from qlib_factor_lab.autoresearch.multilane import MultiLaneReport, run_multilane_autoresearch
 
+
+REVERSAL_LOGIC_TOKENS = ("reversal", "repair", "washout", "discount", "divergence", "convergence", "wangji")
+NON_REVERSAL_PRIORITY_LANES = {"emotion_atmosphere", "liquidity_microstructure", "risk_structure"}
 
 DEFAULT_ROTATION_FACTOR_NAMES: dict[str, list[str]] = {
     "pattern_event": ["wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"],
@@ -84,6 +89,7 @@ def run_multilane_loop(
     max_crashes: int = 5,
     sleep_sec: float = 60.0,
     lane_factor_batch_size: int = 2,
+    include_reversal_expression_candidates: bool = False,
     runner: MultiLaneRunner = run_multilane_autoresearch,
 ) -> MultiLaneLoopResult:
     root = Path(project_root)
@@ -103,7 +109,12 @@ def run_multilane_loop(
     crash_budget = max(1, int(max_crashes))
     stop_reason = "max_iterations"
     iteration = 0
-    expression_candidates = _expression_candidate_paths(root, expression_candidate_path, expression_candidate_glob)
+    expression_candidates = _expression_candidate_paths(
+        root,
+        expression_candidate_path,
+        expression_candidate_glob,
+        include_reversal=include_reversal_expression_candidates,
+    )
     _write_loop_summary(
         log_dir,
         iterations=iterations,
@@ -130,6 +141,7 @@ def run_multilane_loop(
         rotation = {
             "expression_candidate": Path(expression_candidate_for_iteration).name,
             "lane_factor_name_overrides": lane_factor_overrides,
+            "policy": "all_candidates" if include_reversal_expression_candidates else "non_reversal_priority",
         }
         iteration_row: dict[str, Any] = {
             "iteration": iteration,
@@ -227,7 +239,13 @@ def resolve_multilane_max_iterations(
     )
 
 
-def _expression_candidate_paths(root: Path, fallback: str | Path, glob_pattern: str | None) -> list[str]:
+def _expression_candidate_paths(
+    root: Path,
+    fallback: str | Path,
+    glob_pattern: str | None,
+    *,
+    include_reversal: bool = False,
+) -> list[str]:
     fallback_path = _resolve(root, fallback)
     candidates: list[Path] = []
     if glob_pattern:
@@ -235,17 +253,36 @@ def _expression_candidate_paths(root: Path, fallback: str | Path, glob_pattern: 
     if fallback_path not in candidates:
         candidates.insert(0, fallback_path)
     existing = [path for path in candidates if path.exists()]
+    if not include_reversal:
+        non_reversal = [path for path in existing if not _is_reversal_expression_candidate(path)]
+        if non_reversal:
+            existing = non_reversal
     paths = existing or [fallback_path]
     return [str(path) for path in paths]
 
 
 def _lane_factor_name_overrides(iteration: int, batch_size: int) -> dict[str, list[str]]:
-    size = max(1, int(batch_size))
     return {
-        lane: _rotate_items(names, iteration, size)
+        lane: _rotate_items(names, iteration, _lane_batch_size(lane, batch_size))
         for lane, names in DEFAULT_ROTATION_FACTOR_NAMES.items()
         if names
     }
+
+
+def _lane_batch_size(lane: str, batch_size: int) -> int:
+    size = max(1, int(batch_size))
+    if lane in NON_REVERSAL_PRIORITY_LANES:
+        return max(size, 3)
+    return size
+
+
+def _is_reversal_expression_candidate(path: Path) -> bool:
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return any(token in path.name.lower() for token in REVERSAL_LOGIC_TOKENS)
+    text = " ".join(str(data.get(key, "")) for key in ("name", "family", "description", "expected_behavior")).lower()
+    return any(token in text for token in REVERSAL_LOGIC_TOKENS)
 
 
 def _rotate_items(items: list[Any], iteration: int, batch_size: int) -> list[Any]:

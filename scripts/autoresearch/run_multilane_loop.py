@@ -48,6 +48,11 @@ def main() -> int:
     parser.add_argument("--sleep-sec", type=float, default=60.0)
     parser.add_argument("--max-crashes", type=int, default=5)
     parser.add_argument("--lane-factor-batch-size", type=int, default=2)
+    parser.add_argument(
+        "--include-reversal-expression-candidates",
+        action="store_true",
+        help="Allow reversal-like expression candidates in the nightly expression rotation.",
+    )
     args = parser.parse_args()
 
     deadline = parse_multilane_deadline(args.until, timezone=args.timezone)
@@ -77,6 +82,7 @@ def main() -> int:
         max_crashes=args.max_crashes,
         sleep_sec=args.sleep_sec,
         lane_factor_batch_size=args.lane_factor_batch_size,
+        include_reversal_expression_candidates=args.include_reversal_expression_candidates,
     )
     print(f"iterations_started: {result.iterations_started}")
     print(f"crash_count: {result.crash_count}")

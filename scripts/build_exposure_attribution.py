@@ -13,6 +13,7 @@ add_src_to_path()
 from qlib_factor_lab.exposure_attribution import (
     build_exposure_attribution,
     load_factor_family_map,
+    load_factor_logic_map,
     write_exposure_attribution_csv,
     write_exposure_attribution_markdown,
 )
@@ -35,13 +36,16 @@ def main() -> int:
     input_path = _resolve(root, args.input_csv)
     portfolio = pd.read_csv(input_path)
     family_map = {}
+    logic_map = {}
     approved_path = _resolve(root, args.approved_factors)
     if approved_path.exists():
         family_map = load_factor_family_map(approved_path)
+        logic_map = load_factor_logic_map(approved_path)
 
     result = build_exposure_attribution(
         portfolio,
         family_map=family_map,
+        logic_map=logic_map,
         weight_col=args.weight_col,
         industry_col=args.industry_col,
         style_cols=args.style_col,

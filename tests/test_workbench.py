@@ -180,6 +180,8 @@ class WorkbenchTests(unittest.TestCase):
                     "event_count": [1, 0],
                     "family_momentum_score": [0.3, 0.3],
                     "family_reversal_score": [0.1, 0.1],
+                    "logic_trend_following_score": [0.3, 0.3],
+                    "logic_reversal_repair_score": [0.1, 0.1],
                 }
             ).to_csv(run / "target_portfolio.csv", index=False)
 
@@ -191,6 +193,7 @@ class WorkbenchTests(unittest.TestCase):
         self.assertAlmostEqual(float(row["industry_coverage"]), 0.5)
         self.assertAlmostEqual(float(row["event_coverage"]), 0.5)
         self.assertAlmostEqual(float(row["factor_family_concentration"]), 0.75)
+        self.assertAlmostEqual(float(row["factor_logic_concentration"]), 0.75)
 
     def test_workbench_snapshot_counts_approved_factors_and_latest_target(self):
         with tempfile.TemporaryDirectory() as tmp:

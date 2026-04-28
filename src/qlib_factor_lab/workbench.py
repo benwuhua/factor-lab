@@ -515,6 +515,9 @@ def build_portfolio_gate_trend(root: str | Path = ".", *, limit: int = 20) -> pd
                 "industry_coverage": _portfolio_industry_coverage(portfolio),
                 "event_coverage": _portfolio_event_coverage(portfolio),
                 "factor_family_concentration": _portfolio_family_concentration(gate.family),
+                "factor_logic_concentration": _portfolio_family_concentration(
+                    gate.logic.rename(columns={"logic_bucket": "family"})
+                ),
             }
         )
     if not rows:
@@ -526,6 +529,7 @@ def build_portfolio_gate_trend(root: str | Path = ".", *, limit: int = 20) -> pd
                 "industry_coverage",
                 "event_coverage",
                 "factor_family_concentration",
+                "factor_logic_concentration",
             ]
         )
     return pd.DataFrame(rows).tail(limit).reset_index(drop=True)

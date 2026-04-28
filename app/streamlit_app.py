@@ -37,6 +37,7 @@ from qlib_factor_lab.workbench import (
     load_execution_gate_card,
     load_autoresearch_queue,
     load_factor_family_map_safe,
+    load_factor_logic_map_safe,
     load_multilane_report,
     load_portfolio_gate_explanation,
     load_stock_cards,
@@ -364,6 +365,7 @@ def render_portfolio_gate() -> None:
         portfolio,
         risk_config=load_risk_config_dict(ROOT),
         factor_family_map=load_factor_family_map_safe(ROOT),
+        factor_logic_map=load_factor_logic_map_safe(ROOT),
     )
     expert = _latest_expert_review()
     pretrade = build_pretrade_review(portfolio)
@@ -461,17 +463,31 @@ def render_portfolio_gate() -> None:
             st.info("还没有可展示的历史组合门禁趋势。")
         else:
             display_trend = trend.copy()
-            for column in ["industry_coverage", "event_coverage", "factor_family_concentration"]:
+            for column in [
+                "industry_coverage",
+                "event_coverage",
+                "factor_family_concentration",
+                "factor_logic_concentration",
+            ]:
                 if column in display_trend.columns:
                     display_trend[column] = display_trend[column].map(lambda value: f"{float(value):.1%}")
             st.dataframe(display_trend, width="stretch", hide_index=True)
             chart_trend = trend.set_index("run_date")[
-                [column for column in ["industry_coverage", "event_coverage", "factor_family_concentration"] if column in trend.columns]
+                [
+                    column
+                    for column in [
+                        "industry_coverage",
+                        "event_coverage",
+                        "factor_family_concentration",
+                        "factor_logic_concentration",
+                    ]
+                    if column in trend.columns
+                ]
             ]
             if not chart_trend.empty:
                 st.line_chart(chart_trend)
 
-        chart_cols = st.columns(2)
+        chart_cols = st.columns(3)
         with chart_cols[0]:
             st.subheader("行业权重")
             if gate.industry.empty:
@@ -484,8 +500,17 @@ def render_portfolio_gate() -> None:
                 st.info("组合里没有 top factor driver。")
             else:
                 st.bar_chart(gate.family.set_index("family")["abs_weighted_contribution"])
+        with chart_cols[2]:
+            st.subheader("交易逻辑桶暴露")
+            if gate.logic.empty:
+                st.info("组合里没有 logic bucket driver。")
+            else:
+                st.bar_chart(gate.logic.set_index("logic_bucket")["abs_weighted_contribution"])
 
         st.subheader("组合明细")
+        logic_score_columns = [
+            column for column in portfolio.columns if column.startswith("logic_") and column.endswith("_score")
+        ]
         keep = [
             column
             for column in [
@@ -501,6 +526,7 @@ def render_portfolio_gate() -> None:
                 "top_factor_2_contribution",
                 "risk_flags",
                 "event_risk_summary",
+                *logic_score_columns,
             ]
             if column in portfolio.columns
         ]
