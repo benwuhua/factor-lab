@@ -291,6 +291,7 @@ class ExpertReviewTests(unittest.TestCase):
     def test_parse_expert_review_decision_accepts_markdown_and_defaults_to_unknown(self):
         self.assertEqual(parse_expert_review_decision("研究复核结论: reject"), "reject")
         self.assertEqual(parse_expert_review_decision("**结论：`caution`**，不是 `reject`。"), "caution")
+        self.assertEqual(parse_expert_review_decision("结论：**`caution`**\n我不会给 `reject`。"), "caution")
         self.assertEqual(parse_expert_review_decision("No explicit decision."), "unknown")
 
     def test_write_expert_review_result_outputs_markdown(self):

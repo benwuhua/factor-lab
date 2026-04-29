@@ -206,7 +206,7 @@ def _manual_confirmed_gate(decision: str, raw: dict[str, Any] | None, detail: st
 def parse_expert_review_decision(text: str) -> str:
     lower = text.lower()
     explicit = re.search(
-        r"(?:research_review_status|review_status|decision|研究复核结论|复核结论|结论)\s*[：:]\s*`?(pass|caution|reject)`?",
+        r"(?:research_review_status|review_status|decision|研究复核结论|复核结论|结论)\s*[：:]\s*(?:\*\*)?\s*`?(pass|caution|reject)`?",
         lower,
     )
     if explicit:
