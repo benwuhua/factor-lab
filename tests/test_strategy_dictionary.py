@@ -8,6 +8,7 @@ import yaml
 
 from qlib_factor_lab.combo_spec import load_combo_spec
 from qlib_factor_lab.strategy_dictionary import (
+    build_expression_candidate_from_strategy,
     filter_strategy_entries,
     load_strategy_dictionary,
     propose_strategy_ideas,
@@ -179,6 +180,57 @@ class StrategyDictionaryTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("stock_low_volatility", output_md.read_text(encoding="utf-8"))
             self.assertIn("stock_low_volatility", output_csv.read_text(encoding="utf-8"))
+
+    def test_strategy_dictionary_cli_writes_expression_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_dir = root / "candidates"
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/autoresearch/propose_from_strategy_dictionary.py"),
+                    "--dictionary",
+                    str(repo / "configs/strategy_dictionary/151_trading_strategies_equity.yaml"),
+                    "--combo-spec",
+                    str(repo / "configs/combo_specs/balanced_multifactor_v1.yaml"),
+                    "--lane",
+                    "expression",
+                    "--limit",
+                    "2",
+                    "--write-expression-candidates",
+                    "--candidate-output-dir",
+                    str(output_dir),
+                    "--output-md",
+                    str(root / "proposals.md"),
+                    "--output-csv",
+                    str(root / "proposals.csv"),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((output_dir / "low_vol_120_v1.yaml").exists())
+            self.assertTrue((output_dir / "momentum_120_skip_20_v1.yaml").exists())
+
+    def test_build_expression_candidate_from_strategy_uses_mapped_formula(self):
+        entry = load_strategy_dictionary(
+            Path(__file__).resolve().parents[1] / "configs/strategy_dictionary/151_trading_strategies_equity.yaml"
+        )
+        by_id = {item.strategy_id: item for item in entry}
+
+        low_vol = build_expression_candidate_from_strategy(by_id["stock_low_volatility"])
+        momentum = build_expression_candidate_from_strategy(by_id["stock_price_momentum"])
+
+        self.assertEqual(low_vol["name"], "low_vol_120_v1")
+        self.assertEqual(low_vol["family"], "volatility")
+        self.assertEqual(low_vol["expression"], "Std($close / Ref($close, 1) - 1, 120)")
+        self.assertEqual(low_vol["direction"], -1)
+        self.assertEqual(momentum["name"], "momentum_120_skip_20_v1")
+        self.assertEqual(momentum["expression"], "Ref($close, 20) / Ref($close, 120) - 1")
 
 
 if __name__ == "__main__":

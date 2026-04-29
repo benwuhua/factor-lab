@@ -136,6 +136,15 @@ class AutoresearchExpressionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "disallowed window: 120"):
                 load_expression_candidate(candidate_path, space)
 
+    def test_default_expression_space_accepts_low_volatility_dictionary_candidate(self):
+        root = Path(__file__).resolve().parents[1]
+        space = load_expression_space(root / "configs/autoresearch/expression_space.yaml")
+
+        candidate = load_expression_candidate(root / "configs/autoresearch/candidates/low_vol_120_v1.yaml", space)
+
+        self.assertEqual(candidate.name, "low_vol_120_v1")
+        self.assertEqual(candidate.family, "volatility")
+
 
 if __name__ == "__main__":
     unittest.main()

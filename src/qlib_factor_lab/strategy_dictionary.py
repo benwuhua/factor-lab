@@ -132,6 +132,30 @@ def render_strategy_proposals_markdown(proposals: list[StrategyProposal]) -> str
     return "\n".join(lines) + "\n"
 
 
+def build_expression_candidate_from_strategy(entry: StrategyEntry) -> dict[str, Any]:
+    if entry.strategy_id == "stock_low_volatility":
+        return {
+            "name": "low_vol_120_v1",
+            "family": "volatility",
+            "expression": "Std($close / Ref($close, 1) - 1, 120)",
+            "direction": -1,
+            "description": "120 day close-to-close volatility inspired by the low-volatility strategy archetype. Lower volatility ranks higher.",
+            "expected_behavior": "Stocks with lower 120 day realized volatility should receive higher scores after applying direction -1.",
+            "strategy_dictionary_id": entry.strategy_id,
+        }
+    if entry.strategy_id == "stock_price_momentum":
+        return {
+            "name": "momentum_120_skip_20_v1",
+            "family": "momentum",
+            "expression": "Ref($close, 20) / Ref($close, 120) - 1",
+            "direction": 1,
+            "description": "120 day price momentum skipping the latest 20 sessions, inspired by the price momentum strategy archetype.",
+            "expected_behavior": "Stocks with stronger medium-term returns before the latest 20 day skip window should rank higher.",
+            "strategy_dictionary_id": entry.strategy_id,
+        }
+    raise ValueError(f"no expression candidate mapping for strategy_id: {entry.strategy_id}")
+
+
 def _strategy_entry(raw: dict[str, Any], *, default_source: str) -> StrategyEntry:
     return StrategyEntry(
         strategy_id=str(raw["strategy_id"]),

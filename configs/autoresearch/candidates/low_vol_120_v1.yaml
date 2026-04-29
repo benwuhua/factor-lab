@@ -1,0 +1,9 @@
+name: low_vol_120_v1
+family: volatility
+expression: Std($close / Ref($close, 1) - 1, 120)
+direction: -1
+description: 120 day close-to-close volatility inspired by the low-volatility strategy
+  archetype. Lower volatility ranks higher.
+expected_behavior: Stocks with lower 120 day realized volatility should receive higher
+  scores after applying direction -1.
+strategy_dictionary_id: stock_low_volatility

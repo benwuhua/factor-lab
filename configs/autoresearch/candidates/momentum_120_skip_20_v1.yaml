@@ -1,0 +1,9 @@
+name: momentum_120_skip_20_v1
+family: momentum
+expression: Ref($close, 20) / Ref($close, 120) - 1
+direction: 1
+description: 120 day price momentum skipping the latest 20 sessions, inspired by the
+  price momentum strategy archetype.
+expected_behavior: Stocks with stronger medium-term returns before the latest 20 day
+  skip window should rank higher.
+strategy_dictionary_id: stock_price_momentum
