@@ -1,0 +1,180 @@
+source: "151 Trading Strategies / SSRN abstract=3247865"
+source_type: "strategy inspiration dictionary"
+usage_note: "Use as an idea taxonomy only. Every candidate must be revalidated on A-share point-in-time data before entering production research."
+strategies:
+  - strategy_id: stock_price_momentum
+    strategy_name: "Price momentum"
+    asset_class: "stocks"
+    strategy_family: "momentum"
+    signal_type: "cross_sectional_rank"
+    template_formula: "Return(120) excluding latest 20 trading days"
+    required_data: ["close", "calendar"]
+    a_share_transferability: "high"
+    risk_notes:
+      - "Short-term reversal and limit-up/limit-down frictions can damage naive momentum."
+      - "Prefer skip windows and tradability filters."
+    candidate_lane: "expression"
+    implementation_status: "candidate"
+    related_factors: ["momentum_120_skip_20", "risk_adjusted_momentum"]
+
+  - strategy_id: stock_earnings_momentum
+    strategy_name: "Earnings momentum"
+    asset_class: "stocks"
+    strategy_family: "growth_improvement"
+    signal_type: "point_in_time_fundamental"
+    template_formula: "Change in reported profit growth and revenue growth after announce_date"
+    required_data: ["announce_date", "revenue_growth_yoy", "net_profit_growth_yoy"]
+    a_share_transferability: "high"
+    risk_notes:
+      - "Must use announce_date, not report_period."
+      - "A-share event windows may reprice before next open."
+    candidate_lane: "fundamental_quality"
+    implementation_status: "seeded"
+    related_factors: ["growth_improvement"]
+
+  - strategy_id: stock_value
+    strategy_name: "Value"
+    asset_class: "stocks"
+    strategy_family: "value"
+    signal_type: "point_in_time_fundamental"
+    template_formula: "EP + CFP + BP with industry-aware cleaning"
+    required_data: ["market_cap", "net_profit", "operating_cashflow", "book_value", "announce_date"]
+    a_share_transferability: "high"
+    risk_notes:
+      - "Can load on cycle traps and financial-sector accounting effects."
+      - "Use quality and event gates before portfolio inclusion."
+    candidate_lane: "fundamental_quality"
+    implementation_status: "seeded"
+    related_factors: ["value_ep_cfp", "dividend_yield"]
+
+  - strategy_id: stock_low_volatility
+    strategy_name: "Low-volatility anomaly"
+    asset_class: "stocks"
+    strategy_family: "low_vol"
+    signal_type: "risk_rank"
+    template_formula: "-Std(Return, 120) and/or -DownsideVol(Return, 120)"
+    required_data: ["close"]
+    a_share_transferability: "high"
+    risk_notes:
+      - "May concentrate in banks, utilities, high-dividend sectors."
+      - "Needs industry exposure guard."
+    candidate_lane: "expression"
+    implementation_status: "candidate"
+    related_factors: ["low_vol_120", "downside_vol_120"]
+
+  - strategy_id: stock_multifactor_portfolio
+    strategy_name: "Multifactor portfolio"
+    asset_class: "stocks"
+    strategy_family: "alpha_combo"
+    signal_type: "combo_construction"
+    template_formula: "Rank-combine value, momentum, quality, low-vol, dividend, event signals"
+    required_data: ["factor_scores", "factor_diagnostics", "risk_exposures"]
+    a_share_transferability: "high"
+    risk_notes:
+      - "Avoid single-family dominance and duplicated factor archetypes."
+      - "Use costs, liquidity and event gates."
+    candidate_lane: "combo"
+    implementation_status: "seeded"
+    related_factors: ["balanced_multifactor_v1"]
+
+  - strategy_id: stock_residual_momentum
+    strategy_name: "Residual momentum"
+    asset_class: "stocks"
+    strategy_family: "residual_momentum"
+    signal_type: "neutralized_return"
+    template_formula: "Residual return after market/industry regression over 120 days, skip 20"
+    required_data: ["close", "benchmark", "industry"]
+    a_share_transferability: "medium"
+    risk_notes:
+      - "Requires stable industry classification and enough observations."
+      - "Sensitive to regression window and outlier handling."
+    candidate_lane: "expression"
+    implementation_status: "candidate"
+    related_factors: ["residual_momentum_120_skip_20"]
+
+  - strategy_id: stock_pairs_trading
+    strategy_name: "Pairs trading"
+    asset_class: "stocks"
+    strategy_family: "pairs_cluster_reversion"
+    signal_type: "relative_value"
+    template_formula: "Z-score of price spread within matched pair or industry peer"
+    required_data: ["close", "industry", "liquidity"]
+    a_share_transferability: "medium"
+    risk_notes:
+      - "A-share borrow constraints make short legs hard; long-only adaptation should be tested separately."
+      - "Pairs can break around fundamentals and events."
+    candidate_lane: "pattern_event"
+    implementation_status: "candidate"
+    related_factors: ["industry_relative_reversion"]
+
+  - strategy_id: stock_cluster_mean_reversion
+    strategy_name: "Mean reversion - cluster"
+    asset_class: "stocks"
+    strategy_family: "cluster_reversion"
+    signal_type: "relative_reversion"
+    template_formula: "Negative residual return versus industry or learned cluster"
+    required_data: ["close", "industry", "market_cap"]
+    a_share_transferability: "medium"
+    risk_notes:
+      - "Can catch falling knives; require quality/event/tradability gates."
+    candidate_lane: "expression"
+    implementation_status: "candidate"
+    related_factors: ["industry_residual_reversal_20"]
+
+  - strategy_id: stock_moving_average_trend
+    strategy_name: "Moving average trend"
+    asset_class: "stocks"
+    strategy_family: "trend_following"
+    signal_type: "time_series_filter"
+    template_formula: "Close above MA60 and MA20 slope positive"
+    required_data: ["close"]
+    a_share_transferability: "medium"
+    risk_notes:
+      - "May lag in choppy markets."
+      - "Better used as confirmation than standalone alpha."
+    candidate_lane: "expression"
+    implementation_status: "candidate"
+    related_factors: ["ma_trend_20_60"]
+
+  - strategy_id: stock_support_resistance_channel
+    strategy_name: "Support/resistance and channel"
+    asset_class: "stocks"
+    strategy_family: "pattern_channel"
+    signal_type: "technical_pattern"
+    template_formula: "Price position inside rolling high-low channel with breakout confirmation"
+    required_data: ["high", "low", "close", "volume"]
+    a_share_transferability: "medium"
+    risk_notes:
+      - "Needs volume/tradability confirmation to avoid false breakouts."
+    candidate_lane: "pattern_event"
+    implementation_status: "candidate"
+    related_factors: ["quiet_breakout_20", "wangji-factor1"]
+
+  - strategy_id: etf_sector_momentum_rotation
+    strategy_name: "Sector momentum rotation"
+    asset_class: "ETF/index/industry"
+    strategy_family: "sector_theme"
+    signal_type: "sector_rank"
+    template_formula: "Rank industries by 60/120 day relative strength, then map to constituents"
+    required_data: ["industry", "close", "benchmark"]
+    a_share_transferability: "high"
+    risk_notes:
+      - "A-share themes rotate fast; combine with event/news theme evidence."
+    candidate_lane: "theme"
+    implementation_status: "candidate"
+    related_factors: ["sector_momentum_60", "theme_heat_score"]
+
+  - strategy_id: stock_alpha_combo
+    strategy_name: "Alpha combos"
+    asset_class: "stocks"
+    strategy_family: "alpha_combo"
+    signal_type: "portfolio_construction"
+    template_formula: "Combine weak alpha signals using correlation, ICIR and family caps"
+    required_data: ["candidate_factors", "ledger", "factor_correlation", "transaction_costs"]
+    a_share_transferability: "high"
+    risk_notes:
+      - "The goal is robustness, not maximizing one backtest window."
+      - "Needs redundancy penalty and cost-aware gates."
+    candidate_lane: "combo"
+    implementation_status: "candidate"
+    related_factors: ["combo_icir_weighted", "combo_low_corr"]
