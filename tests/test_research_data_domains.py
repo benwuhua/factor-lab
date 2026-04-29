@@ -3,13 +3,16 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
 from qlib_factor_lab.research_data_domains import (
     build_announcement_evidence_index,
     build_shareholder_capital_from_events,
+    derive_fundamental_valuation_fields,
     normalize_fundamental_quality,
+    normalize_cninfo_dividend,
     write_research_data_domains,
 )
 
@@ -30,6 +33,8 @@ class ResearchDataDomainsTest(unittest.TestCase):
                     "盈利收益率": "4.8",
                     "经营现金流市值比": "3.2",
                     "股息率": "2.1",
+                    "摊薄每股收益(元)": "1.2",
+                    "每股经营性现金流(元)": "0.8",
                 }
             ]
         )
@@ -45,7 +50,108 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertAlmostEqual(4.8, float(result.loc[0, "ep"]))
         self.assertAlmostEqual(3.2, float(result.loc[0, "cfp"]))
         self.assertAlmostEqual(2.1, float(result.loc[0, "dividend_yield"]))
+        self.assertAlmostEqual(1.2, float(result.loc[0, "eps"]))
+        self.assertAlmostEqual(0.8, float(result.loc[0, "operating_cashflow_per_share"]))
         self.assertEqual("akshare_financial_indicator", result.loc[0, "source"])
+
+    def test_normalize_fundamental_quality_derives_ratios_from_price_when_raw_ratios_missing(self) -> None:
+        raw = pd.DataFrame(
+            [
+                {
+                    "证券代码": "600000",
+                    "报告期": "2026-03-31",
+                    "公告日期": "2026-04-20",
+                    "摊薄每股收益(元)": "1.5",
+                    "每股经营性现金流(元)": "0.6",
+                    "close": "30",
+                    "dividend_cash_per_10": "3",
+                }
+            ]
+        )
+
+        result = normalize_fundamental_quality(raw, as_of_date="2026-04-27")
+
+        self.assertAlmostEqual(5.0, float(result.loc[0, "ep"]))
+        self.assertAlmostEqual(2.0, float(result.loc[0, "cfp"]))
+        self.assertAlmostEqual(1.0, float(result.loc[0, "dividend_yield"]))
+
+    def test_normalize_cninfo_dividend_keeps_cash_dividend_and_pit_dates(self) -> None:
+        raw = pd.DataFrame(
+            [
+                {
+                    "实施方案公告日期": "2025-05-19",
+                    "派息比例": "28.1",
+                    "除权日": "2025-05-27",
+                    "报告时间": "2024年报",
+                }
+            ]
+        )
+
+        result = normalize_cninfo_dividend(raw, instrument="SZ002032")
+
+        self.assertEqual(["SZ002032"], result["instrument"].tolist())
+        self.assertEqual(["2025-05-27"], result["available_at"].tolist())
+        self.assertAlmostEqual(28.1, float(result.loc[0, "dividend_cash_per_10"]))
+        self.assertEqual("cninfo_dividend", result.loc[0, "source"])
+
+    def test_derive_fundamental_valuation_fields_uses_pit_close_and_cninfo_dividend(self) -> None:
+        fundamentals = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-20",
+                    "available_at": "2026-04-20",
+                    "eps": 1.2,
+                    "operating_cashflow_per_share": 0.6,
+                }
+            ]
+        )
+        prices = pd.DataFrame(
+            [
+                {"instrument": "SH600000", "trade_date": "2026-04-19", "close": 20.0},
+                {"instrument": "SH600000", "trade_date": "2026-04-20", "close": 24.0},
+            ]
+        )
+        dividends = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "announce_date": "2026-04-10",
+                    "available_at": "2026-04-18",
+                    "dividend_cash_per_10": 2.4,
+                    "source": "cninfo_dividend",
+                }
+            ]
+        )
+
+        result = derive_fundamental_valuation_fields(fundamentals, prices=prices, dividends=dividends)
+
+        self.assertAlmostEqual(5.0, float(result.loc[0, "ep"]))
+        self.assertAlmostEqual(2.5, float(result.loc[0, "cfp"]))
+        self.assertAlmostEqual(1.0, float(result.loc[0, "dividend_yield"]))
+        self.assertEqual("eps_to_pit_close;ocfps_to_pit_close;cninfo_dividend_to_pit_close", result.loc[0, "valuation_source"])
+
+    def test_derive_fundamental_valuation_fields_records_only_used_sources(self) -> None:
+        fundamentals = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-20",
+                    "available_at": "2026-04-20",
+                    "eps": 1.2,
+                    "operating_cashflow_per_share": "",
+                }
+            ]
+        )
+        prices = pd.DataFrame([{"instrument": "SH600000", "trade_date": "2026-04-20", "close": 24.0}])
+
+        result = derive_fundamental_valuation_fields(fundamentals, prices=prices)
+
+        self.assertAlmostEqual(5.0, float(result.loc[0, "ep"]))
+        self.assertTrue(pd.isna(pd.to_numeric(result.loc[0, "cfp"], errors="coerce")))
+        self.assertEqual("eps_to_pit_close", result.loc[0, "valuation_source"])
 
     def test_normalize_fundamental_quality_accepts_compact_as_of_date(self) -> None:
         raw = pd.DataFrame([{"证券代码": "000001", "报告期": "2026-03-31", "公告日期": "2026-04-20"}])
@@ -154,6 +260,74 @@ class ResearchDataDomainsTest(unittest.TestCase):
             self.assertTrue(Path(manifest["fundamental_quality"]).exists())
             self.assertTrue(Path(manifest["shareholder_capital"]).exists())
             self.assertTrue(Path(manifest["announcement_evidence"]).exists())
+
+    def test_write_research_data_domains_merges_limited_live_refresh_with_existing_data(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame({"instrument": ["SH600000", "SZ000001"]}).to_csv(root / "data/security_master.csv", index=False)
+            pd.DataFrame(
+                [
+                    {
+                        "instrument": "SH600000",
+                        "report_period": "2025-12-31",
+                        "announce_date": "2026-04-30",
+                        "available_at": "2026-04-30",
+                        "roe": 10.0,
+                    }
+                ]
+            ).to_csv(root / "data/fundamental_quality.csv", index=False)
+            pd.DataFrame(
+                [
+                    {
+                        "instrument": "SH600000",
+                        "announce_date": "2025-05-10",
+                        "available_at": "2025-05-20",
+                        "dividend_cash_per_10": 1.0,
+                        "source": "cninfo_dividend",
+                    }
+                ]
+            ).to_csv(root / "data/cninfo_dividends.csv", index=False)
+
+            live_fundamentals = pd.DataFrame(
+                [
+                    {
+                        "instrument": "SZ000001",
+                        "report_period": "2025-12-31",
+                        "announce_date": "2026-04-30",
+                        "available_at": "2026-04-30",
+                        "roe": 9.0,
+                    }
+                ]
+            )
+            live_dividends = pd.DataFrame(
+                [
+                    {
+                        "instrument": "SZ000001",
+                        "announce_date": "2025-05-10",
+                        "available_at": "2025-05-20",
+                        "dividend_cash_per_10": 2.0,
+                        "source": "cninfo_dividend",
+                    }
+                ]
+            )
+
+            with patch("qlib_factor_lab.research_data_domains.fetch_fundamental_quality_from_akshare", return_value=live_fundamentals), patch(
+                "qlib_factor_lab.research_data_domains.fetch_cninfo_dividends_from_akshare",
+                return_value=live_dividends,
+            ):
+                write_research_data_domains(
+                    root,
+                    as_of_date="2026-04-29",
+                    fetch_fundamentals=True,
+                    fetch_cninfo_dividends=True,
+                    limit=1,
+                )
+
+            fundamentals = pd.read_csv(root / "data/fundamental_quality.csv")
+            dividends = pd.read_csv(root / "data/cninfo_dividends.csv")
+            self.assertEqual({"SH600000", "SZ000001"}, set(fundamentals["instrument"]))
+            self.assertEqual({"SH600000", "SZ000001"}, set(dividends["instrument"]))
 
     def test_write_research_data_domains_preserves_existing_fundamentals_without_refresh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

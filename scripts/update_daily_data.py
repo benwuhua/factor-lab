@@ -21,6 +21,8 @@ def main() -> int:
     parser.add_argument("--skip-market-data", action="store_true")
     parser.add_argument("--skip-research-context", action="store_true")
     parser.add_argument("--fetch-fundamentals", action="store_true")
+    parser.add_argument("--derive-valuation-fields", action="store_true")
+    parser.add_argument("--fetch-cninfo-dividends", action="store_true")
     parser.add_argument("--fundamental-source", default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--delay", type=float, default=0.2)
@@ -35,6 +37,8 @@ def main() -> int:
         skip_market_data=args.skip_market_data,
         skip_research_context=args.skip_research_context,
         fetch_fundamentals=args.fetch_fundamentals,
+        derive_valuation_fields=args.derive_valuation_fields,
+        fetch_cninfo_dividends=args.fetch_cninfo_dividends,
         fundamental_source=Path(args.fundamental_source) if args.fundamental_source else None,
         limit=args.limit,
         delay=args.delay,

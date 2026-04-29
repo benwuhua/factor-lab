@@ -13,6 +13,8 @@ class DailyDataUpdateConfig:
     skip_market_data: bool = False
     skip_research_context: bool = False
     fetch_fundamentals: bool = False
+    derive_valuation_fields: bool = False
+    fetch_cninfo_dividends: bool = False
     fundamental_source: Path | None = None
     limit: int | None = None
     delay: float = 0.2
@@ -105,6 +107,10 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
     if config.fetch_fundamentals:
         research_domain_command += ("--fetch-fundamentals", "--delay", str(config.delay))
         research_domain_command += _limit_args(config.limit)
+    if config.derive_valuation_fields:
+        research_domain_command += ("--derive-valuation-fields",)
+    if config.fetch_cninfo_dividends:
+        research_domain_command += ("--fetch-cninfo-dividends",)
     if config.fundamental_source is not None:
         research_domain_command += ("--fundamental-source", str(config.fundamental_source))
     steps.append(DataUpdateStep("research_data_domains", research_domain_command))
