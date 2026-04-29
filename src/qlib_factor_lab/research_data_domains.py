@@ -22,6 +22,9 @@ FUNDAMENTAL_QUALITY_COLUMNS = [
     "revenue_growth_yoy",
     "net_profit_growth_yoy",
     "operating_cashflow_to_net_profit",
+    "ep",
+    "cfp",
+    "dividend_yield",
     "source",
 ]
 
@@ -98,6 +101,9 @@ def normalize_fundamental_quality(raw: pd.DataFrame, *, as_of_date: str, source:
                     item,
                     ["operating_cashflow_to_net_profit", "经营现金流量净额/净利润", "经营现金流净额/净利润"],
                 ),
+                "ep": _number_from_row(item, ["ep", "EP", "earnings_to_price", "盈利收益率", "市盈率倒数"]),
+                "cfp": _number_from_row(item, ["cfp", "CFP", "cashflow_to_price", "operating_cashflow_to_market_cap", "经营现金流市值比", "现金流收益率"]),
+                "dividend_yield": _number_from_row(item, ["dividend_yield", "股息率", "股息率(%)", "分红收益率", "现金分红收益率"]),
                 "source": source,
             }
         )

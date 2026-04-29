@@ -226,7 +226,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     )
 
     diagnostics = (
-        factor_diagnostics_from_combo_spec(combo_spec, _load_factor_diagnostics(root_path, run_date))
+        factor_diagnostics_from_combo_spec(combo_spec, _load_factor_diagnostics(root_path, run_date, combo_spec.name))
         if combo_spec is not None
         else _load_factor_diagnostics(root_path, run_date)
     )
@@ -497,12 +497,20 @@ def _preflight_run_date(run_date: str) -> str | None:
     return value
 
 
-def _load_factor_diagnostics(root: Path, run_date: str) -> pd.DataFrame | None:
+def _load_factor_diagnostics(root: Path, run_date: str, combo_name: str | None = None) -> pd.DataFrame | None:
+    yyyymmdd = run_date.replace("-", "")
     candidates = [
-        root / "reports" / f"single_factor_diagnostics_{run_date.replace('-', '')}.csv",
+        root / "reports" / f"single_factor_diagnostics_{yyyymmdd}.csv",
         root / "reports" / f"single_factor_diagnostics_{run_date}.csv",
         root / "reports" / "single_factor_diagnostics.csv",
     ]
+    if combo_name:
+        candidates = [
+            root / "reports" / f"combo_member_diagnostics_{combo_name}_{yyyymmdd}.csv",
+            root / "reports" / f"combo_member_diagnostics_{combo_name}_{run_date}.csv",
+            root / "reports" / f"combo_member_diagnostics_{combo_name}.csv",
+            *candidates,
+        ]
     for path in candidates:
         if path.exists():
             return pd.read_csv(path)

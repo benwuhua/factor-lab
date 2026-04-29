@@ -59,6 +59,9 @@ data_governance:
         - report_period
         - announce_date
         - available_at
+        - ep
+        - cfp
+        - dividend_yield
       pit_fields:
         - report_period
         - announce_date

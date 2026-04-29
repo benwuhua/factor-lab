@@ -1,5 +1,5 @@
 name: balanced_multifactor_v1
-description: "Balanced A-share multi-factor candidate: quality, growth improvement, cashflow quality, low gap risk, and quiet breakout. Value/dividend slots are kept as shadow members until PIT valuation and dividend fields are governed."
+description: "Balanced A-share multi-factor candidate: quality, growth improvement, cashflow quality, low gap risk, quiet breakout, PIT value, and dividend yield."
 fundamental_path: data/fundamental_quality.csv
 members:
   - name: quality_low_leverage
@@ -74,9 +74,8 @@ members:
     logic_bucket: fundamental_value
     direction: 1
     weight: 0.10
-    approval_status: shadow
+    approval_status: core
     regime_profile: all_weather
-    active: false
     components:
       - field: ep
         direction: 1
@@ -90,9 +89,8 @@ members:
     logic_bucket: fundamental_dividend
     direction: 1
     weight: 0.05
-    approval_status: shadow
+    approval_status: core
     regime_profile: down_sideways
-    active: false
     components:
       - field: dividend_yield
         direction: 1

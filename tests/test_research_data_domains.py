@@ -27,6 +27,9 @@ class ResearchDataDomainsTest(unittest.TestCase):
                     "资产负债率": "42.1",
                     "营业收入同比增长率": "12.3",
                     "净利润同比增长率": "-5.5",
+                    "盈利收益率": "4.8",
+                    "经营现金流市值比": "3.2",
+                    "股息率": "2.1",
                 }
             ]
         )
@@ -39,6 +42,9 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertEqual(["2026-04-20"], result["available_at"].tolist())
         self.assertAlmostEqual(8.5, float(result.loc[0, "roe"]))
         self.assertAlmostEqual(31.2, float(result.loc[0, "gross_margin"]))
+        self.assertAlmostEqual(4.8, float(result.loc[0, "ep"]))
+        self.assertAlmostEqual(3.2, float(result.loc[0, "cfp"]))
+        self.assertAlmostEqual(2.1, float(result.loc[0, "dividend_yield"]))
         self.assertEqual("akshare_financial_indicator", result.loc[0, "source"])
 
     def test_normalize_fundamental_quality_accepts_compact_as_of_date(self) -> None:
@@ -178,6 +184,7 @@ class ResearchDataDomainsTest(unittest.TestCase):
 
             result = pd.read_csv(root / "data/fundamental_quality.csv")
             self.assertEqual(["SZ000001"], result["instrument"].tolist())
+            self.assertEqual({"ep", "cfp", "dividend_yield"} <= set(result.columns), True)
             self.assertEqual(["existing"], result["source"].tolist())
 
 

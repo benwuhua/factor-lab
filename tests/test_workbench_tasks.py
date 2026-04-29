@@ -39,6 +39,7 @@ class WorkbenchTaskTests(unittest.TestCase):
         self.assertEqual(WORKBENCH_TASKS["autoresearch-multilane"].command, ("make", "autoresearch-multilane"))
         self.assertEqual(WORKBENCH_TASKS["autoresearch-multilane-smoke"].command, ("make", "autoresearch-multilane"))
         self.assertEqual(WORKBENCH_TASKS["stock-cards"].command, ("make", "stock-cards"))
+        self.assertEqual(WORKBENCH_TASKS["combo-manual-confirm"].command, ("make", "combo-manual-confirm"))
 
     def test_makefile_exposes_one_command_factor_research_pipeline(self):
         makefile = Path(__file__).resolve().parents[1].joinpath("Makefile").read_text(encoding="utf-8")
@@ -92,6 +93,34 @@ class WorkbenchTaskTests(unittest.TestCase):
                     "AUTORESEARCH_START_TIME": "2026-01-01",
                     "AUTORESEARCH_END_TIME": "2026-04-20",
                     "AUTORESEARCH_MULTILANE_OUTPUT": "reports/autoresearch/multilane_smoke_20260420.md",
+                },
+            )
+
+    def test_launch_workbench_task_persists_combo_manual_confirm_env(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "scripts").mkdir()
+            (root / "scripts/run_workbench_task.py").write_text("print('stub')", encoding="utf-8")
+
+            with patch("qlib_factor_lab.workbench_tasks.subprocess.Popen"):
+                record = launch_workbench_task(
+                    root,
+                    "combo-manual-confirm",
+                    env_overrides={
+                        "COMBO_SPEC": "configs/combo_specs/balanced_multifactor_v1.yaml",
+                        "EXPERT_REVIEWER": "ryan",
+                        "EXPERT_CONFIRM_REASON": "UI confirmed after review",
+                        "UNSAFE": "ignored",
+                    },
+                )
+
+            manifest = json.loads(task_manifest_path(record.run_dir).read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["env_overrides"],
+                {
+                    "COMBO_SPEC": "configs/combo_specs/balanced_multifactor_v1.yaml",
+                    "EXPERT_REVIEWER": "ryan",
+                    "EXPERT_CONFIRM_REASON": "UI confirmed after review",
                 },
             )
 

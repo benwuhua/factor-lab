@@ -43,7 +43,9 @@ WORKBENCH_TASKS: dict[str, WorkbenchTask] = {
     ),
     "autoresearch-review": WorkbenchTask("autoresearch-review", "复核自动挖掘", ("make", "autoresearch-review"), "汇总 nightly ledger、稳定性和重复簇。"),
     "research-context": WorkbenchTask("research-context", "刷新证据库", ("make", "research-context"), "刷新 data/security_master.csv 和 data/company_events.csv。"),
+    "combo-diagnostics": WorkbenchTask("combo-diagnostics", "组合成员诊断", ("make", "combo-diagnostics"), "为 combo spec 成员刷新近期正式 IC/LS 诊断。"),
     "target-portfolio": WorkbenchTask("target-portfolio", "生成目标组合", ("make", "target-portfolio"), "把当日信号转换成 target_portfolio。"),
+    "combo-manual-confirm": WorkbenchTask("combo-manual-confirm", "人工确认放行", ("make", "combo-manual-confirm"), "对 caution/manual 专家门禁记录人工确认并重跑组合流水线。"),
     "stock-cards": WorkbenchTask("stock-cards", "生成股票卡片", ("make", "stock-cards"), "把 target_portfolio 转换成可复核 JSONL 股票卡片。"),
     "exposure-attribution": WorkbenchTask("exposure-attribution", "暴露归因", ("make", "exposure-attribution"), "解释行业、因子族和风格暴露。"),
     "paper-orders": WorkbenchTask("paper-orders", "生成纸面订单", ("make", "paper-orders"), "把目标组合转换为纸面订单和模拟成交。"),
@@ -60,6 +62,12 @@ ALLOWED_TASK_ENV_OVERRIDES = {
     "AUTORESEARCH_START_TIME",
     "AUTORESEARCH_END_TIME",
     "AUTORESEARCH_MULTILANE_OUTPUT",
+    "COMBO_SPEC",
+    "COMBO_DIAGNOSTICS_START_TIME",
+    "COMBO_DIAGNOSTICS_END_TIME",
+    "COMBO_DIAGNOSTICS_OUTPUT",
+    "EXPERT_REVIEWER",
+    "EXPERT_CONFIRM_REASON",
 }
 
 

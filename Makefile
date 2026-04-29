@@ -89,8 +89,16 @@ DAILY_DATA_MANIFEST ?= reports/daily_data_update_$(DAILY_DATA_AS_OF).md
 INDUSTRY_OVERRIDES_OUTPUT ?= data/security_industry_overrides.csv
 INDUSTRY_OVERRIDES_AS_OF ?= $(RUN_DATE)
 INDUSTRY_OVERRIDES_UNIVERSES ?= csi300 csi500
+COMBO_SPEC ?= configs/combo_specs/balanced_multifactor_v1.yaml
+COMBO_DIAGNOSTICS_PROVIDER ?= $(CSI500_PROVIDER)
+COMBO_DIAGNOSTICS_START_TIME ?=
+COMBO_DIAGNOSTICS_END_TIME ?=
+COMBO_DIAGNOSTICS_OUTPUT ?= reports/combo_member_diagnostics_balanced_multifactor_v1_$(RUN_DATE).csv
+COMBO_DIAGNOSTICS_WINDOW_ARGS = $(if $(COMBO_DIAGNOSTICS_START_TIME),--start-time $(COMBO_DIAGNOSTICS_START_TIME),) $(if $(COMBO_DIAGNOSTICS_END_TIME),--end-time $(COMBO_DIAGNOSTICS_END_TIME),)
+EXPERT_REVIEWER ?= manual-reviewer
+EXPERT_CONFIRM_REASON ?= reviewed in workbench
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors execution-calendar daily-signal check-data-quality target-portfolio stock-cards theme-scan exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -118,6 +126,7 @@ help:
 	@printf "  make autoresearch-ledger  Summarize expression autoresearch ledger\n"
 	@printf "  make autoresearch-codex-loop  Run overnight Codex CLI expression autoresearch\n"
 	@printf "  make select-factors   Build approved factor governance artifacts\n"
+	@printf "  make combo-diagnostics  Evaluate recent IC/LS diagnostics for combo members\n"
 	@printf "  make execution-calendar  Build daily A-share execution status CSV\n"
 	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
 	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
@@ -143,6 +152,7 @@ help:
 	@printf "  make autoresearch-ledger AUTORESEARCH_LEDGER=reports/autoresearch/expression_results.tsv\n"
 	@printf "  make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_ITERATIONS=30\n"
 	@printf "  make select-factors FACTOR_SELECTION_CONFIG=configs/factor_selection.yaml\n"
+	@printf "  make combo-diagnostics RUN_DATE=20260420 COMBO_DIAGNOSTICS_START_TIME=2025-10-01 COMBO_DIAGNOSTICS_END_TIME=2026-04-20\n"
 	@printf "  make execution-calendar RUN_DATE=20260420\n"
 	@printf "  make daily-signal SIGNAL_CONFIG=configs/signal.yaml SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml\n"
 	@printf "  make check-data-quality SIGNAL_CSV=reports/signals_20260420.csv\n"
@@ -331,6 +341,13 @@ select-factors:
 	$(PYTHON) scripts/select_factors.py \
 		--config $(FACTOR_SELECTION_CONFIG)
 
+combo-diagnostics:
+	$(PYTHON) scripts/eval_combo_spec_diagnostics.py \
+		--combo-spec $(COMBO_SPEC) \
+		--provider-config $(COMBO_DIAGNOSTICS_PROVIDER) \
+		--output-csv $(COMBO_DIAGNOSTICS_OUTPUT) \
+		$(COMBO_DIAGNOSTICS_WINDOW_ARGS)
+
 execution-calendar:
 	$(PYTHON) scripts/build_execution_calendar.py \
 		--provider-config $(CSI500_PROVIDER) \
@@ -353,6 +370,13 @@ target-portfolio:
 		--trading-config $(TRADING_CONFIG) \
 		--portfolio-config $(PORTFOLIO_CONFIG) \
 		--risk-config $(RISK_CONFIG)
+
+combo-manual-confirm:
+	$(PYTHON) scripts/run_daily_pipeline.py \
+		--combo-spec $(COMBO_SPEC) \
+		--expert-manual-confirm \
+		--expert-reviewer "$(EXPERT_REVIEWER)" \
+		--expert-confirm-reason "$(EXPERT_CONFIRM_REASON)"
 
 stock-cards:
 	$(PYTHON) scripts/build_stock_cards.py \

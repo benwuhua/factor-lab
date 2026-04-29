@@ -91,6 +91,7 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
         self.assertIn("门禁趋势", _app_text(portfolio))
         self.assertIn("交易逻辑桶暴露", _app_text(portfolio))
         self.assertIn("专家硬复核名单", _app_text(portfolio))
+        self.assertIn("Confirm · 人工确认放行", _button_labels(portfolio))
         self.assertIn("刷新证据库", _app_text(evidence))
         self.assertIn("纸面执行动作", _app_text(execution))
 

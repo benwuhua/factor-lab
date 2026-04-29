@@ -1365,9 +1365,30 @@ def _autoresearch_rows() -> list[dict[str, object]]:
 
 def _portfolio_gate_rows() -> list[dict[str, object]]:
     return [
+        {
+            "step": "00 DIAG",
+            "title": "组合成员诊断",
+            "command": "make combo-diagnostics",
+            "status": "formal IC/LS",
+            "action": "Run",
+            "task_id": "combo-diagnostics",
+        },
         {"step": "01 TARGET", "title": "生成目标组合", "command": "make target-portfolio", "status": "ready", "action": "Run", "task_id": "target-portfolio"},
         {"step": "02 ATTR", "title": "暴露归因", "command": "make exposure-attribution", "status": "ready", "action": "Review", "task_id": "exposure-attribution"},
-        {"step": "03 PAPER", "title": "生成纸面订单", "command": "make paper-orders", "status": "guarded", "action": "Stage", "task_id": "paper-orders"},
+        {
+            "step": "03 CONFIRM",
+            "title": "人工确认放行",
+            "command": "make combo-manual-confirm",
+            "status": "manual gate",
+            "action": "Confirm",
+            "task_id": "combo-manual-confirm",
+            "env_overrides": {
+                "COMBO_SPEC": "configs/combo_specs/balanced_multifactor_v1.yaml",
+                "EXPERT_REVIEWER": "streamlit",
+                "EXPERT_CONFIRM_REASON": "confirmed from portfolio gate page",
+            },
+        },
+        {"step": "04 PAPER", "title": "生成纸面订单", "command": "make paper-orders", "status": "guarded", "action": "Stage", "task_id": "paper-orders"},
     ]
 
 
