@@ -23,6 +23,7 @@ def main() -> int:
     parser.add_argument("--execution-config", default="configs/execution.yaml")
     parser.add_argument("--event-risk-config", default="configs/event_risk.yaml")
     parser.add_argument("--data-governance-config", default="configs/data_governance.yaml")
+    parser.add_argument("--combo-spec", default=None, help="Optional governed combo spec to score instead of the approved factor list.")
     parser.add_argument("--exposures-csv", default=None, help="Optional precomputed exposures CSV.")
     parser.add_argument("--current-positions-csv", default="state/current_positions.csv")
     parser.add_argument("--run-date", default=None)
@@ -40,6 +41,7 @@ def main() -> int:
             execution_config_path=Path(args.execution_config),
             event_risk_config_path=Path(args.event_risk_config) if args.event_risk_config else None,
             data_governance_config_path=Path(args.data_governance_config) if args.data_governance_config else None,
+            combo_spec_path=Path(args.combo_spec) if args.combo_spec else None,
             exposures_csv=Path(args.exposures_csv) if args.exposures_csv else None,
             current_positions_csv=Path(args.current_positions_csv) if args.current_positions_csv else None,
             run_date=args.run_date,

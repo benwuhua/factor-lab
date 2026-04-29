@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import yaml
 
 from .akshare_data import read_latest_qlib_calendar_date
 from .company_events import (
@@ -18,6 +19,15 @@ from .company_events import (
     load_event_risk_config,
 )
 from .config import load_project_config, load_yaml
+from .combo_spec import (
+    approved_factors_payload_from_combo_spec,
+    build_combo_exposures,
+    factor_diagnostics_from_combo_spec,
+    load_combo_spec,
+    market_signal_factors_from_combo_spec,
+    signal_config_for_combo_spec,
+    signal_factors_from_combo_spec,
+)
 from .data_governance import build_data_governance_report, load_data_governance_config, write_data_governance_report
 from .data_quality import check_signal_quality, load_data_quality_config, write_quality_report
 from .expert_review import (
@@ -62,6 +72,7 @@ class DailyPipelineInputs:
     execution_config_path: Path
     event_risk_config_path: Path | None = None
     data_governance_config_path: Path | None = None
+    combo_spec_path: Path | None = None
     exposures_csv: Path | None = None
     current_positions_csv: Path | None = None
     run_date: str | None = None
@@ -137,8 +148,17 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             manifest_path = _write_manifest(root_path, run_dir, preflight_run_date, "data_governance_failed", False, artifacts, inputs)
             return DailyPipelineResult(preflight_run_date, run_dir, "data_governance_failed", False, manifest_path, artifacts)
 
-    factors = load_approved_signal_factors(_resolve(root_path, signal_config.approved_factors_path))
-    exposures = _load_exposures(root_path, inputs.exposures_csv, signal_config, factors)
+    approved_factors = load_approved_signal_factors(_resolve(root_path, signal_config.approved_factors_path))
+    combo_spec = load_combo_spec(_resolve(root_path, inputs.combo_spec_path)) if inputs.combo_spec_path is not None else None
+    if combo_spec is None:
+        factors = approved_factors
+        exposures = _load_exposures(root_path, inputs.exposures_csv, signal_config, factors)
+    else:
+        market_factors = market_signal_factors_from_combo_spec(combo_spec, approved_factors)
+        base_exposures = _load_exposures(root_path, inputs.exposures_csv, signal_config, market_factors)
+        signal_config = signal_config_for_combo_spec(signal_config, combo_spec)
+        factors = signal_factors_from_combo_spec(combo_spec, approved_factors)
+        exposures = build_combo_exposures(root_path, combo_spec, base_exposures, signal_config)
     if signal_config.run_date == "latest":
         signal_config = signal_config.__class__(**{**signal_config.__dict__, "run_date": str(exposures["date"].max())})
 
@@ -168,6 +188,14 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     signal_summary_path = write_signal_summary(signal, factors, signal_config, run_dir / "signal_summary.md")
     artifacts.update({"signals": str(signal_path), "signal_summary": str(signal_summary_path)})
     _copy_if_exists(_resolve(root_path, signal_config.approved_factors_path), run_dir / "approved_factors.yaml", artifacts, "approved_factors")
+    if combo_spec is not None and inputs.combo_spec_path is not None:
+        _copy_if_exists(_resolve(root_path, inputs.combo_spec_path), run_dir / "combo_spec.yaml", artifacts, "combo_spec")
+        combo_factors_path = run_dir / "combo_factors.yaml"
+        combo_factors_path.write_text(
+            yaml.safe_dump(approved_factors_payload_from_combo_spec(combo_spec, approved_factors), allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        artifacts["combo_factors"] = str(combo_factors_path)
     _copy_configs(root_path, run_dir, inputs, artifacts)
 
     quality_report = check_signal_quality(signal, load_data_quality_config(_resolve(root_path, inputs.trading_config_path)))
@@ -193,7 +221,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         current_positions=current_positions,
     )
 
-    diagnostics = _load_factor_diagnostics(root_path, run_date)
+    diagnostics = factor_diagnostics_from_combo_spec(combo_spec) if combo_spec is not None else _load_factor_diagnostics(root_path, run_date)
     pre_review_stock_cards = build_stock_cards(
         portfolio,
         run_id=f"daily_{run_date.replace('-', '')}",
@@ -543,6 +571,8 @@ def _copy_configs(root: Path, run_dir: Path, inputs: DailyPipelineInputs, artifa
         config_paths.append(("event_risk_config", inputs.event_risk_config_path))
     if inputs.data_governance_config_path is not None:
         config_paths.append(("data_governance_config", inputs.data_governance_config_path))
+    if inputs.combo_spec_path is not None:
+        config_paths.append(("combo_spec_config", inputs.combo_spec_path))
     for name, path in config_paths:
         _copy_if_exists(_resolve(root, path), config_dir / Path(path).name, artifacts, name)
 
@@ -768,6 +798,7 @@ def _write_manifest(
             "execution_config": str(inputs.execution_config_path),
             "event_risk_config": str(inputs.event_risk_config_path) if inputs.event_risk_config_path else None,
             "data_governance_config": str(inputs.data_governance_config_path) if inputs.data_governance_config_path else None,
+            "combo_spec": str(inputs.combo_spec_path) if inputs.combo_spec_path else None,
             "exposures_csv": str(inputs.exposures_csv) if inputs.exposures_csv else None,
             "current_positions_csv": str(inputs.current_positions_csv) if inputs.current_positions_csv else None,
         },

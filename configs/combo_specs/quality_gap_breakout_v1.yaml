@@ -1,0 +1,37 @@
+name: quality_gap_breakout_v1
+description: "Balanced candidate combo: start from PIT fundamental quality, then require lower gap risk and quiet breakout repair room before the formal portfolio gate."
+fundamental_path: data/fundamental_quality.csv
+members:
+  - name: quality_low_leverage
+    source: fundamental_quality
+    family: fundamental_quality
+    logic_bucket: quality_low_leverage
+    direction: 1
+    weight: 0.60
+    approval_status: core
+    regime_profile: all_weather
+    components:
+      - field: roe
+        direction: 1
+        weight: 1.00
+      - field: debt_ratio
+        direction: -1
+        weight: 0.25
+  - name: gap_risk_20
+    source: qlib_expression
+    expression: "Mean(Abs($open / Ref($close, 1) - 1), 20)"
+    family: gap_risk
+    logic_bucket: risk_structure
+    direction: -1
+    weight: 0.25
+    approval_status: core
+    regime_profile: all_weather
+  - name: quiet_breakout_20
+    source: qlib_expression
+    expression: "($close / Ref($close, 20) - 1) - (Mean($volume, 5) / Mean($volume, 20) - 1)"
+    family: quiet_breakout
+    logic_bucket: reversal_repair
+    direction: 1
+    weight: 0.15
+    approval_status: core
+    regime_profile: all_weather

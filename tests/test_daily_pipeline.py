@@ -623,6 +623,95 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertIn("event_blocked_positions", risk_report)
             self.assertIn("AAA:", risk_report)
 
+    def test_daily_pipeline_cli_runs_combo_spec_through_formal_review_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            (root / "configs/combo_specs").mkdir(parents=True)
+            (root / "configs/combo_specs/quality_gap_breakout_v1.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "name": "quality_gap_breakout_v1",
+                        "description": "Quality base plus gap/risk structure.",
+                        "members": [
+                            {
+                                "name": "quality_low_leverage",
+                                "source": "fundamental_quality",
+                                "family": "fundamental_quality",
+                                "logic_bucket": "quality_low_leverage",
+                                "direction": 1,
+                                "weight": 0.6,
+                                "components": [
+                                    {"field": "roe", "direction": 1, "weight": 1.0},
+                                    {"field": "debt_ratio", "direction": -1, "weight": 0.25},
+                                ],
+                            },
+                            {
+                                "name": "core_alpha",
+                                "source": "approved_factor",
+                                "family": "test_family",
+                                "logic_bucket": "test_logic",
+                                "direction": 1,
+                                "weight": 0.4,
+                            },
+                        ],
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB", "CCC"],
+                    "available_at": ["2026-04-01", "2026-04-01", "2026-04-01"],
+                    "roe": [12.0, 6.0, 3.0],
+                    "debt_ratio": [20.0, 80.0, 50.0],
+                }
+            ).to_csv(root / "data/fundamental_quality.csv", index=False)
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                    "--combo-spec",
+                    "configs/combo_specs/quality_gap_breakout_v1.yaml",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            run_dir = root / "runs/20260423"
+            signals = pd.read_csv(run_dir / "signals.csv")
+            self.assertIn("quality_low_leverage_contribution", signals.columns)
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["inputs"]["combo_spec"], "configs/combo_specs/quality_gap_breakout_v1.yaml")
+            self.assertIn("combo_spec", manifest["artifacts"])
+            packet = (run_dir / "expert_review_packet.md").read_text(encoding="utf-8")
+            self.assertIn("quality_low_leverage", packet)
+            self.assertIn("source=fundamental_quality; direction=1; weight=0.6", packet)
+            self.assertIn("source=approved_factor; direction=1; weight=0.4", packet)
+            stock_cards = (run_dir / "stock_cards.jsonl").read_text(encoding="utf-8")
+            self.assertIn("quality_low_leverage", stock_cards)
+
     def _write_fixture(self, root: Path, min_positions: int = 1) -> None:
         (root / "configs").mkdir(parents=True)
         (root / "reports").mkdir(parents=True)
