@@ -17,6 +17,7 @@ class DailyDataUpdateConfig:
     fetch_cninfo_dividends: bool = False
     fundamental_source: Path | None = None
     limit: int | None = None
+    offset: int = 0
     delay: float = 0.2
 
 
@@ -111,6 +112,8 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
         research_domain_command += ("--derive-valuation-fields",)
     if config.fetch_cninfo_dividends:
         research_domain_command += ("--fetch-cninfo-dividends",)
+    if config.fetch_fundamentals or config.fetch_cninfo_dividends:
+        research_domain_command += _offset_args(config.offset)
     if config.fundamental_source is not None:
         research_domain_command += ("--fundamental-source", str(config.fundamental_source))
     steps.append(DataUpdateStep("research_data_domains", research_domain_command))
@@ -193,6 +196,12 @@ def _limit_args(limit: int | None) -> tuple[str, ...]:
     if limit is None:
         return ()
     return ("--limit", str(limit))
+
+
+def _offset_args(offset: int) -> tuple[str, ...]:
+    if int(offset) <= 0:
+        return ()
+    return ("--offset", str(int(offset)))
 
 
 def _yyyymmdd(value: str) -> str:

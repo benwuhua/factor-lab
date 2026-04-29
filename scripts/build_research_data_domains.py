@@ -23,6 +23,7 @@ def main() -> int:
     parser.add_argument("--derive-valuation-fields", action="store_true", help="Derive EP/CFP/dividend yield from PIT close prices and dividend records.")
     parser.add_argument("--fetch-cninfo-dividends", action="store_true", help="Fetch dividend records from CNINFO via AkShare.")
     parser.add_argument("--limit", type=int, default=None, help="Limit instruments for smoke tests.")
+    parser.add_argument("--offset", type=int, default=0, help="Skip the first N instruments for batched refreshes.")
     parser.add_argument("--delay", type=float, default=0.2)
     args = parser.parse_args()
 
@@ -34,6 +35,7 @@ def main() -> int:
         derive_valuation_fields=args.derive_valuation_fields,
         fetch_cninfo_dividends=args.fetch_cninfo_dividends,
         limit=args.limit,
+        offset=args.offset,
         delay=args.delay,
     )
     for key, path in manifest.items():

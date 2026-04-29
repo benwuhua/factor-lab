@@ -37,6 +37,25 @@ class DailyDataUpdateTest(unittest.TestCase):
 
         self.assertEqual(["research_context", "research_data_domains", "data_governance"], [step.name for step in steps])
 
+    def test_plan_can_batch_research_data_domain_refresh_with_offset(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-27",
+            fetch_fundamentals=True,
+            fetch_cninfo_dividends=True,
+            limit=50,
+            offset=100,
+        )
+
+        steps = build_daily_data_update_plan(config)
+        research_step = steps[-2]
+
+        self.assertEqual("research_data_domains", research_step.name)
+        self.assertIn("--limit", research_step.command)
+        self.assertIn("50", research_step.command)
+        self.assertIn("--offset", research_step.command)
+        self.assertIn("100", research_step.command)
+
     def test_write_update_manifest_records_step_statuses(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp) / "manifest.md"

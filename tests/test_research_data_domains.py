@@ -329,6 +329,28 @@ class ResearchDataDomainsTest(unittest.TestCase):
             self.assertEqual({"SH600000", "SZ000001"}, set(fundamentals["instrument"]))
             self.assertEqual({"SH600000", "SZ000001"}, set(dividends["instrument"]))
 
+    def test_write_research_data_domains_passes_offset_to_live_fetchers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame({"instrument": ["SH600000", "SZ000001", "SZ000002"]}).to_csv(root / "data/security_master.csv", index=False)
+
+            with patch("qlib_factor_lab.research_data_domains.fetch_fundamental_quality_from_akshare", return_value=pd.DataFrame()) as fundamentals, patch(
+                "qlib_factor_lab.research_data_domains.fetch_cninfo_dividends_from_akshare",
+                return_value=pd.DataFrame(),
+            ) as dividends:
+                write_research_data_domains(
+                    root,
+                    as_of_date="2026-04-29",
+                    fetch_fundamentals=True,
+                    fetch_cninfo_dividends=True,
+                    limit=1,
+                    offset=2,
+                )
+
+            self.assertEqual(2, fundamentals.call_args.kwargs["offset"])
+            self.assertEqual(2, dividends.call_args.kwargs["offset"])
+
     def test_write_research_data_domains_preserves_existing_fundamentals_without_refresh(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

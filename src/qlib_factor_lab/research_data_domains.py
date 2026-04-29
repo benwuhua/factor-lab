@@ -305,6 +305,7 @@ def fetch_fundamental_quality_from_akshare(
     *,
     as_of_date: str,
     limit: int | None = None,
+    offset: int = 0,
     delay: float = 0.2,
 ) -> pd.DataFrame:
     try:
@@ -314,6 +315,8 @@ def fetch_fundamental_quality_from_akshare(
 
     frames: list[pd.DataFrame] = []
     symbols = list(dict.fromkeys(str(item).upper() for item in instruments if str(item).strip()))
+    if offset > 0:
+        symbols = symbols[offset:]
     if limit is not None:
         symbols = symbols[:limit]
     for instrument in symbols:
@@ -338,6 +341,7 @@ def fetch_cninfo_dividends_from_akshare(
     instruments: Iterable[str],
     *,
     limit: int | None = None,
+    offset: int = 0,
     delay: float = 0.2,
 ) -> pd.DataFrame:
     try:
@@ -347,6 +351,8 @@ def fetch_cninfo_dividends_from_akshare(
 
     frames: list[pd.DataFrame] = []
     symbols = list(dict.fromkeys(str(item).upper() for item in instruments if str(item).strip()))
+    if offset > 0:
+        symbols = symbols[offset:]
     if limit is not None:
         symbols = symbols[:limit]
     for instrument in symbols:
@@ -400,6 +406,7 @@ def write_research_data_domains(
     derive_valuation_fields: bool = False,
     fetch_cninfo_dividends: bool = False,
     limit: int | None = None,
+    offset: int = 0,
     delay: float = 0.2,
 ) -> dict[str, str]:
     root = Path(project_root).expanduser().resolve()
@@ -414,6 +421,7 @@ def write_research_data_domains(
             security_master.get("instrument", pd.Series(dtype=str)).dropna().astype(str).tolist(),
             as_of_date=as_of_date,
             limit=limit,
+            offset=offset,
             delay=delay,
         )
         fundamentals = _merge_domain_rows(
@@ -431,6 +439,7 @@ def write_research_data_domains(
         fetched_dividends = fetch_cninfo_dividends_from_akshare(
             security_master.get("instrument", pd.Series(dtype=str)).dropna().astype(str).tolist(),
             limit=limit,
+            offset=offset,
             delay=delay,
         )
         dividends = _merge_domain_rows(

@@ -25,6 +25,7 @@ def main() -> int:
     parser.add_argument("--fetch-cninfo-dividends", action="store_true")
     parser.add_argument("--fundamental-source", default=None)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--delay", type=float, default=0.2)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--manifest", default=None)
@@ -41,6 +42,7 @@ def main() -> int:
         fetch_cninfo_dividends=args.fetch_cninfo_dividends,
         fundamental_source=Path(args.fundamental_source) if args.fundamental_source else None,
         limit=args.limit,
+        offset=args.offset,
         delay=args.delay,
     )
     rows = run_daily_data_update(config, dry_run=args.dry_run)
