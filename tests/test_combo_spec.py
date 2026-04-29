@@ -5,7 +5,12 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from qlib_factor_lab.combo_spec import build_combo_exposures, load_combo_spec, signal_factors_from_combo_spec
+from qlib_factor_lab.combo_spec import (
+    build_combo_exposures,
+    factor_diagnostics_from_combo_spec,
+    load_combo_spec,
+    signal_factors_from_combo_spec,
+)
 from qlib_factor_lab.signal import SignalConfig
 
 
@@ -49,6 +54,65 @@ class ComboSpecTests(unittest.TestCase):
             self.assertEqual(["quality_low_leverage", "gap_risk_20"], [factor.name for factor in factors])
             self.assertEqual("fundamental_quality", factors[0].family)
             self.assertEqual("quality_low_leverage", factors[0].logic_bucket)
+
+    def test_inactive_combo_members_are_kept_in_spec_but_not_scored(self):
+        spec = load_combo_spec(
+            {
+                "name": "balanced_multifactor_v1",
+                "members": [
+                    {"name": "quality_low_leverage", "source": "fundamental_quality", "family": "fundamental_quality"},
+                    {"name": "dividend_yield", "source": "fundamental_quality", "family": "dividend", "active": False},
+                ],
+            }
+        )
+
+        factors = signal_factors_from_combo_spec(spec)
+
+        self.assertEqual(["quality_low_leverage"], [factor.name for factor in factors])
+        self.assertEqual(["quality_low_leverage", "dividend_yield"], [member.name for member in spec.members])
+
+    def test_combo_diagnostics_merge_existing_ic_and_keep_member_context(self):
+        spec = load_combo_spec(
+            {
+                "name": "quality_gap_breakout_v1",
+                "members": [
+                    {
+                        "name": "gap_risk_20",
+                        "source": "qlib_expression",
+                        "family": "gap_risk",
+                        "logic_bucket": "risk_structure",
+                        "direction": -1,
+                        "weight": 0.25,
+                    },
+                    {
+                        "name": "quality_low_leverage",
+                        "source": "fundamental_quality",
+                        "family": "fundamental_quality",
+                        "direction": 1,
+                        "weight": 0.6,
+                    },
+                ],
+            }
+        )
+        existing = pd.DataFrame(
+            {
+                "factor": ["gap_risk_20"],
+                "family": ["risk_structure_old"],
+                "suggested_role": ["watch"],
+                "neutral_rank_ic_h20": [0.0123],
+                "neutral_long_short_h20": [0.0045],
+                "concerns": ["low_sample"],
+            }
+        )
+
+        diagnostics = factor_diagnostics_from_combo_spec(spec, existing)
+        by_factor = diagnostics.set_index("factor")
+
+        self.assertEqual(0.0123, float(by_factor.loc["gap_risk_20", "neutral_rank_ic_h20"]))
+        self.assertEqual(0.0045, float(by_factor.loc["gap_risk_20", "neutral_long_short_h20"]))
+        self.assertIn("source=qlib_expression; direction=-1; weight=0.25", by_factor.loc["gap_risk_20", "concerns"])
+        self.assertIn("low_sample", by_factor.loc["gap_risk_20", "concerns"])
+        self.assertEqual("", by_factor.loc["quality_low_leverage", "neutral_rank_ic_h20"])
 
     def test_build_combo_exposures_merges_point_in_time_fundamentals(self):
         with tempfile.TemporaryDirectory() as tmp:

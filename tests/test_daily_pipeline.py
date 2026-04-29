@@ -712,6 +712,66 @@ class DailyPipelineTests(unittest.TestCase):
             stock_cards = (run_dir / "stock_cards.jsonl").read_text(encoding="utf-8")
             self.assertIn("quality_low_leverage", stock_cards)
 
+    def test_daily_pipeline_cli_manual_confirmation_override_releases_caution_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_fixture(root)
+            execution_path = root / "configs/execution.yaml"
+            data = yaml.safe_load(execution_path.read_text(encoding="utf-8"))
+            data["expert_review"] = {
+                "enabled": True,
+                "command": [
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdin.read(); print('结论：`caution`\\n硬人工复核：AAA')",
+                ],
+                "caution_action": "manual_confirmation",
+            }
+            execution_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/run_daily_pipeline.py"),
+                    "--project-root",
+                    str(root),
+                    "--signal-config",
+                    "configs/signal.yaml",
+                    "--trading-config",
+                    "configs/trading.yaml",
+                    "--portfolio-config",
+                    "configs/portfolio.yaml",
+                    "--risk-config",
+                    "configs/risk.yaml",
+                    "--execution-config",
+                    "configs/execution.yaml",
+                    "--exposures-csv",
+                    "data/exposures.csv",
+                    "--current-positions-csv",
+                    "state/current_positions.csv",
+                    "--expert-manual-confirm",
+                    "--expert-reviewer",
+                    "ryan",
+                    "--expert-confirm-reason",
+                    "checked event and chart context",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            run_dir = root / "runs/20260423"
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual("pass", manifest["status"])
+            self.assertEqual("manual_confirmed", manifest["expert_review_gate"]["status"])
+            self.assertEqual("ryan", manifest["expert_review_gate"]["reviewer"])
+            self.assertTrue((run_dir / "orders.csv").exists())
+            portfolio = pd.read_csv(run_dir / "target_portfolio.csv")
+            aaa = portfolio[portfolio["instrument"] == "AAA"].iloc[0]
+            self.assertIn("expert_manual_confirmed", aaa["risk_flags"])
+
     def _write_fixture(self, root: Path, min_positions: int = 1) -> None:
         (root / "configs").mkdir(parents=True)
         (root / "reports").mkdir(parents=True)

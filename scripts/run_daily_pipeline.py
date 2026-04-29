@@ -26,6 +26,9 @@ def main() -> int:
     parser.add_argument("--combo-spec", default=None, help="Optional governed combo spec to score instead of the approved factor list.")
     parser.add_argument("--exposures-csv", default=None, help="Optional precomputed exposures CSV.")
     parser.add_argument("--current-positions-csv", default="state/current_positions.csv")
+    parser.add_argument("--expert-manual-confirm", action="store_true", help="Confirm an expert caution/manual gate for this run.")
+    parser.add_argument("--expert-reviewer", default="", help="Reviewer name for --expert-manual-confirm.")
+    parser.add_argument("--expert-confirm-reason", default="", help="Reason recorded for --expert-manual-confirm.")
     parser.add_argument("--run-date", default=None)
     parser.add_argument("--active-regime", default=None)
     args = parser.parse_args()
@@ -44,6 +47,9 @@ def main() -> int:
             combo_spec_path=Path(args.combo_spec) if args.combo_spec else None,
             exposures_csv=Path(args.exposures_csv) if args.exposures_csv else None,
             current_positions_csv=Path(args.current_positions_csv) if args.current_positions_csv else None,
+            expert_manual_confirm=args.expert_manual_confirm,
+            expert_reviewer=args.expert_reviewer,
+            expert_confirm_reason=args.expert_confirm_reason,
             run_date=args.run_date,
             active_regime=args.active_regime,
         ),

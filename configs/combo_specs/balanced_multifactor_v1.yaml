@@ -1,0 +1,99 @@
+name: balanced_multifactor_v1
+description: "Balanced A-share multi-factor candidate: quality, growth improvement, cashflow quality, low gap risk, and quiet breakout. Value/dividend slots are kept as shadow members until PIT valuation and dividend fields are governed."
+fundamental_path: data/fundamental_quality.csv
+members:
+  - name: quality_low_leverage
+    source: fundamental_quality
+    family: fundamental_quality
+    logic_bucket: quality_low_leverage
+    direction: 1
+    weight: 0.30
+    approval_status: core
+    regime_profile: all_weather
+    components:
+      - field: roe
+        direction: 1
+        weight: 1.00
+      - field: gross_margin
+        direction: 1
+        weight: 0.35
+      - field: debt_ratio
+        direction: -1
+        weight: 0.25
+  - name: growth_improvement
+    source: fundamental_quality
+    family: growth_improvement
+    logic_bucket: fundamental_growth
+    direction: 1
+    weight: 0.20
+    approval_status: core
+    regime_profile: all_weather
+    components:
+      - field: revenue_growth_yoy
+        direction: 1
+        weight: 0.45
+      - field: net_profit_growth_yoy
+        direction: 1
+        weight: 0.45
+      - field: gross_margin
+        direction: 1
+        weight: 0.10
+  - name: cashflow_quality
+    source: fundamental_quality
+    family: cashflow_quality
+    logic_bucket: fundamental_quality
+    direction: 1
+    weight: 0.10
+    approval_status: core
+    regime_profile: all_weather
+    components:
+      - field: operating_cashflow_to_net_profit
+        direction: 1
+        weight: 1.00
+  - name: gap_risk_20
+    source: qlib_expression
+    expression: "Mean(Abs($open / Ref($close, 1) - 1), 20)"
+    family: gap_risk
+    logic_bucket: risk_structure
+    direction: -1
+    weight: 0.15
+    approval_status: core
+    regime_profile: all_weather
+  - name: quiet_breakout_20
+    source: qlib_expression
+    expression: "($close / Ref($close, 20) - 1) - (Mean($volume, 5) / Mean($volume, 20) - 1)"
+    family: quiet_breakout
+    logic_bucket: reversal_repair
+    direction: 1
+    weight: 0.10
+    approval_status: core
+    regime_profile: all_weather
+  - name: value_ep_cfp
+    source: fundamental_quality
+    family: value
+    logic_bucket: fundamental_value
+    direction: 1
+    weight: 0.10
+    approval_status: shadow
+    regime_profile: all_weather
+    active: false
+    components:
+      - field: ep
+        direction: 1
+        weight: 0.50
+      - field: cfp
+        direction: 1
+        weight: 0.50
+  - name: dividend_yield
+    source: fundamental_quality
+    family: dividend
+    logic_bucket: fundamental_dividend
+    direction: 1
+    weight: 0.05
+    approval_status: shadow
+    regime_profile: down_sideways
+    active: false
+    components:
+      - field: dividend_yield
+        direction: 1
+        weight: 1.00

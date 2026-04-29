@@ -34,3 +34,35 @@ Use `--exposures-csv` for fixture or offline validation. Without `--exposures-cs
 - `quiet_breakout_20` keeps a modest repair/breakout component.
 
 It is not a final production portfolio. It is a formal research candidate that now receives the same stock-card, event-risk, expert-review, and portfolio-gate treatment as the normal daily pipeline.
+
+## Balanced Fundamental Candidate
+
+`balanced_multifactor_v1` is the first broader multi-factor candidate pool:
+
+- Active today: quality/low leverage, growth improvement, cashflow quality, low gap risk, quiet breakout.
+- Shadow until data governance is ready: value via `ep/cfp`, dividend via `dividend_yield`.
+
+The shadow members are deliberately present in the spec but excluded from scoring. This keeps the target architecture visible while preventing missing PIT valuation/dividend data from silently entering the daily portfolio.
+
+Run it with:
+
+```bash
+.venv/bin/python scripts/run_daily_pipeline.py \
+  --combo-spec configs/combo_specs/balanced_multifactor_v1.yaml
+```
+
+## Manual Expert Confirmation
+
+When expert review returns `caution` or names hard manual-review items, the run is blocked unless manual confirmation is recorded.
+
+Use this only after reading `expert_review_result.md`, `stock_cards.jsonl`, event context, and charts:
+
+```bash
+.venv/bin/python scripts/run_daily_pipeline.py \
+  --combo-spec configs/combo_specs/quality_gap_breakout_v1.yaml \
+  --expert-manual-confirm \
+  --expert-reviewer ryan \
+  --expert-confirm-reason "checked event risk, charts, and liquidity"
+```
+
+The manifest records the confirmation and the selected rows receive `expert_manual_confirmed` in `risk_flags`.

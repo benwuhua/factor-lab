@@ -18,6 +18,7 @@ FUNDAMENTAL_SOURCE = "fundamental_quality"
 class ComboMember:
     name: str
     source: str
+    active: bool = True
     weight: float = 1.0
     direction: int = 1
     family: str = ""
@@ -56,6 +57,8 @@ def signal_factors_from_combo_spec(spec: ComboSpec, approved_factors: list[Signa
     approved = {factor.name: factor for factor in approved_factors or []}
     factors = []
     for member in spec.members:
+        if not member.active:
+            continue
         base = approved.get(member.name)
         expression = member.expression or (base.expression if base else member.name)
         factors.append(
@@ -78,12 +81,14 @@ def market_signal_factors_from_combo_spec(
 ) -> list[SignalFactor]:
     all_factors = signal_factors_from_combo_spec(spec, approved_factors)
     by_name = {factor.name: factor for factor in all_factors}
-    return [by_name[member.name] for member in spec.members if member.source in MARKET_SOURCES]
+    return [by_name[member.name] for member in spec.members if member.active and member.source in MARKET_SOURCES]
 
 
 def signal_config_for_combo_spec(config: SignalConfig, spec: ComboSpec) -> SignalConfig:
     family_weights = dict(config.family_weights)
     for member in spec.members:
+        if not member.active:
+            continue
         family_weights[member.family or member.name] = member.weight
     return config.__class__(
         **{
@@ -106,6 +111,8 @@ def build_combo_exposures(
     frame["date"] = pd.to_datetime(frame["date"]).dt.strftime("%Y-%m-%d")
     run_date = _resolve_run_date(signal_config.run_date, frame)
     for member in spec.members:
+        if not member.active:
+            continue
         if member.source == FUNDAMENTAL_SOURCE:
             frame = _merge_fundamental_member(Path(root), frame, spec, member, run_date)
         elif member.name not in frame.columns:
@@ -131,17 +138,29 @@ def approved_factors_payload_from_combo_spec(spec: ComboSpec, approved_factors: 
     }
 
 
-def factor_diagnostics_from_combo_spec(spec: ComboSpec) -> pd.DataFrame:
+def factor_diagnostics_from_combo_spec(spec: ComboSpec, existing: pd.DataFrame | None = None) -> pd.DataFrame:
+    existing_by_factor = {}
+    if existing is not None and not existing.empty and "factor" in existing.columns:
+        existing_by_factor = {
+            str(row["factor"]): row
+            for _, row in existing.iterrows()
+        }
     rows = []
     for member in spec.members:
+        if not member.active:
+            continue
+        matched = existing_by_factor.get(member.name)
+        member_context = f"source={member.source}; direction={member.direction}; weight={member.weight:g}"
+        existing_concerns = _value_from_row(matched, "concerns")
+        concerns = member_context if not existing_concerns else f"{member_context}; {existing_concerns}"
         rows.append(
             {
                 "factor": member.name,
-                "family": member.family or member.name,
-                "suggested_role": f"combo_member:{spec.name}",
-                "neutral_rank_ic_h20": "",
-                "neutral_long_short_h20": "",
-                "concerns": f"source={member.source}; direction={member.direction}; weight={member.weight:g}",
+                "family": member.family or _value_from_row(matched, "family") or member.name,
+                "suggested_role": _value_from_row(matched, "suggested_role") or f"combo_member:{spec.name}",
+                "neutral_rank_ic_h20": _value_from_row(matched, "neutral_rank_ic_h20"),
+                "neutral_long_short_h20": _value_from_row(matched, "neutral_long_short_h20"),
+                "concerns": concerns,
             }
         )
     return pd.DataFrame(rows)
@@ -153,6 +172,7 @@ def _combo_member(raw: dict[str, Any]) -> ComboMember:
     return ComboMember(
         name=str(raw["name"]),
         source=str(raw.get("source", "approved_factor")),
+        active=bool(raw.get("active", True)),
         weight=float(raw.get("weight", 1.0)),
         direction=int(raw.get("direction", 1)),
         family=str(raw.get("family", "")),
@@ -227,3 +247,12 @@ def _zscore(series: pd.Series) -> pd.Series:
     if not std or pd.isna(std):
         return pd.Series(0.0, index=series.index)
     return ((values - values.mean(skipna=True)) / std).fillna(0.0)
+
+
+def _value_from_row(row: pd.Series | None, column: str) -> Any:
+    if row is None or column not in row.index:
+        return ""
+    value = row[column]
+    if pd.isna(value):
+        return ""
+    return value

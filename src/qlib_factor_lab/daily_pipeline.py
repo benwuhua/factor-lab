@@ -75,6 +75,9 @@ class DailyPipelineInputs:
     combo_spec_path: Path | None = None
     exposures_csv: Path | None = None
     current_positions_csv: Path | None = None
+    expert_manual_confirm: bool = False
+    expert_reviewer: str = ""
+    expert_confirm_reason: str = ""
     run_date: str | None = None
     active_regime: str | None = None
 
@@ -102,6 +105,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         )
 
     execution_config = load_yaml(_resolve(root_path, inputs.execution_config_path))
+    execution_config = _apply_expert_manual_confirmation_override(execution_config, inputs)
     artifacts: dict[str, str] = {}
     run_dir: Path | None = None
     freshness_config = execution_config.get("data_freshness", {}) or {}
@@ -221,7 +225,11 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         current_positions=current_positions,
     )
 
-    diagnostics = factor_diagnostics_from_combo_spec(combo_spec) if combo_spec is not None else _load_factor_diagnostics(root_path, run_date)
+    diagnostics = (
+        factor_diagnostics_from_combo_spec(combo_spec, _load_factor_diagnostics(root_path, run_date))
+        if combo_spec is not None
+        else _load_factor_diagnostics(root_path, run_date)
+    )
     pre_review_stock_cards = build_stock_cards(
         portfolio,
         run_id=f"daily_{run_date.replace('-', '')}",
@@ -801,6 +809,8 @@ def _write_manifest(
             "combo_spec": str(inputs.combo_spec_path) if inputs.combo_spec_path else None,
             "exposures_csv": str(inputs.exposures_csv) if inputs.exposures_csv else None,
             "current_positions_csv": str(inputs.current_positions_csv) if inputs.current_positions_csv else None,
+            "expert_manual_confirm": inputs.expert_manual_confirm,
+            "expert_reviewer": inputs.expert_reviewer,
         },
         "artifacts": artifacts,
         "expert_review": expert_review or {"status": "not_run", "decision": "not_run", "error": ""},
@@ -833,3 +843,18 @@ def _resolve_optional(root: Path, path: str | Path | None) -> Path | None:
     if path is None:
         return None
     return _resolve(root, path)
+
+
+def _apply_expert_manual_confirmation_override(data: dict[str, Any], inputs: DailyPipelineInputs) -> dict[str, Any]:
+    if not inputs.expert_manual_confirm:
+        return data
+    output = dict(data)
+    expert_review = dict(output.get("expert_review", {}) or {})
+    expert_review["caution_action"] = "manual_confirmation"
+    expert_review["manual_confirmation"] = {
+        "enabled": True,
+        "reviewer": inputs.expert_reviewer or "manual",
+        "reason": inputs.expert_confirm_reason or "manual confirmation override from CLI",
+    }
+    output["expert_review"] = expert_review
+    return output
