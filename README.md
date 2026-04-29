@@ -9,6 +9,12 @@ The current project focuses on:
 - JoinQuant factor-library migration candidates that can be expressed with local OHLCV and turnover fields.
 - A factor-to-live-trading design note under `docs/superpowers/specs/`.
 
+## Platform Loop
+
+![Factor Lab commercial research pipeline](docs/assets/factor-lab-commercial-pipeline.svg)
+
+Factor Lab follows one conservative operating loop: govern the data first, research factors inside bounded lanes, combine approved factor families, then pass every portfolio through review gates before paper execution.
+
 Generated market data, Qlib binaries, MLflow records, and backtest reports are intentionally ignored by Git. See [docs/data-and-artifacts.md](docs/data-and-artifacts.md).
 
 For a compact command-by-command example, see [docs/factor-research-path.md](docs/factor-research-path.md).
