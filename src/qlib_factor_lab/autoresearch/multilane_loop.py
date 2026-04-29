@@ -14,6 +14,12 @@ import yaml
 
 from qlib_factor_lab.autoresearch.codex_loop import parse_until_deadline, resolve_max_iterations
 from qlib_factor_lab.autoresearch.multilane import MultiLaneReport, run_multilane_autoresearch
+from qlib_factor_lab.combo_spec import load_combo_spec
+from qlib_factor_lab.strategy_dictionary import (
+    build_expression_candidate_from_strategy,
+    load_strategy_dictionary,
+    propose_strategy_ideas,
+)
 
 
 REVERSAL_LOGIC_TOKENS = ("reversal", "repair", "washout", "discount", "divergence", "convergence", "wangji")
@@ -109,6 +115,10 @@ def run_multilane_loop(
     crash_budget = max(1, int(max_crashes))
     stop_reason = "max_iterations"
     iteration = 0
+    strategy_dictionary_seed = _seed_strategy_dictionary_candidates(
+        root=root,
+        lane_space_path=lane_space_path,
+    )
     expression_candidates, skipped_expression_candidates = _expression_candidate_paths_with_skips(
         root,
         expression_candidate_path,
@@ -123,6 +133,7 @@ def run_multilane_loop(
         lane_crash_count=lane_crash_count,
         stop_reason="running",
         skipped_expression_candidates=skipped_expression_candidates,
+        strategy_dictionary_seed=strategy_dictionary_seed,
     )
 
     while True:
@@ -199,6 +210,7 @@ def run_multilane_loop(
             lane_crash_count=lane_crash_count,
             stop_reason="running",
             skipped_expression_candidates=skipped_expression_candidates,
+            strategy_dictionary_seed=strategy_dictionary_seed,
         )
 
         if crash_count >= crash_budget:
@@ -215,6 +227,7 @@ def run_multilane_loop(
         lane_crash_count=lane_crash_count,
         stop_reason=stop_reason,
         skipped_expression_candidates=skipped_expression_candidates,
+        strategy_dictionary_seed=strategy_dictionary_seed,
     )
     return MultiLaneLoopResult(
         iterations_started=iterations_started,
@@ -322,6 +335,7 @@ def _write_loop_summary(
     lane_crash_count: int,
     stop_reason: str,
     skipped_expression_candidates: list[dict[str, str]] | None = None,
+    strategy_dictionary_seed: dict[str, Any] | None = None,
 ) -> None:
     payload = {
         "iterations_started": iterations_started,
@@ -329,6 +343,7 @@ def _write_loop_summary(
         "lane_crash_count": lane_crash_count,
         "stop_reason": stop_reason,
         "skipped_expression_candidates": skipped_expression_candidates or [],
+        "strategy_dictionary_seed": strategy_dictionary_seed or {"enabled": False},
         "iterations": iterations,
     }
     (log_dir / "summary.json").write_text(json.dumps(_json_safe(payload), ensure_ascii=False, indent=2), encoding="utf-8")
@@ -338,6 +353,7 @@ def _write_loop_summary(
         f"lane_crash_count: {lane_crash_count}",
         f"stop_reason: {stop_reason}",
         f"skipped_expression_candidates: {len(skipped_expression_candidates or [])}",
+        f"strategy_dictionary_seed_written_candidates: {(strategy_dictionary_seed or {}).get('written_candidates', 0)}",
         "",
         "| iteration | status | lane_crashes | output |",
         "|---:|---|---:|---|",
@@ -347,6 +363,70 @@ def _write_loop_summary(
             f"| {item['iteration']} | {item['status']} | {item.get('lane_crashes', 0)} | {item.get('output_path', '')} |"
         )
     (log_dir / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _seed_strategy_dictionary_candidates(root: Path, lane_space_path: str | Path) -> dict[str, Any]:
+    lane_space = _load_lane_space(root, lane_space_path)
+    config = lane_space.get("strategy_dictionary", {})
+    if not isinstance(config, dict) or not config.get("enabled", False):
+        return {"enabled": False}
+    if not config.get("write_candidates", True):
+        return {"enabled": True, "written_candidates": 0, "skipped": "write_candidates_disabled"}
+    lanes = {str(item) for item in config.get("lanes", ["expression"])}
+    if "expression" not in lanes:
+        return {"enabled": True, "written_candidates": 0, "skipped": "expression_lane_not_requested"}
+
+    dictionary_path = _resolve(root, config.get("path", "configs/strategy_dictionary/151_trading_strategies_equity.yaml"))
+    combo_path = _resolve(root, config.get("combo_spec", "configs/combo_specs/balanced_multifactor_v1.yaml"))
+    output_dir = _resolve(root, config.get("candidate_output_dir", "configs/autoresearch/candidates"))
+    limit = int(config.get("limit_per_run", 2))
+    entries = load_strategy_dictionary(dictionary_path)
+    combo_spec = None
+    seed_notes = []
+    if combo_path.exists():
+        try:
+            combo_spec = load_combo_spec(combo_path)
+        except Exception as exc:
+            seed_notes.append({"type": "combo_spec_ignored", "reason": str(exc), "path": str(combo_path)})
+    proposals = propose_strategy_ideas(
+        entries,
+        combo_spec=combo_spec,
+        limit=limit,
+        candidate_lane="expression",
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    entry_by_id = {entry.strategy_id: entry for entry in entries}
+    written = []
+    skipped = []
+    for proposal in proposals:
+        try:
+            candidate = build_expression_candidate_from_strategy(entry_by_id[proposal.strategy_id])
+        except ValueError as exc:
+            skipped.append({"strategy_id": proposal.strategy_id, "reason": str(exc)})
+            continue
+        candidate_path = output_dir / f"{candidate['name']}.yaml"
+        if candidate_path.exists():
+            skipped.append({"strategy_id": proposal.strategy_id, "reason": "candidate_exists", "path": str(candidate_path)})
+            continue
+        candidate_path.write_text(yaml.safe_dump(candidate, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        written.append({"strategy_id": proposal.strategy_id, "path": str(candidate_path)})
+    return {
+        "enabled": True,
+        "dictionary": str(dictionary_path),
+        "candidate_output_dir": str(output_dir),
+        "written_candidates": len(written),
+        "written": written,
+        "skipped": skipped,
+        "notes": seed_notes,
+    }
+
+
+def _load_lane_space(root: Path, lane_space_path: str | Path) -> dict[str, Any]:
+    path = _resolve(root, lane_space_path)
+    if not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    return data if isinstance(data, dict) else {}
 
 
 def _json_safe(value: Any) -> Any:

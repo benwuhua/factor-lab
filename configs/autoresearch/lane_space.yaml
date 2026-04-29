@@ -1,6 +1,16 @@
 generated_at: "2026-04-24"
 description: "Autoresearch lanes for avoiding same-style factor over-exploration."
 
+strategy_dictionary:
+  enabled: true
+  path: configs/strategy_dictionary/151_trading_strategies_equity.yaml
+  combo_spec: configs/combo_specs/balanced_multifactor_v1.yaml
+  lanes:
+    - expression
+  limit_per_run: 2
+  write_candidates: true
+  candidate_output_dir: configs/autoresearch/candidates
+
 data_governance:
   default_universes:
     - csi300

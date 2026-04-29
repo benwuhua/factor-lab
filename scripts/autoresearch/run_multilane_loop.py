@@ -49,6 +49,11 @@ def main() -> int:
     parser.add_argument("--max-crashes", type=int, default=5)
     parser.add_argument("--lane-factor-batch-size", type=int, default=2)
     parser.add_argument(
+        "--disable-strategy-dictionary-seed",
+        action="store_true",
+        help="Temporarily disable strategy_dictionary seeding from lane_space before candidate rotation.",
+    )
+    parser.add_argument(
         "--include-reversal-expression-candidates",
         action="store_true",
         help="Allow reversal-like expression candidates in the nightly expression rotation.",
@@ -61,9 +66,12 @@ def main() -> int:
         has_deadline=deadline is not None,
         max_hours=args.max_hours,
     )
+    lane_space_path = Path(args.lane_space)
+    if args.disable_strategy_dictionary_seed:
+        lane_space_path = _write_strategy_dictionary_disabled_lane_space(root, lane_space_path)
     result = run_multilane_loop(
         project_root=root,
-        lane_space_path=args.lane_space,
+        lane_space_path=lane_space_path,
         contract_path=args.contract,
         expression_space_path=args.expression_space,
         expression_candidate_path=args.expression_candidate,
@@ -89,6 +97,20 @@ def main() -> int:
     print(f"stop_reason: {result.stop_reason}")
     print(f"log_dir: {result.log_dir}")
     return 0
+
+
+def _write_strategy_dictionary_disabled_lane_space(root: Path, lane_space_path: Path) -> Path:
+    import yaml
+
+    source = lane_space_path if lane_space_path.is_absolute() else root / lane_space_path
+    data = yaml.safe_load(source.read_text(encoding="utf-8")) or {}
+    strategy_dictionary = dict(data.get("strategy_dictionary", {}))
+    strategy_dictionary["enabled"] = False
+    data["strategy_dictionary"] = strategy_dictionary
+    output = root / "reports/autoresearch/lane_space_strategy_dictionary_disabled.yaml"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return output
 
 
 if __name__ == "__main__":
