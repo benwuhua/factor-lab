@@ -7,7 +7,7 @@ members:
     family: fundamental_quality
     logic_bucket: quality_low_leverage
     direction: 1
-    weight: 0.30
+    weight: 0.00
     approval_status: core
     regime_profile: all_weather
     components:
@@ -73,7 +73,7 @@ members:
     family: value
     logic_bucket: fundamental_value
     direction: 1
-    weight: 0.10
+    weight: 0.20
     approval_status: core
     regime_profile: all_weather
     components:
@@ -88,7 +88,7 @@ members:
     family: dividend
     logic_bucket: fundamental_dividend
     direction: 1
-    weight: 0.05
+    weight: 0.10
     approval_status: core
     regime_profile: down_sideways
     components:

@@ -89,6 +89,56 @@ class StageCTests(unittest.TestCase):
         self.assertEqual(list(portfolio["instrument"]), ["AAA", "BBB", "DDD"])
         self.assertIn("held_by_dropout", set(portfolio["selection_reason"]))
 
+    def test_target_portfolio_requires_non_quality_confirmation_when_configured(self):
+        signal = pd.DataFrame(
+            {
+                "date": ["2026-04-23"] * 3,
+                "instrument": ["QUALITY_ONLY", "CONFIRMED", "WEAK_CONFIRM"],
+                "ensemble_score": [9.0, 8.0, 7.0],
+                "risk_flags": ["", "", ""],
+                "family_fundamental_quality_score": [0.35, 0.30, 0.35],
+                "family_value_score": [0.0, 0.08, 0.01],
+                "family_gap_risk_score": [0.0, 0.00, 0.01],
+            }
+        )
+
+        portfolio = build_target_portfolio(
+            signal,
+            PortfolioConfig(
+                top_k=2,
+                cash_buffer=0.1,
+                max_single_weight=0.5,
+                require_positive_non_quality_confirmation=True,
+                confirmation_exclude_families=("fundamental_quality",),
+                confirmation_min_score=0.05,
+            ),
+        )
+
+        self.assertEqual(list(portfolio["instrument"]), ["CONFIRMED"])
+
+    def test_target_portfolio_applies_required_min_score_gates_before_ranking(self):
+        signal = pd.DataFrame(
+            {
+                "date": ["2026-04-23"] * 3,
+                "instrument": ["LOW_QUALITY_HIGH_SCORE", "PASSING_QUALITY", "ALSO_PASSING"],
+                "ensemble_score": [9.0, 8.0, 7.0],
+                "risk_flags": ["", "", ""],
+                "quality_low_leverage_contribution": [-0.2, 0.1, 0.5],
+            }
+        )
+
+        portfolio = build_target_portfolio(
+            signal,
+            PortfolioConfig(
+                top_k=2,
+                cash_buffer=0.1,
+                max_single_weight=0.5,
+                required_min_scores={"quality_low_leverage_contribution": 0.0},
+            ),
+        )
+
+        self.assertEqual(list(portfolio["instrument"]), ["PASSING_QUALITY", "ALSO_PASSING"])
+
     def test_risk_checks_report_concentration_failure(self):
         portfolio = pd.DataFrame(
             {

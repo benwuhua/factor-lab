@@ -40,6 +40,7 @@ class SignalConfig:
     combination_mode: str = "factor_sum"
     family_weights: dict[str, float] = field(default_factory=dict)
     family_score_cap: float | None = None
+    factor_contribution_cap: float | None = None
 
 
 def load_signal_config(path: str | Path) -> SignalConfig:
@@ -62,6 +63,11 @@ def load_signal_config(path: str | Path) -> SignalConfig:
         family_score_cap=(
             float(data.get("combination", {}).get("family_score_cap"))
             if data.get("combination", {}).get("family_score_cap") is not None
+            else None
+        ),
+        factor_contribution_cap=(
+            float(data.get("combination", {}).get("factor_contribution_cap"))
+            if data.get("combination", {}).get("factor_contribution_cap") is not None
             else None
         ),
         rule_weight=float(ensemble.get("rule_score", 1.0)),
@@ -130,7 +136,11 @@ def build_daily_signal(
             active_logic_cols.setdefault(factor.logic_bucket or infer_logic_bucket(factor.family or factor.name), []).append(
                 contribution_col
             )
-        frame[contribution_col] = _zscore(frame[factor.name].astype(float) * factor.direction) * multiplier
+        contribution = _zscore(frame[factor.name].astype(float) * factor.direction) * multiplier
+        if config.factor_contribution_cap is not None:
+            cap = abs(float(config.factor_contribution_cap))
+            contribution = contribution.clip(lower=-cap, upper=cap)
+        frame[contribution_col] = contribution
         contribution_cols.append(contribution_col)
 
     family_score_cols: list[str] = []
@@ -154,7 +164,12 @@ def build_daily_signal(
     else:
         frame["rule_score"] = 0.0
     frame["ensemble_score"] = frame["rule_score"] * config.rule_weight + frame["model_score"] * config.model_weight
-    top = frame.apply(lambda row: _top_contributions(row, factors, contribution_cols), axis=1, result_type="expand")
+    family_counts = {family: len(cols) for family, cols in active_family_cols.items()}
+    top = frame.apply(
+        lambda row: _top_contributions(row, factors, contribution_cols, config, family_counts),
+        axis=1,
+        result_type="expand",
+    )
     top.columns = ["top_factor_1", "top_factor_1_contribution", "top_factor_2", "top_factor_2_contribution"]
     frame = pd.concat([frame, top], axis=1)
     frame["risk_flags"] = frame.apply(lambda row: _risk_flags(row, active_factor_count), axis=1)
@@ -342,10 +357,20 @@ def _zscore(series: pd.Series) -> pd.Series:
     return ((series - mean) / std).fillna(0.0)
 
 
-def _top_contributions(row: pd.Series, factors: list[SignalFactor], contribution_cols: list[str]) -> tuple[str, float, str, float]:
+def _top_contributions(
+    row: pd.Series,
+    factors: list[SignalFactor],
+    contribution_cols: list[str],
+    config: SignalConfig,
+    family_counts: dict[str, int],
+) -> tuple[str, float, str, float]:
     items = []
     for factor, col in zip(factors, contribution_cols):
         value = float(row[col])
+        if config.combination_mode == "family_first":
+            family = factor.family or factor.name
+            count = max(1, family_counts.get(family, 1))
+            value = value * config.family_weights.get(family, 1.0) / count
         if value != 0 and math.isfinite(value):
             items.append((factor.name, value))
     items.sort(key=lambda item: abs(item[1]), reverse=True)

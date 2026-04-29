@@ -154,6 +154,50 @@ class SignalTests(unittest.TestCase):
             self.assertAlmostEqual(first["family_test_family_score"], 0.25)
             self.assertAlmostEqual(first["rule_score"], 0.25)
 
+    def test_build_daily_signal_caps_raw_factor_contribution_before_explanation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved_path, config_path = self._write_fixture(root)
+            config_data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            config_data["combination"] = {
+                "mode": "family_first",
+                "factor_contribution_cap": 1.0,
+            }
+            config_path.write_text(yaml.safe_dump(config_data, sort_keys=False), encoding="utf-8")
+            exposures = self._exposures()
+            exposures["core_alpha"] = [100.0, 2.0, 1.0]
+
+            signal = build_daily_signal(
+                exposures,
+                load_approved_signal_factors(approved_path),
+                load_signal_config(config_path),
+            )
+
+            first = signal.loc[signal["instrument"] == "AAA"].iloc[0]
+            self.assertAlmostEqual(first["core_alpha_contribution"], 1.0)
+            self.assertAlmostEqual(first["top_factor_1_contribution"], 0.5)
+
+    def test_family_first_explanation_uses_family_weighted_contribution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved_path, config_path = self._write_fixture(root)
+            config_data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            config_data["combination"] = {
+                "mode": "family_first",
+                "family_weights": {"test_family": 0.2},
+            }
+            config_path.write_text(yaml.safe_dump(config_data, sort_keys=False), encoding="utf-8")
+
+            signal = build_daily_signal(
+                self._exposures(),
+                load_approved_signal_factors(approved_path),
+                load_signal_config(config_path),
+            )
+
+            first = signal.loc[signal["instrument"] == "AAA"].iloc[0]
+            self.assertAlmostEqual(first["core_alpha_contribution"], 1.0)
+            self.assertAlmostEqual(first["top_factor_1_contribution"], 0.1)
+
     def test_build_daily_signal_cli_writes_csv_and_summary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

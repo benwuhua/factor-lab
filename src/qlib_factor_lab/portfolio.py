@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -51,6 +51,10 @@ class PortfolioConfig:
     max_new_buys: int | None = None
     dropout_rank: int | None = None
     score_column: str = "ensemble_score"
+    require_positive_non_quality_confirmation: bool = False
+    confirmation_exclude_families: tuple[str, ...] = ("fundamental_quality",)
+    confirmation_min_score: float = 0.0
+    required_min_scores: dict[str, float] = field(default_factory=dict)
     target_output_path: Path = Path("reports/target_portfolio_{run_yyyymmdd}.csv")
     summary_output_path: Path = Path("reports/target_portfolio_summary_{run_yyyymmdd}.md")
 
@@ -67,6 +71,10 @@ def load_portfolio_config(path: str | Path) -> PortfolioConfig:
         max_new_buys=int(max_new_buys) if max_new_buys is not None else None,
         dropout_rank=int(raw["dropout_rank"]) if raw.get("dropout_rank") is not None else None,
         score_column=str(raw.get("score_column", "ensemble_score")),
+        require_positive_non_quality_confirmation=bool(raw.get("require_positive_non_quality_confirmation", False)),
+        confirmation_exclude_families=tuple(str(item) for item in raw.get("confirmation_exclude_families", ["fundamental_quality"])),
+        confirmation_min_score=float(raw.get("confirmation_min_score", 0.0)),
+        required_min_scores={str(key): float(value) for key, value in raw.get("required_min_scores", {}).items()},
         target_output_path=Path(output.get("target_portfolio", "reports/target_portfolio_{run_yyyymmdd}.csv")),
         summary_output_path=Path(output.get("summary", "reports/target_portfolio_summary_{run_yyyymmdd}.md")),
     )
@@ -88,6 +96,8 @@ def build_target_portfolio(
     if config.score_column not in eligible.columns:
         raise ValueError(f"signal is missing score column: {config.score_column}")
     eligible = eligible.dropna(subset=[config.score_column]).sort_values(config.score_column, ascending=False)
+    eligible = _apply_required_min_score_gates(eligible, config)
+    eligible = _apply_non_quality_confirmation_filter(eligible, config)
     selected = _select_candidates(eligible, config, current_positions)
     if selected.empty:
         return pd.DataFrame(
@@ -212,6 +222,32 @@ def _dropout_keep(ranked: pd.DataFrame, current: set[str], config: PortfolioConf
     return keep.sort_values(config.score_column, ascending=False).head(config.top_k)
 
 
+def _apply_non_quality_confirmation_filter(eligible: pd.DataFrame, config: PortfolioConfig) -> pd.DataFrame:
+    if not config.require_positive_non_quality_confirmation:
+        return eligible
+    confirmation_columns = [
+        column
+        for column in _family_score_columns(eligible)
+        if _family_name_from_score_column(column) not in set(config.confirmation_exclude_families)
+    ]
+    if not confirmation_columns:
+        return eligible.iloc[0:0].copy()
+    confirmation = eligible[confirmation_columns].apply(pd.to_numeric, errors="coerce").clip(lower=0).sum(axis=1)
+    return eligible[confirmation >= config.confirmation_min_score].copy()
+
+
+def _apply_required_min_score_gates(eligible: pd.DataFrame, config: PortfolioConfig) -> pd.DataFrame:
+    if not config.required_min_scores:
+        return eligible
+    gated = eligible.copy()
+    for column, minimum in config.required_min_scores.items():
+        if column not in gated.columns:
+            return gated.iloc[0:0].copy()
+        values = pd.to_numeric(gated[column], errors="coerce")
+        gated = gated[values >= minimum]
+    return gated
+
+
 def _selection_explanation(row: pd.Series, score_column: str) -> str:
     drivers = []
     for factor_col, contribution_col in [
@@ -232,6 +268,10 @@ def _selection_explanation(row: pd.Series, score_column: str) -> str:
 
 def _family_score_columns(frame: pd.DataFrame) -> list[str]:
     return [column for column in frame.columns if column.startswith("family_") and column.endswith("_score")]
+
+
+def _family_name_from_score_column(column: str) -> str:
+    return column.removeprefix("family_").removesuffix("_score")
 
 
 def _logic_score_columns(frame: pd.DataFrame) -> list[str]:
