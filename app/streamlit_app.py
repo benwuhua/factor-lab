@@ -18,8 +18,10 @@ import streamlit as st
 
 from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
+    build_combo_profile_summary,
     build_event_evidence_library,
     build_execution_performance_attribution,
+    build_factor_data_gap_summary,
     build_gate_review_items,
     build_multilane_queue,
     build_portfolio_gate_explanation,
@@ -174,6 +176,7 @@ def render_dashboard() -> None:
 def render_data_governance() -> None:
     snapshot = load_workbench_snapshot(ROOT)
     freshness = pd.DataFrame(snapshot.freshness)
+    factor_gaps = build_factor_data_gap_summary(ROOT)
     provider_rows = _provider_rows()
     quality_rows = _quality_rows(snapshot)
 
@@ -215,7 +218,12 @@ def render_data_governance() -> None:
         st.markdown(_section_header_html("质量检查动作", "quality gate"), unsafe_allow_html=True)
         st.markdown(_workflow_card_grid_html(quality_rows), unsafe_allow_html=True)
         _render_workflow_task_buttons(quality_rows, "data-quality")
+
+        st.markdown(_section_header_html("因子数据缺口", "fundamental coverage for value, quality, growth and cashflow lanes"), unsafe_allow_html=True)
+        st.caption("重点字段: revenue_growth_yoy / net_profit_growth_yoy / operating_cashflow_to_net_profit。覆盖不足时，进攻型和现金流质量因子只能保持 shadow 或 data-gated 状态。")
+        st.dataframe(factor_gaps, width="stretch", hide_index=True)
     with rail_col:
+        blocked_fields = ", ".join(factor_gaps.loc[factor_gaps["status"] == "blocked", "field"].astype(str).head(4)) if not factor_gaps.empty else "n/a"
         st.markdown(
             '<aside class="right-rail detail-rail">'
             + _detail_card_html(
@@ -232,6 +240,15 @@ def render_data_governance() -> None:
                 ],
                 note="超过 freshness SLA 的产物会在后续组合环节被视为待复核输入。",
             )
+            + _detail_card_html(
+                "Factor Data Gaps",
+                [
+                    ("blocked", int((factor_gaps["status"] == "blocked").sum()) if not factor_gaps.empty else 0),
+                    ("caution", int((factor_gaps["status"] == "caution").sum()) if not factor_gaps.empty else 0),
+                    ("fields", blocked_fields or "n/a"),
+                ],
+                note="数据缺口会影响进攻/现金流/基本面 lane 的实际可用性。",
+            )
             + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">make check-env<br>make check-data-quality<br>make daily-signal</div></section>'
             + "</aside>",
             unsafe_allow_html=True,
@@ -241,6 +258,8 @@ def render_data_governance() -> None:
 def render_factor_research() -> None:
     queue = load_autoresearch_queue(ROOT)
     multilane = load_multilane_report(ROOT)
+    combo_profiles = build_combo_profile_summary(ROOT)
+    factor_gaps = build_factor_data_gap_summary(ROOT)
     multilane_queue = build_multilane_queue(multilane)
     multilane_summary = summarize_multilane_report(multilane)
     latest_multilane = find_latest_multilane_report(ROOT)
@@ -273,6 +292,16 @@ def render_factor_research() -> None:
         factor_rows = _factor_research_rows()
         st.markdown(_workflow_card_grid_html(factor_rows), unsafe_allow_html=True)
         _render_workflow_task_buttons(factor_rows, "factor-research")
+
+        st.markdown(_section_header_html("组合模式与数据缺口", "Defensive / Balanced / Offensive profiles"), unsafe_allow_html=True)
+        st.caption("Offensive 模式依赖 momentum、volume_confirm、quiet_breakout 和 growth_improvement；若 revenue_growth_yoy、net_profit_growth_yoy 或 cashflow 覆盖不足，系统会把对应基本面进攻项标为 data-gated。")
+        if combo_profiles.empty:
+            st.info("还没有 combo spec。")
+        else:
+            st.dataframe(combo_profiles, width="stretch", hide_index=True)
+        blocked_gap_fields = factor_gaps.loc[factor_gaps["status"] == "blocked", "field"].astype(str).tolist() if not factor_gaps.empty else []
+        if blocked_gap_fields:
+            st.warning("当前阻断字段: " + ", ".join(blocked_gap_fields[:6]))
 
         st.markdown(_section_header_html("最新 Smoke / 多车道结果", "expression, pattern, emotion lanes"), unsafe_allow_html=True)
         if multilane.empty:
@@ -338,6 +367,21 @@ def render_factor_research() -> None:
                 "Factor Families",
                 [("count", int(family_counts.size)), ("top", str(family_counts.index[0]) if not family_counts.empty else "n/a")],
                 note="后续 portfolio gate 会检查因子族集中度，避免组合只押单一量价逻辑。",
+            )
+            + _detail_card_html(
+                "Combo Profiles",
+                [
+                    ("profiles", int(len(combo_profiles))),
+                    (
+                        "offensive",
+                        int((combo_profiles["posture"] == "offensive").sum()) if not combo_profiles.empty else 0,
+                    ),
+                    (
+                        "defensive",
+                        int((combo_profiles["posture"] == "defensive").sum()) if not combo_profiles.empty else 0,
+                    ),
+                ],
+                note="进攻型组合现在是独立 spec，不再和红利/价值防御组合混在一起评价。",
             )
             + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">make select-factors<br>make daily-signal<br>make exposure-attribution</div></section>'
             + "</aside>",

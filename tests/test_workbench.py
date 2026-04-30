@@ -9,9 +9,11 @@ import yaml
 
 from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
+    build_combo_profile_summary,
     build_execution_gate_card,
     build_event_evidence_library,
     build_execution_performance_attribution,
+    build_factor_data_gap_summary,
     build_portfolio_layer_comparison,
     build_portfolio_gate_explanation,
     build_portfolio_gate_trend,
@@ -698,6 +700,73 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(diagnostics["eval"].loc[0, "neutralized_rank_ic_mean"], 0.03)
         self.assertEqual(diagnostics["yearly"].loc[0, "segment"], 2026)
         self.assertEqual(diagnostics["redundancy"].loc[0, "cluster_size"], 4)
+
+    def test_factor_data_gap_summary_flags_missing_growth_and_cashflow_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB", "CCC"],
+                    "available_at": ["2026-04-01", "2026-04-01", "2026-04-01"],
+                    "roe": [12.0, 8.0, 4.0],
+                    "ep": [0.03, 0.01, 0.02],
+                    "dividend_yield": [0.04, 0.02, 0.03],
+                    "revenue_growth_yoy": [None, None, None],
+                    "net_profit_growth_yoy": [None, None, None],
+                    "operating_cashflow_to_net_profit": [None, None, None],
+                }
+            ).to_csv(root / "data/fundamental_quality.csv", index=False)
+
+            summary = build_factor_data_gap_summary(root)
+
+        by_field = summary.set_index("field")
+        self.assertEqual("blocked", by_field.loc["revenue_growth_yoy", "status"])
+        self.assertEqual("blocked", by_field.loc["operating_cashflow_to_net_profit", "status"])
+        self.assertEqual("ready", by_field.loc["roe", "status"])
+        self.assertGreater(float(by_field.loc["roe", "coverage_pct"]), 0.99)
+
+    def test_combo_profile_summary_classifies_offensive_and_defensive_specs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            specs = root / "configs/combo_specs"
+            specs.mkdir(parents=True)
+            (specs / "offensive.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "name": "offensive",
+                        "members": [
+                            {"name": "mom_60", "source": "qlib_expression", "family": "momentum", "weight": 0.45},
+                            {"name": "vol_confirm", "source": "qlib_expression", "family": "volume_confirm", "weight": 0.20},
+                            {"name": "quiet", "source": "qlib_expression", "family": "quiet_breakout", "weight": 0.15},
+                            {"name": "gap", "source": "qlib_expression", "family": "gap_risk", "weight": 0.10},
+                        ],
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+            (specs / "defensive.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "name": "defensive",
+                        "members": [
+                            {"name": "value", "source": "fundamental_quality", "family": "value", "weight": 0.45},
+                            {"name": "dividend", "source": "fundamental_quality", "family": "dividend", "weight": 0.35},
+                            {"name": "gap", "source": "qlib_expression", "family": "gap_risk", "weight": 0.10},
+                        ],
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            summary = build_combo_profile_summary(root)
+
+        by_name = summary.set_index("name")
+        self.assertEqual("offensive", by_name.loc["offensive", "posture"])
+        self.assertEqual("defensive", by_name.loc["defensive", "posture"])
+        self.assertGreater(float(by_name.loc["offensive", "offensive_weight"]), float(by_name.loc["offensive", "defensive_weight"]))
 
 
 if __name__ == "__main__":

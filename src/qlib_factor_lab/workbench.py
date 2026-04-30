@@ -11,6 +11,7 @@ import yaml
 
 from .exposure_attribution import build_exposure_attribution, load_factor_family_map, load_factor_logic_map
 from .company_events import COMPANY_EVENT_COLUMNS, load_company_events, load_event_risk_config
+from .combo_spec import load_combo_spec
 from .evidence_library import summarize_announcement_evidence
 from .expert_review import parse_expert_review_manual_items
 from .risk import RiskConfig, check_portfolio_risk
@@ -21,6 +22,22 @@ APPROVED_FACTORS = Path("reports/approved_factors.yaml")
 RISK_CONFIG = Path("configs/risk.yaml")
 EVENT_RISK_CONFIG = Path("configs/event_risk.yaml")
 AUTORESEARCH_REVIEW_ANALYSIS = Path("reports/autoresearch")
+COMBO_SPEC_DIR = Path("configs/combo_specs")
+FUNDAMENTAL_QUALITY = Path("data/fundamental_quality.csv")
+
+OFFENSIVE_FACTOR_FAMILIES = {"momentum", "volume_confirm", "quiet_breakout", "growth_improvement", "event_catalyst", "theme"}
+DEFENSIVE_FACTOR_FAMILIES = {"value", "dividend", "gap_risk", "cashflow_quality", "fundamental_quality", "low_vol"}
+FACTOR_DATA_FIELDS = [
+    {"field": "roe", "lane": "quality", "use_case": "质量防雷", "required_for": "balanced"},
+    {"field": "gross_margin", "lane": "quality", "use_case": "质量/盈利能力", "required_for": "balanced"},
+    {"field": "debt_ratio", "lane": "quality", "use_case": "低杠杆风险过滤", "required_for": "balanced"},
+    {"field": "ep", "lane": "value", "use_case": "价值安全边际", "required_for": "defensive"},
+    {"field": "cfp", "lane": "value", "use_case": "现金流价值", "required_for": "defensive"},
+    {"field": "dividend_yield", "lane": "dividend", "use_case": "红利防御", "required_for": "defensive"},
+    {"field": "revenue_growth_yoy", "lane": "growth", "use_case": "进攻/盈利改善", "required_for": "offensive"},
+    {"field": "net_profit_growth_yoy", "lane": "growth", "use_case": "进攻/盈利改善", "required_for": "offensive"},
+    {"field": "operating_cashflow_to_net_profit", "lane": "cashflow", "use_case": "质量/现金流确认", "required_for": "balanced"},
+]
 
 
 @dataclass(frozen=True)
@@ -838,6 +855,121 @@ def build_research_context_health(
     }
 
 
+def build_factor_data_gap_summary(
+    root: str | Path = ".",
+    fundamental_path: str | Path = FUNDAMENTAL_QUALITY,
+    *,
+    ready_threshold: float = 0.50,
+    caution_threshold: float = 0.10,
+) -> pd.DataFrame:
+    root_path = Path(root)
+    path = _resolve(root_path, fundamental_path)
+    fundamentals = _read_csv_or_empty(path)
+    denominator = max(len(fundamentals), 1)
+    rows = []
+    for spec in FACTOR_DATA_FIELDS:
+        field = str(spec["field"])
+        if field not in fundamentals.columns:
+            non_null = 0
+            unique_instruments = 0
+        else:
+            valid = pd.to_numeric(fundamentals[field], errors="coerce").notna()
+            non_null = int(valid.sum())
+            unique_instruments = (
+                int(fundamentals.loc[valid, "instrument"].dropna().astype(str).nunique())
+                if "instrument" in fundamentals.columns
+                else 0
+            )
+        coverage = non_null / denominator
+        rows.append(
+            {
+                "field": field,
+                "lane": spec["lane"],
+                "use_case": spec["use_case"],
+                "required_for": spec["required_for"],
+                "non_null_rows": non_null,
+                "coverage_pct": coverage,
+                "unique_instruments": unique_instruments,
+                "status": _coverage_status(coverage, ready_threshold, caution_threshold),
+                "platform_impact": _factor_data_gap_impact(field, coverage),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_combo_profile_summary(
+    root: str | Path = ".",
+    combo_spec_dir: str | Path = COMBO_SPEC_DIR,
+) -> pd.DataFrame:
+    root_path = Path(root)
+    spec_dir = _resolve(root_path, combo_spec_dir)
+    columns = [
+        "name",
+        "posture",
+        "members",
+        "active_members",
+        "offensive_weight",
+        "defensive_weight",
+        "largest_family",
+        "largest_family_weight",
+        "data_blockers",
+        "path",
+    ]
+    if not spec_dir.exists():
+        return pd.DataFrame(columns=columns)
+
+    data_gaps = build_factor_data_gap_summary(root_path)
+    blocker_fields = set(data_gaps.loc[data_gaps["status"] == "blocked", "field"].astype(str)) if not data_gaps.empty else set()
+    rows = []
+    for path in sorted(spec_dir.glob("*.yaml")):
+        try:
+            spec = load_combo_spec(path)
+        except Exception as exc:
+            rows.append(
+                {
+                    "name": path.stem,
+                    "posture": "invalid",
+                    "members": 0,
+                    "active_members": 0,
+                    "offensive_weight": 0.0,
+                    "defensive_weight": 0.0,
+                    "largest_family": "n/a",
+                    "largest_family_weight": 0.0,
+                    "data_blockers": str(exc),
+                    "path": str(path),
+                }
+            )
+            continue
+        active = [member for member in spec.members if member.active]
+        family_weights: dict[str, float] = {}
+        blocked = set()
+        for member in active:
+            family = member.family or member.name
+            family_weights[family] = family_weights.get(family, 0.0) + float(member.weight)
+            for component in member.components:
+                field = str(component.get("field", ""))
+                if field in blocker_fields:
+                    blocked.add(field)
+        offensive_weight = sum(weight for family, weight in family_weights.items() if family in OFFENSIVE_FACTOR_FAMILIES)
+        defensive_weight = sum(weight for family, weight in family_weights.items() if family in DEFENSIVE_FACTOR_FAMILIES)
+        largest_family, largest_weight = _largest_family_weight(family_weights)
+        rows.append(
+            {
+                "name": spec.name,
+                "posture": _combo_posture(offensive_weight, defensive_weight),
+                "members": int(len(spec.members)),
+                "active_members": int(len(active)),
+                "offensive_weight": offensive_weight,
+                "defensive_weight": defensive_weight,
+                "largest_family": largest_family,
+                "largest_family_weight": largest_weight,
+                "data_blockers": ", ".join(sorted(blocked)),
+                "path": str(path),
+            }
+        )
+    return pd.DataFrame(rows, columns=columns)
+
+
 def build_execution_gate_card(
     gate_decision: str,
     pretrade_review: pd.DataFrame,
@@ -1392,6 +1524,41 @@ def _pct(numerator: int, denominator: int) -> float:
     if denominator <= 0:
         return 0.0
     return round(float(numerator) / float(denominator) * 100.0, 1)
+
+
+def _coverage_status(coverage: float, ready_threshold: float, caution_threshold: float) -> str:
+    if coverage >= ready_threshold:
+        return "ready"
+    if coverage >= caution_threshold:
+        return "caution"
+    return "blocked"
+
+
+def _factor_data_gap_impact(field: str, coverage: float) -> str:
+    if coverage >= 0.50:
+        return "可用于正式因子或门禁复核。"
+    if field in {"revenue_growth_yoy", "net_profit_growth_yoy"}:
+        return "进攻型盈利改善 lane 会退化，不能把增长因子当作有效驱动。"
+    if field == "operating_cashflow_to_net_profit":
+        return "现金流质量确认不足，质量因子只能先做弱约束。"
+    if field in {"ep", "cfp", "dividend_yield"}:
+        return "价值/红利覆盖不足时，防御组合需要降权或人工确认。"
+    return "覆盖不足，需要补数据或保持 shadow/watch 状态。"
+
+
+def _largest_family_weight(family_weights: dict[str, float]) -> tuple[str, float]:
+    if not family_weights:
+        return "n/a", 0.0
+    family = max(family_weights, key=lambda key: family_weights[key])
+    return family, float(family_weights[family])
+
+
+def _combo_posture(offensive_weight: float, defensive_weight: float) -> str:
+    if offensive_weight >= 0.45 and offensive_weight > defensive_weight:
+        return "offensive"
+    if defensive_weight >= 0.45 and defensive_weight >= offensive_weight:
+        return "defensive"
+    return "balanced"
 
 
 def _split_semicolon_values(value: Any) -> list[str]:

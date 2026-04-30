@@ -67,10 +67,19 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
         text = _app_text(app)
 
         self.assertIn("最新 Smoke / 多车道结果", text)
+        self.assertIn("组合模式与数据缺口", text)
+        self.assertIn("Offensive", text)
         self.assertIn("Multilane Summary", text)
         self.assertIn("Run · 开始因子研究", _button_labels(app))
         self.assertIn("Smoke · 短窗多车道 smoke", _button_labels(app))
         self.assertIn("Run · 生成 approved 因子", _button_labels(app))
+
+    def test_data_governance_page_surfaces_factor_data_gaps(self):
+        app = self.run_page("02 数据治理")
+        text = _app_text(app)
+
+        self.assertIn("因子数据缺口", text)
+        self.assertIn("revenue_growth_yoy", text)
 
     def test_autoresearch_page_surfaces_queue_multilane_and_loop_actions(self):
         app = self.run_page("04 自动挖掘")

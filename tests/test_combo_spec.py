@@ -195,6 +195,19 @@ class ComboSpecTests(unittest.TestCase):
         self.assertFalse(by_name["quality_low_leverage"].active)
         self.assertNotIn("quality_low_leverage", [factor.name for factor in factors])
 
+    def test_offensive_multifactor_spec_is_not_defensive_value_or_dividend_dominated(self):
+        spec = load_combo_spec(Path(__file__).resolve().parents[1] / "configs/combo_specs/offensive_multifactor_v1.yaml")
+        active = [member for member in spec.members if member.active]
+        by_family = {}
+        for member in active:
+            by_family[member.family] = by_family.get(member.family, 0.0) + member.weight
+
+        self.assertGreaterEqual(by_family.get("momentum", 0.0), 0.35)
+        self.assertGreaterEqual(by_family.get("volume_confirm", 0.0) + by_family.get("quiet_breakout", 0.0), 0.25)
+        self.assertLessEqual(by_family.get("value", 0.0), 0.05)
+        self.assertLessEqual(by_family.get("dividend", 0.0), 0.05)
+        self.assertIn("growth_improvement", [member.name for member in active])
+
 
 if __name__ == "__main__":
     unittest.main()

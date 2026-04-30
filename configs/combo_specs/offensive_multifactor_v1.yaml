@@ -1,0 +1,67 @@
+name: offensive_multifactor_v1
+description: "Risk-on A-share multi-factor candidate: medium-term momentum, volume confirmation, quiet breakout, and growth improvement, with gap risk kept as a guardrail instead of a return driver."
+fundamental_path: data/fundamental_quality.csv
+members:
+  - name: momentum_60_skip5
+    source: qlib_expression
+    expression: "Ref($close, 5) / Ref($close, 60) - 1"
+    family: momentum
+    logic_bucket: trend_following
+    direction: 1
+    weight: 0.25
+    approval_status: challenger
+    regime_profile: all_weather
+  - name: momentum_120_skip10
+    source: qlib_expression
+    expression: "Ref($close, 10) / Ref($close, 120) - 1"
+    family: momentum
+    logic_bucket: trend_following
+    direction: 1
+    weight: 0.15
+    approval_status: challenger
+    regime_profile: all_weather
+  - name: volume_confirm_20
+    source: qlib_expression
+    expression: "Mean($volume, 5) / Mean($volume, 20) - 1"
+    family: volume_confirm
+    logic_bucket: liquidity_attention
+    direction: 1
+    weight: 0.15
+    approval_status: challenger
+    regime_profile: all_weather
+  - name: quiet_breakout_20
+    source: qlib_expression
+    expression: "($close / Ref($close, 20) - 1) - (Mean($volume, 5) / Mean($volume, 20) - 1)"
+    family: quiet_breakout
+    logic_bucket: reversal_repair
+    direction: 1
+    weight: 0.15
+    approval_status: core
+    regime_profile: all_weather
+  - name: growth_improvement
+    source: fundamental_quality
+    family: growth_improvement
+    logic_bucket: fundamental_growth
+    direction: 1
+    weight: 0.20
+    approval_status: data_gated
+    regime_profile: all_weather
+    components:
+      - field: revenue_growth_yoy
+        direction: 1
+        weight: 0.40
+      - field: net_profit_growth_yoy
+        direction: 1
+        weight: 0.40
+      - field: gross_margin
+        direction: 1
+        weight: 0.20
+  - name: gap_risk_20
+    source: qlib_expression
+    expression: "Mean(Abs($open / Ref($close, 1) - 1), 20)"
+    family: gap_risk
+    logic_bucket: risk_structure
+    direction: -1
+    weight: 0.10
+    approval_status: guardrail
+    regime_profile: all_weather
