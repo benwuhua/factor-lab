@@ -96,6 +96,7 @@ def run_multilane_loop(
     sleep_sec: float = 60.0,
     lane_factor_batch_size: int = 2,
     include_reversal_expression_candidates: bool = False,
+    stop_on_rotation_exhausted: bool = False,
     runner: MultiLaneRunner = run_multilane_autoresearch,
 ) -> MultiLaneLoopResult:
     root = Path(project_root)
@@ -136,6 +137,7 @@ def run_multilane_loop(
         strategy_dictionary_seed=strategy_dictionary_seed,
     )
 
+    seen_rotation_keys: set[str] = set()
     while True:
         if final_deadline is not None and datetime.now(final_deadline.tzinfo) >= final_deadline:
             stop_reason = "deadline"
@@ -144,17 +146,24 @@ def run_multilane_loop(
             stop_reason = "max_iterations"
             break
 
-        iteration += 1
-        iterations_started += 1
-        iteration_output = log_dir / f"multilane_iteration_{iteration:03d}.md"
-        iteration_started_at = datetime.now(tzinfo)
-        expression_candidate_for_iteration = _rotate_items(expression_candidates, iteration, 1)[0]
-        lane_factor_overrides = _lane_factor_name_overrides(iteration, lane_factor_batch_size)
+        next_iteration = iteration + 1
+        expression_candidate_for_iteration = _rotate_items(expression_candidates, next_iteration, 1)[0]
+        lane_factor_overrides = _lane_factor_name_overrides(next_iteration, lane_factor_batch_size)
         rotation = {
             "expression_candidate": Path(expression_candidate_for_iteration).name,
             "lane_factor_name_overrides": lane_factor_overrides,
             "policy": "all_candidates" if include_reversal_expression_candidates else "non_reversal_priority",
         }
+        rotation_key = _rotation_key(rotation)
+        if stop_on_rotation_exhausted and rotation_key in seen_rotation_keys:
+            stop_reason = "rotation_exhausted"
+            break
+        seen_rotation_keys.add(rotation_key)
+
+        iteration = next_iteration
+        iterations_started += 1
+        iteration_output = log_dir / f"multilane_iteration_{iteration:03d}.md"
+        iteration_started_at = datetime.now(tzinfo)
         iteration_row: dict[str, Any] = {
             "iteration": iteration,
             "started_at": iteration_started_at.isoformat(timespec="seconds"),
@@ -307,6 +316,10 @@ def _lane_batch_size(lane: str, batch_size: int) -> int:
     if lane in NON_REVERSAL_PRIORITY_LANES:
         return max(size, 3)
     return size
+
+
+def _rotation_key(rotation: dict[str, Any]) -> str:
+    return json.dumps(_json_safe(rotation), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def _is_reversal_expression_candidate(path: Path) -> bool:

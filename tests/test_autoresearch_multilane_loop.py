@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from qlib_factor_lab.autoresearch.multilane import MultiLaneReport
 from qlib_factor_lab.autoresearch.multilane_loop import run_multilane_loop
@@ -243,6 +244,60 @@ class AutoresearchMultilaneLoopTests(unittest.TestCase):
                 [Path(call["expression_candidate_path"]).name for call in calls],
                 ["candidate_momentum.yaml", "candidate_reversal.yaml"],
             )
+
+    def test_loop_can_stop_when_rotation_repeats(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate_dir = root / "configs/autoresearch/candidates"
+            candidate_dir.mkdir(parents=True)
+            (candidate_dir / "candidate_a.yaml").write_text(
+                "name: candidate_a\nfamily: momentum\nexpression: $close\n",
+                encoding="utf-8",
+            )
+            (candidate_dir / "candidate_b.yaml").write_text(
+                "name: candidate_b\nfamily: momentum\nexpression: $open\n",
+                encoding="utf-8",
+            )
+            calls: list[dict] = []
+
+            def fake_runner(**kwargs):
+                calls.append(kwargs)
+                output = Path(kwargs["output_path"])
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text("# fake multilane\n", encoding="utf-8")
+                return MultiLaneReport((), output_path=output)
+
+            with patch.dict(
+                "qlib_factor_lab.autoresearch.multilane_loop.DEFAULT_ROTATION_FACTOR_NAMES",
+                {"pattern_event": ["pattern_a", "pattern_b"]},
+                clear=True,
+            ):
+                result = run_multilane_loop(
+                    project_root=root,
+                    lane_space_path="lane_space.yaml",
+                    contract_path="contract.yaml",
+                    expression_space_path="space.yaml",
+                    expression_candidate_path="configs/autoresearch/candidates/candidate_a.yaml",
+                    expression_candidate_glob="configs/autoresearch/candidates/*.yaml",
+                    mining_config_path="mining.yaml",
+                    provider_config_path="provider.yaml",
+                    output_root="reports/autoresearch/multilane_loop",
+                    max_iterations=10,
+                    max_crashes=3,
+                    sleep_sec=0,
+                    lane_factor_batch_size=1,
+                    stop_on_rotation_exhausted=True,
+                    runner=fake_runner,
+                )
+
+            self.assertEqual(result.stop_reason, "rotation_exhausted")
+            self.assertEqual(result.iterations_started, 2)
+            self.assertEqual(
+                [Path(call["expression_candidate_path"]).name for call in calls],
+                ["candidate_a.yaml", "candidate_b.yaml"],
+            )
+            summary = json.loads((result.log_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["stop_reason"], "rotation_exhausted")
 
     def test_loop_seeds_expression_candidates_from_strategy_dictionary_before_rotation(self):
         with tempfile.TemporaryDirectory() as tmp:

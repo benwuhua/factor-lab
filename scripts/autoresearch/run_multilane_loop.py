@@ -49,6 +49,11 @@ def main() -> int:
     parser.add_argument("--max-crashes", type=int, default=5)
     parser.add_argument("--lane-factor-batch-size", type=int, default=2)
     parser.add_argument(
+        "--stop-on-rotation-exhausted",
+        action="store_true",
+        help="Stop once expression/lane-factor rotation repeats within the same run.",
+    )
+    parser.add_argument(
         "--disable-strategy-dictionary-seed",
         action="store_true",
         help="Temporarily disable strategy_dictionary seeding from lane_space before candidate rotation.",
@@ -91,6 +96,7 @@ def main() -> int:
         sleep_sec=args.sleep_sec,
         lane_factor_batch_size=args.lane_factor_batch_size,
         include_reversal_expression_candidates=args.include_reversal_expression_candidates,
+        stop_on_rotation_exhausted=args.stop_on_rotation_exhausted,
     )
     print(f"iterations_started: {result.iterations_started}")
     print(f"crash_count: {result.crash_count}")
