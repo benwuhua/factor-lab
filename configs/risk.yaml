@@ -8,6 +8,14 @@ risk:
   max_factor_family_concentration: 0.85
   min_factor_logic_count: 3
   max_factor_logic_concentration: 0.65
+  portfolio_value: null
+  min_amount_20d: null
+  max_position_amount_share: null
+  max_estimated_cost: null
+  commission_bps: 0.0
+  slippage_bps: 0.0
+  stamp_tax_bps: 0.0
+  max_risk_budget_per_position: null
   factor_family_map_path: reports/approved_factors.yaml
   factor_logic_map_path: reports/approved_factors.yaml
 

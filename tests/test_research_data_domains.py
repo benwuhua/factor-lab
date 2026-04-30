@@ -10,6 +10,7 @@ import pandas as pd
 from qlib_factor_lab.research_data_domains import (
     build_announcement_evidence_index,
     build_shareholder_capital_from_events,
+    derive_fundamental_quality_fields,
     derive_fundamental_valuation_fields,
     normalize_fundamental_quality,
     normalize_cninfo_dividend,
@@ -54,6 +55,81 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertAlmostEqual(1.2, float(result.loc[0, "eps"]))
         self.assertAlmostEqual(0.8, float(result.loc[0, "operating_cashflow_per_share"]))
         self.assertEqual("akshare_financial_indicator", result.loc[0, "source"])
+
+    def test_normalize_fundamental_quality_keeps_p1_quality_fields_when_available(self) -> None:
+        raw = pd.DataFrame(
+            [
+                {
+                    "证券代码": "600000",
+                    "报告期": "2026-03-31",
+                    "公告日期": "2026-04-20",
+                    "投入资本回报率": "9.1",
+                    "应计比率": "-2.3",
+                    "经营现金流同比增长率": "18.2",
+                }
+            ]
+        )
+
+        result = normalize_fundamental_quality(raw, as_of_date="2026-04-27")
+
+        for column in [
+            "roic",
+            "accrual_ratio",
+            "gross_margin_change_yoy",
+            "revenue_growth_change_yoy",
+            "net_profit_growth_change_yoy",
+            "cashflow_growth_change_yoy",
+            "dividend_stability",
+            "dividend_cashflow_coverage",
+        ]:
+            self.assertIn(column, result.columns)
+        self.assertAlmostEqual(9.1, float(result.loc[0, "roic"]))
+        self.assertAlmostEqual(-2.3, float(result.loc[0, "accrual_ratio"]))
+        self.assertTrue(pd.isna(pd.to_numeric(result.loc[0, "dividend_stability"], errors="coerce")))
+
+    def test_derive_fundamental_quality_fields_derives_changes_and_dividend_metrics(self) -> None:
+        fundamentals = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "report_period": "2025-12-31",
+                    "announce_date": "2026-04-20",
+                    "available_at": "2026-04-20",
+                    "gross_margin": 30.0,
+                    "revenue_growth_yoy": 8.0,
+                    "net_profit_growth_yoy": 5.0,
+                    "cashflow_growth_yoy": 12.0,
+                    "operating_cashflow_per_share": 1.2,
+                },
+                {
+                    "instrument": "SH600000",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-28",
+                    "available_at": "2026-04-28",
+                    "gross_margin": 34.5,
+                    "revenue_growth_yoy": 11.0,
+                    "net_profit_growth_yoy": 2.0,
+                    "cashflow_growth_yoy": 17.0,
+                    "operating_cashflow_per_share": 1.5,
+                },
+            ]
+        )
+        dividends = pd.DataFrame(
+            [
+                {"instrument": "SH600000", "available_at": "2025-05-20", "dividend_cash_per_10": 2.0},
+                {"instrument": "SH600000", "available_at": "2026-04-25", "dividend_cash_per_10": 3.0},
+            ]
+        )
+
+        result = derive_fundamental_quality_fields(fundamentals, dividends=dividends)
+        current = result[result["report_period"] == "2026-03-31"].iloc[0]
+
+        self.assertAlmostEqual(4.5, float(current["gross_margin_change_yoy"]))
+        self.assertAlmostEqual(3.0, float(current["revenue_growth_change_yoy"]))
+        self.assertAlmostEqual(-3.0, float(current["net_profit_growth_change_yoy"]))
+        self.assertAlmostEqual(5.0, float(current["cashflow_growth_change_yoy"]))
+        self.assertAlmostEqual(0.5, float(current["dividend_stability"]))
+        self.assertAlmostEqual(5.0, float(current["dividend_cashflow_coverage"]))
 
     def test_normalize_fundamental_quality_derives_ratios_from_price_when_raw_ratios_missing(self) -> None:
         raw = pd.DataFrame(
@@ -346,6 +422,7 @@ class ResearchDataDomainsTest(unittest.TestCase):
             dividends = pd.read_csv(root / "data/cninfo_dividends.csv")
             self.assertEqual({"SH600000", "SZ000001"}, set(fundamentals["instrument"]))
             self.assertEqual({"SH600000", "SZ000001"}, set(dividends["instrument"]))
+            self.assertIn("dividend_stability", fundamentals.columns)
 
     def test_write_research_data_domains_can_fetch_fundamentals_from_tushare(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

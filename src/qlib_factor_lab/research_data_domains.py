@@ -18,16 +18,25 @@ FUNDAMENTAL_QUALITY_COLUMNS = [
     "announce_date",
     "available_at",
     "roe",
+    "roic",
     "gross_margin",
     "debt_ratio",
     "revenue_growth_yoy",
     "net_profit_growth_yoy",
+    "cashflow_growth_yoy",
     "operating_cashflow_to_net_profit",
+    "accrual_ratio",
     "eps",
     "operating_cashflow_per_share",
     "ep",
     "cfp",
     "dividend_yield",
+    "gross_margin_change_yoy",
+    "revenue_growth_change_yoy",
+    "net_profit_growth_change_yoy",
+    "cashflow_growth_change_yoy",
+    "dividend_stability",
+    "dividend_cashflow_coverage",
     "valuation_source",
     "source",
 ]
@@ -105,14 +114,20 @@ def normalize_fundamental_quality(raw: pd.DataFrame, *, as_of_date: str, source:
                 "announce_date": announce_date,
                 "available_at": available_at,
                 "roe": _number_from_row(item, ["roe", "净资产收益率", "净资产收益率(%)", "加权净资产收益率"]),
+                "roic": _number_from_row(item, ["roic", "ROIC", "投入资本回报率", "投入资本回报率(%)"]),
                 "gross_margin": _number_from_row(item, ["gross_margin", "销售毛利率", "毛利率", "销售毛利率(%)"]),
                 "debt_ratio": _number_from_row(item, ["debt_ratio", "资产负债率", "资产负债率(%)"]),
                 "revenue_growth_yoy": _number_from_row(item, ["revenue_growth_yoy", "营业收入同比增长率", "营业总收入同比增长率", "营业收入同比增长率(%)"]),
                 "net_profit_growth_yoy": _number_from_row(item, ["net_profit_growth_yoy", "净利润同比增长率", "归母净利润同比增长率", "净利润同比增长率(%)"]),
+                "cashflow_growth_yoy": _number_from_row(
+                    item,
+                    ["cashflow_growth_yoy", "经营现金流同比增长率", "经营现金流量净额同比增长率", "经营活动现金流量净额同比增长率"],
+                ),
                 "operating_cashflow_to_net_profit": _number_from_row(
                     item,
                     ["operating_cashflow_to_net_profit", "经营现金流量净额/净利润", "经营现金流净额/净利润"],
                 ),
+                "accrual_ratio": _number_from_row(item, ["accrual_ratio", "应计比率", "应计项目比率"]),
                 "eps": _number_from_row(item, ["eps", "EPS", "摊薄每股收益(元)", "加权每股收益(元)", "基本每股收益", "每股收益"]),
                 "operating_cashflow_per_share": _number_from_row(
                     item,
@@ -136,7 +151,8 @@ def normalize_fundamental_quality(raw: pd.DataFrame, *, as_of_date: str, source:
     if not rows:
         return _empty(FUNDAMENTAL_QUALITY_COLUMNS)
     frame = pd.DataFrame(rows, columns=FUNDAMENTAL_QUALITY_COLUMNS)
-    return frame.sort_values(["instrument", "report_period"]).drop_duplicates(["instrument", "report_period"], keep="last")
+    frame = frame.sort_values(["instrument", "report_period"]).drop_duplicates(["instrument", "report_period"], keep="last")
+    return derive_fundamental_quality_fields(frame)
 
 
 def normalize_cninfo_dividend(raw: pd.DataFrame, *, instrument: str) -> pd.DataFrame:
@@ -237,6 +253,33 @@ def derive_fundamental_valuation_fields(
         output = output.drop(columns=[f"{column}_derived"])
     output = output.drop(columns=["_row_id"], errors="ignore")
     return output.loc[:, FUNDAMENTAL_QUALITY_COLUMNS]
+
+
+def derive_fundamental_quality_fields(fundamentals: pd.DataFrame, dividends: pd.DataFrame | None = None) -> pd.DataFrame:
+    if fundamentals is None or fundamentals.empty:
+        return _empty(FUNDAMENTAL_QUALITY_COLUMNS)
+    frame = fundamentals.copy()
+    for column in FUNDAMENTAL_QUALITY_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = pd.NA if column not in {"valuation_source", "source"} else ""
+
+    frame["_report_period_dt"] = pd.to_datetime(frame["report_period"], errors="coerce")
+    frame = frame.sort_values(["instrument", "_report_period_dt", "report_period"])
+    change_pairs = {
+        "gross_margin_change_yoy": "gross_margin",
+        "revenue_growth_change_yoy": "revenue_growth_yoy",
+        "net_profit_growth_change_yoy": "net_profit_growth_yoy",
+        "cashflow_growth_change_yoy": "cashflow_growth_yoy",
+    }
+    for output_column, source_column in change_pairs.items():
+        current = pd.to_numeric(frame[source_column], errors="coerce")
+        previous = current.groupby(frame["instrument"].astype(str)).shift(1)
+        existing = pd.to_numeric(frame[output_column], errors="coerce")
+        frame[output_column] = existing.combine_first(current - previous)
+
+    frame = _derive_dividend_quality_fields(frame, dividends)
+    frame = frame.drop(columns=["_report_period_dt"], errors="ignore")
+    return frame.loc[:, FUNDAMENTAL_QUALITY_COLUMNS]
 
 
 def build_shareholder_capital_from_events(events: pd.DataFrame, *, as_of_date: str) -> pd.DataFrame:
@@ -471,6 +514,7 @@ def write_research_data_domains(
     if derive_valuation_fields:
         prices = read_close_prices_from_source_dirs(root, price_source_dirs)
         fundamentals = derive_fundamental_valuation_fields(fundamentals, prices=prices, dividends=dividends)
+    fundamentals = derive_fundamental_quality_fields(fundamentals, dividends=dividends)
 
     shareholder = build_shareholder_capital_from_events(events, as_of_date=as_of_date)
     evidence = build_announcement_evidence_index(events, as_of_date=as_of_date)
@@ -692,6 +736,72 @@ def _attach_latest_dividend(frame: pd.DataFrame, dividends: pd.DataFrame | None)
             )
         pieces.append(filled)
     return pd.concat(pieces, ignore_index=True) if pieces else frame
+
+
+def _derive_dividend_quality_fields(frame: pd.DataFrame, dividends: pd.DataFrame | None) -> pd.DataFrame:
+    output = frame.copy()
+    if dividends is None or dividends.empty:
+        return output
+    if "available_at" not in output.columns or "instrument" not in output.columns:
+        return output
+    div = dividends.copy()
+    if "dividend_cash_per_10" not in div.columns or "available_at" not in div.columns or "instrument" not in div.columns:
+        return output
+    div["available_at"] = pd.to_datetime(div["available_at"], errors="coerce")
+    div["dividend_cash_per_10"] = pd.to_numeric(div["dividend_cash_per_10"], errors="coerce")
+    div = div.dropna(subset=["instrument", "available_at", "dividend_cash_per_10"]).sort_values(["instrument", "available_at"])
+    if div.empty:
+        return output
+
+    work = output.reset_index(drop=True).copy()
+    work["_row_id"] = work.index
+    work["_available_at_dt"] = pd.to_datetime(work["available_at"], errors="coerce")
+    rows = []
+    for _, item in work.iterrows():
+        available_at = item.get("_available_at_dt")
+        if pd.isna(available_at):
+            rows.append({"_row_id": item["_row_id"], "latest_dividend_cash_per_10": pd.NA, "dividend_stability_derived": pd.NA})
+            continue
+        history = div[
+            (div["instrument"].astype(str) == str(item.get("instrument", "")))
+            & (div["available_at"] <= available_at)
+        ].sort_values("available_at")
+        if history.empty:
+            rows.append({"_row_id": item["_row_id"], "latest_dividend_cash_per_10": pd.NA, "dividend_stability_derived": pd.NA})
+            continue
+        latest = float(history.iloc[-1]["dividend_cash_per_10"])
+        stability = pd.NA
+        if len(history) >= 2:
+            previous = float(history.iloc[-2]["dividend_cash_per_10"])
+            if previous != 0:
+                stability = max(0.0, min(1.0, 1.0 - abs(latest - previous) / abs(previous)))
+        rows.append(
+            {
+                "_row_id": item["_row_id"],
+                "latest_dividend_cash_per_10": latest,
+                "dividend_stability_derived": stability,
+            }
+        )
+    derived = pd.DataFrame(rows)
+    if derived.empty:
+        return output
+    merged = work.merge(derived, on="_row_id", how="left")
+    existing_stability = pd.to_numeric(merged["dividend_stability"], errors="coerce")
+    merged["dividend_stability"] = existing_stability.combine_first(pd.to_numeric(merged["dividend_stability_derived"], errors="coerce"))
+    cashflow = pd.to_numeric(merged["operating_cashflow_per_share"], errors="coerce")
+    dividend_per_share = pd.to_numeric(merged["latest_dividend_cash_per_10"], errors="coerce") / 10.0
+    coverage = cashflow / dividend_per_share.replace(0, pd.NA)
+    existing_coverage = pd.to_numeric(merged["dividend_cashflow_coverage"], errors="coerce")
+    merged["dividend_cashflow_coverage"] = existing_coverage.combine_first(pd.to_numeric(coverage, errors="coerce"))
+    return merged.drop(
+        columns=[
+            "_row_id",
+            "_available_at_dt",
+            "latest_dividend_cash_per_10",
+            "dividend_stability_derived",
+        ],
+        errors="ignore",
+    )
 
 
 def _fill_missing_numeric(current: pd.Series | None, derived: pd.Series) -> pd.Series:

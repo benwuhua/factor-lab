@@ -11,12 +11,116 @@ from qlib_factor_lab.company_events import (
     EVENT_RISK_SNAPSHOT_COLUMNS,
     EventRiskConfig,
     build_event_risk_snapshot,
+    classify_event_type,
     load_company_events,
     load_event_risk_config,
 )
 
 
 class CompanyEventTests(unittest.TestCase):
+    def test_classify_event_type_maps_p2_taxonomy(self):
+        expected = {
+            "buyback": ("positive_catalyst", "info", "boost"),
+            "shareholder_increase": ("positive_catalyst", "info", "boost"),
+            "order_contract": ("positive_catalyst", "info", "boost"),
+            "earnings_preannouncement_up": ("positive_catalyst", "info", "boost"),
+            "equity_incentive": ("positive_catalyst", "info", "boost"),
+            "shareholder_reduction": ("watch_risk", "watch", "watch"),
+            "large_unlock": ("watch_risk", "watch", "watch"),
+            "regulatory_inquiry": ("watch_risk", "watch", "watch"),
+            "pledge_risk": ("watch_risk", "watch", "watch"),
+            "guarantee": ("watch_risk", "watch", "watch"),
+            "lawsuit": ("watch_risk", "watch", "watch"),
+            "disciplinary_action": ("block_risk", "block", "block"),
+            "investigation": ("block_risk", "block", "block"),
+            "st_risk": ("block_risk", "block", "block"),
+            "delisting_risk": ("block_risk", "block", "block"),
+            "nonstandard_audit": ("block_risk", "block", "block"),
+            "major_penalty": ("block_risk", "block", "block"),
+        }
+
+        for event_type, (event_class, severity, action) in expected.items():
+            with self.subTest(event_type=event_type):
+                self.assertEqual(
+                    classify_event_type(event_type),
+                    {
+                        "event_class": event_class,
+                        "default_severity": severity,
+                        "portfolio_action": action,
+                    },
+                )
+
+        self.assertEqual(
+            classify_event_type("unknown_notice"),
+            {
+                "event_class": "watch_risk",
+                "default_severity": "watch",
+                "portfolio_action": "watch",
+            },
+        )
+
+    def test_snapshot_fills_missing_severity_and_summarizes_classes_and_actions(self):
+        signal = pd.DataFrame({"date": ["2026-04-23"], "instrument": ["AAA"]})
+        events = pd.DataFrame(
+            {
+                "event_id": ["evt-1", "evt-2", "evt-3"],
+                "instrument": ["AAA", "AAA", "AAA"],
+                "event_type": ["buyback", "shareholder_reduction", "investigation"],
+                "event_date": ["2026-04-20", "2026-04-21", "2026-04-22"],
+                "source": ["filing", "filing", "exchange"],
+                "source_url": [
+                    "https://example.test/buyback",
+                    "https://example.test/reduction",
+                    "https://example.test/investigation",
+                ],
+                "title": ["Buyback plan", "Reduction plan", "Investigation"],
+                "severity": ["", "risk", ""],
+                "summary": ["Board approved buyback.", "Explicit risk remains authoritative.", "Formal investigation."],
+                "evidence": ["notice", "notice", "notice"],
+                "active_until": ["", "", ""],
+            }
+        )
+
+        snapshot = build_event_risk_snapshot(signal, events, EventRiskConfig(default_lookback_days=30))
+
+        self.assertIn("event_classes", snapshot.columns)
+        self.assertIn("event_actions", snapshot.columns)
+        self.assertEqual(snapshot.loc[0, "event_count"], 3)
+        self.assertTrue(bool(snapshot.loc[0, "event_blocked"]))
+        self.assertEqual(snapshot.loc[0, "max_event_severity"], "block")
+        self.assertEqual(
+            snapshot.loc[0, "event_classes"],
+            "positive_catalyst; watch_risk; block_risk",
+        )
+        self.assertEqual(snapshot.loc[0, "event_actions"], "boost; watch; block")
+
+    def test_snapshot_separates_positive_and_risk_event_evidence(self):
+        signal = pd.DataFrame({"date": ["2026-04-23"], "instrument": ["AAA"]})
+        events = pd.DataFrame(
+            {
+                "event_id": ["evt-1", "evt-2"],
+                "instrument": ["AAA", "AAA"],
+                "event_type": ["order_contract", "regulatory_inquiry"],
+                "event_date": ["2026-04-20", "2026-04-21"],
+                "source": ["filing", "exchange"],
+                "source_url": ["https://example.test/order", "https://example.test/inquiry"],
+                "title": ["Large order", "Inquiry letter"],
+                "severity": ["", ""],
+                "summary": ["Won a material contract.", "Received an exchange inquiry."],
+                "evidence": ["notice", "letter"],
+                "active_until": ["", ""],
+            }
+        )
+
+        snapshot = build_event_risk_snapshot(signal, events, EventRiskConfig(default_lookback_days=30))
+
+        self.assertEqual(snapshot.loc[0, "positive_event_types"], "order_contract")
+        self.assertIn("Large order", snapshot.loc[0, "positive_event_summary"])
+        self.assertNotIn("Inquiry letter", snapshot.loc[0, "positive_event_summary"])
+        self.assertEqual(snapshot.loc[0, "risk_event_types"], "regulatory_inquiry")
+        self.assertIn("Inquiry letter", snapshot.loc[0, "risk_event_summary"])
+        self.assertNotIn("Large order", snapshot.loc[0, "risk_event_summary"])
+
     def test_event_summary_flags_blocking_event_within_window(self):
         signal = pd.DataFrame({"date": ["2026-04-23"], "instrument": ["AAA"], "score": [0.7]})
         events = pd.DataFrame(
@@ -167,6 +271,12 @@ class CompanyEventTests(unittest.TestCase):
                         "    - block",
                         "    - risk",
                         "  max_events_per_name: 2",
+                        "  event_taxonomy:",
+                        "    positive_catalyst:",
+                        "      default_severity: info",
+                        "      portfolio_action: boost",
+                        "      event_types:",
+                        "        - custom_order",
                     ]
                 )
             )
@@ -183,6 +293,50 @@ class CompanyEventTests(unittest.TestCase):
         self.assertEqual(config.block_event_types, ("disciplinary_action", "delisting_risk"))
         self.assertEqual(config.block_severities, ("block", "risk"))
         self.assertEqual(config.max_events_per_name, 2)
+        self.assertEqual(
+            config.event_taxonomy["custom_order"],
+            {
+                "event_class": "positive_catalyst",
+                "default_severity": "info",
+                "portfolio_action": "boost",
+            },
+        )
+
+    def test_configured_event_taxonomy_drives_snapshot_classification(self):
+        signal = pd.DataFrame({"date": ["2026-04-23"], "instrument": ["AAA"]})
+        events = pd.DataFrame(
+            {
+                "event_id": ["evt-1"],
+                "instrument": ["AAA"],
+                "event_type": ["custom_order"],
+                "event_date": ["2026-04-20"],
+                "source": ["filing"],
+                "source_url": ["https://example.test/custom"],
+                "title": ["Custom order"],
+                "severity": [""],
+                "summary": ["Configured taxonomy should classify this as positive."],
+                "evidence": ["notice"],
+                "active_until": [""],
+            }
+        )
+        config = EventRiskConfig(
+            default_lookback_days=30,
+            event_taxonomy={
+                **EventRiskConfig().event_taxonomy,
+                "custom_order": {
+                    "event_class": "positive_catalyst",
+                    "default_severity": "info",
+                    "portfolio_action": "boost",
+                },
+            },
+        )
+
+        snapshot = build_event_risk_snapshot(signal, events, config)
+
+        self.assertEqual("positive_catalyst", snapshot.loc[0, "event_classes"])
+        self.assertEqual("boost", snapshot.loc[0, "event_actions"])
+        self.assertFalse(bool(snapshot.loc[0, "event_blocked"]))
+        self.assertEqual("custom_order", snapshot.loc[0, "positive_event_types"])
 
     def test_load_company_events_returns_required_columns_when_missing(self):
         none_loaded = load_company_events(None)

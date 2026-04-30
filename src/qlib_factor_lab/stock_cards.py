@@ -20,6 +20,11 @@ def build_stock_cards(
     cards = []
     checks = _gate_reason(gate_checks)
     for _, row in portfolio.iterrows():
+        event_count = int(_number(row.get("event_count")) or 0)
+        source_urls = _split_semicolon(row.get("event_source_urls"))
+        risk_flags = _text(row.get("risk_flags"))
+        factor_contributions = _factor_contributions(row)
+        financial_anomalies = _split_list(row.get("financial_anomaly_flags") or row.get("anomaly_flags"))
         cards.append(
             {
                 "instrument": _text(row.get("instrument")),
@@ -57,12 +62,16 @@ def build_stock_cards(
                     "sell_blocked": _bool_or_text(row.get("sell_blocked")),
                 },
                 "evidence": {
-                    "event_count": int(_number(row.get("event_count")) or 0),
+                    "event_count": event_count,
                     "max_event_severity": _text(row.get("max_event_severity")),
                     "event_types": _text(row.get("active_event_types")),
+                    "positive_event_types": _text(row.get("positive_event_types")),
+                    "positive_event_summary": _text(row.get("positive_event_summary")),
+                    "risk_event_types": _text(row.get("risk_event_types")),
+                    "risk_event_summary": _text(row.get("risk_event_summary")),
                     "event_risk_summary": _text(row.get("event_risk_summary")),
-                    "source_urls": _split_semicolon(row.get("event_source_urls")),
-                    "risk_flags": _text(row.get("risk_flags")),
+                    "source_urls": source_urls,
+                    "risk_flags": risk_flags,
                 },
                 "portfolio_role": {
                     "selection_reason": _text(row.get("selection_reason")),
@@ -72,10 +81,46 @@ def build_stock_cards(
                 },
                 "review_questions": {
                     "why_selected": _text(row.get("selection_explanation")),
-                    "key_risk": _text(row.get("risk_flags")),
-                    "manual_chart_needed": bool(_text(row.get("risk_flags"))),
-                    "manual_announcement_needed": int(_number(row.get("event_count")) or 0) > 0,
+                    "key_risk": risk_flags,
+                    "manual_chart_needed": bool(risk_flags),
+                    "manual_announcement_needed": event_count > 0,
                     "gate_reason": checks,
+                },
+                "selection_thesis": {
+                    "why_selected": _text(row.get("selection_explanation")),
+                    "selection_reason": _text(row.get("selection_reason")),
+                    "portfolio_role": _text(row.get("top_factor_family")),
+                    "gate_decision": gate_decision,
+                    "gate_reason": checks,
+                },
+                "factor_contributions": factor_contributions,
+                "counter_evidence": {
+                    "risks": risk_flags,
+                    "risk_event_types": _text(row.get("risk_event_types")),
+                    "risk_event_summary": _text(row.get("risk_event_summary")),
+                    "max_event_severity": _text(row.get("max_event_severity")),
+                    "financial_anomalies": financial_anomalies,
+                },
+                "announcement_evidence": {
+                    "positive_event_types": _text(row.get("positive_event_types")),
+                    "positive_event_summary": _text(row.get("positive_event_summary")),
+                    "risk_event_types": _text(row.get("risk_event_types")),
+                    "risk_event_summary": _text(row.get("risk_event_summary")),
+                    "source_urls": source_urls,
+                },
+                "financial_anomalies": financial_anomalies,
+                "manual_review_actions": {
+                    "announcement_review": event_count > 0
+                    or bool(_text(row.get("positive_event_types")) or _text(row.get("risk_event_types"))),
+                    "financial_review": bool(financial_anomalies),
+                    "manual_chart_needed": bool(risk_flags),
+                    "actions": _manual_review_actions(row, event_count, risk_flags, financial_anomalies),
+                },
+                "tracking": {
+                    "status": _text(row.get("tracking_status")),
+                    "next_review_date": _text(row.get("next_review_date")),
+                    "owner": _text(row.get("tracking_owner") or row.get("owner")),
+                    "notes": _text(row.get("tracking_notes")),
                 },
                 "audit": {
                     "run_id": run_id,
@@ -93,6 +138,29 @@ def build_stock_cards(
     return cards
 
 
+def write_stock_card_report(cards: list[dict[str, Any]], output_path: str | Path) -> Path:
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["# Stock Candidate Report", ""]
+    for card in cards:
+        title = " ".join(part for part in [card.get("instrument", ""), card.get("name", "")] if part).strip()
+        lines.extend(
+            [
+                f"## {title or 'Unknown'}",
+                "",
+                f"Why selected: {_report_text(card.get('selection_thesis', {}).get('why_selected'))}",
+                f"Top drivers: {_format_drivers(card.get('factor_contributions', []))}",
+                f"Risks: {_format_risks(card)}",
+                f"Evidence urls: {_format_urls(card.get('announcement_evidence', {}).get('source_urls', []))}",
+                f"Manual review action: {_format_manual_actions(card)}",
+                f"Tracking: {_format_tracking(card.get('tracking', {}))}",
+                "",
+            ]
+        )
+    output.write_text("\n".join(lines), encoding="utf-8")
+    return output
+
+
 def write_stock_cards(cards: list[dict[str, Any]], output_path: str | Path) -> Path:
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -101,6 +169,22 @@ def write_stock_cards(cards: list[dict[str, Any]], output_path: str | Path) -> P
         encoding="utf-8",
     )
     return output
+
+
+def _factor_contributions(row: pd.Series) -> list[dict[str, Any]]:
+    contributions = []
+    index = 1
+    while f"top_factor_{index}" in row.index:
+        factor = _text(row.get(f"top_factor_{index}"))
+        if factor:
+            contributions.append(
+                {
+                    "factor": factor,
+                    "contribution": _number(row.get(f"top_factor_{index}_contribution")),
+                }
+            )
+        index += 1
+    return contributions
 
 
 def _factor_profile(row: pd.Series) -> dict[str, Any]:
@@ -132,11 +216,95 @@ def _listing_status(row: pd.Series) -> str:
     return ""
 
 
+def _split_list(value: Any) -> list[str]:
+    text = _text(value)
+    if not text:
+        return []
+    normalized = text.replace(",", ";")
+    return [part.strip() for part in normalized.split(";") if part.strip()]
+
+
 def _split_semicolon(value: Any) -> list[str]:
     text = _text(value)
     if not text:
         return []
     return [part.strip() for part in text.split(";") if part.strip()]
+
+
+def _manual_review_actions(
+    row: pd.Series,
+    event_count: int,
+    risk_flags: str,
+    financial_anomalies: list[str],
+) -> list[str]:
+    actions = []
+    if event_count > 0 or _text(row.get("positive_event_types")) or _text(row.get("risk_event_types")):
+        actions.append("Review announcement evidence")
+    if financial_anomalies:
+        actions.append("Review financial anomalies")
+    if risk_flags:
+        actions.append("Review chart/risk flags")
+    if not actions:
+        actions.append("Standard monitoring")
+    return actions
+
+
+def _report_text(value: Any) -> str:
+    return _text(value) or "n/a"
+
+
+def _format_drivers(contributions: Any) -> str:
+    if not isinstance(contributions, list) or not contributions:
+        return "n/a"
+    parts = []
+    for item in contributions:
+        if not isinstance(item, dict):
+            continue
+        factor = _text(item.get("factor"))
+        contribution = item.get("contribution")
+        if factor:
+            parts.append(f"{factor} ({_format_signed_number(contribution)})")
+    return "; ".join(parts) if parts else "n/a"
+
+
+def _format_risks(card: dict[str, Any]) -> str:
+    counter_evidence = card.get("counter_evidence", {})
+    parts = [
+        _text(counter_evidence.get("risks")),
+        _text(counter_evidence.get("risk_event_summary")),
+    ]
+    parts.extend(_text(item) for item in counter_evidence.get("financial_anomalies", []) or [])
+    return "; ".join(part for part in parts if part) or "n/a"
+
+
+def _format_urls(urls: Any) -> str:
+    if not isinstance(urls, list):
+        return "n/a"
+    return "; ".join(_text(url) for url in urls if _text(url)) or "n/a"
+
+
+def _format_manual_actions(card: dict[str, Any]) -> str:
+    actions = card.get("manual_review_actions", {}).get("actions", [])
+    if not isinstance(actions, list):
+        return "n/a"
+    return "; ".join(_text(action) for action in actions if _text(action)) or "n/a"
+
+
+def _format_tracking(tracking: Any) -> str:
+    if not isinstance(tracking, dict):
+        return "status=; next_review_date=; owner="
+    return (
+        f"status={_text(tracking.get('status'))}; "
+        f"next_review_date={_text(tracking.get('next_review_date'))}; "
+        f"owner={_text(tracking.get('owner'))}"
+    )
+
+
+def _format_signed_number(value: Any) -> str:
+    number = _number(value)
+    if number is None:
+        return "n/a"
+    return f"{number:+g}"
 
 
 def _text(value: Any) -> str:

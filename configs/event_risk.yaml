@@ -6,13 +6,54 @@ event_risk:
     shareholder_reduction: 60
     large_unlock: 45
     regulatory_inquiry: 45
+    pledge_risk: 60
+    guarantee: 60
+    lawsuit: 90
     disciplinary_action: 180
+    investigation: 180
+    st_risk: 180
     delisting_risk: 180
+    nonstandard_audit: 180
+    major_penalty: 180
   block_event_types:
     - disciplinary_action
+    - investigation
+    - st_risk
     - delisting_risk
     - trading_suspension
     - st_status
+    - nonstandard_audit
+    - major_penalty
   block_severities:
     - block
+  event_taxonomy:
+    positive_catalyst:
+      default_severity: info
+      portfolio_action: boost
+      event_types:
+        - buyback
+        - shareholder_increase
+        - order_contract
+        - earnings_preannouncement_up
+        - equity_incentive
+    watch_risk:
+      default_severity: watch
+      portfolio_action: watch
+      event_types:
+        - shareholder_reduction
+        - large_unlock
+        - regulatory_inquiry
+        - pledge_risk
+        - guarantee
+        - lawsuit
+    block_risk:
+      default_severity: block
+      portfolio_action: block
+      event_types:
+        - disciplinary_action
+        - investigation
+        - st_risk
+        - delisting_risk
+        - nonstandard_audit
+        - major_penalty
   max_events_per_name: 3

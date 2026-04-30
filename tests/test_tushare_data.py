@@ -279,6 +279,9 @@ class TushareDataTest(unittest.TestCase):
                     "netprofit_yoy": "-5.5",
                     "eps": "1.2",
                     "cfps": "0.8",
+                    "roic": "7.6",
+                    "accrual_ratio": "-1.4",
+                    "ocf_yoy": "9.8",
                 }
             ]
         )
@@ -296,6 +299,11 @@ class TushareDataTest(unittest.TestCase):
         self.assertAlmostEqual(-5.5, float(result.loc[0, "net_profit_growth_yoy"]))
         self.assertAlmostEqual(1.2, float(result.loc[0, "eps"]))
         self.assertAlmostEqual(0.8, float(result.loc[0, "operating_cashflow_per_share"]))
+        self.assertAlmostEqual(7.6, float(result.loc[0, "roic"]))
+        self.assertAlmostEqual(-1.4, float(result.loc[0, "accrual_ratio"]))
+        self.assertAlmostEqual(9.8, float(result.loc[0, "cashflow_growth_yoy"]))
+        self.assertIn("gross_margin_change_yoy", result.columns)
+        self.assertIn("dividend_cashflow_coverage", result.columns)
         self.assertEqual("tushare_fina_indicator_vip", result.loc[0, "source"])
 
     def test_fetch_fundamental_quality_from_tushare_uses_vip_period_batch_and_filters_symbols(self) -> None:
@@ -327,6 +335,35 @@ class TushareDataTest(unittest.TestCase):
         self.assertEqual({"period": "20260331"}, calls[0]["params"])
         self.assertEqual(["SZ000001"], result["instrument"].tolist())
         self.assertEqual(["2026-03-31"], result["report_period"].tolist())
+
+    def test_fetch_fundamental_quality_from_tushare_derives_cross_period_changes(self) -> None:
+        def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
+            period = dict(payload["params"])["period"]
+            rows = {
+                "20251231": [["000001.SZ", "20251231", "20260401", 20.0, 10.0, 5.0]],
+                "20260331": [["000001.SZ", "20260331", "20260420", 25.0, 13.0, 8.0]],
+            }[period]
+            return {
+                "code": 0,
+                "msg": "",
+                "data": {
+                    "fields": ["ts_code", "end_date", "ann_date", "grossprofit_margin", "or_yoy", "netprofit_yoy"],
+                    "items": rows,
+                },
+            }
+
+        result = fetch_fundamental_quality_from_tushare(
+            ["SZ000001"],
+            as_of_date="2026-04-30",
+            periods=["20251231", "20260331"],
+            token="token",
+            transport=fake_transport,
+        ).sort_values("report_period")
+
+        latest = result[result["report_period"] == "2026-03-31"].iloc[0]
+        self.assertAlmostEqual(5.0, float(latest["gross_margin_change_yoy"]))
+        self.assertAlmostEqual(3.0, float(latest["revenue_growth_change_yoy"]))
+        self.assertAlmostEqual(3.0, float(latest["net_profit_growth_change_yoy"]))
 
 
 if __name__ == "__main__":

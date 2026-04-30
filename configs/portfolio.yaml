@@ -5,6 +5,18 @@ portfolio:
   max_new_buys: 5
   dropout_rank: 30
   score_column: ensemble_score
+  profile: balanced
+  profile_confirmation_columns:
+    - family_growth_improvement_score
+    - family_momentum_score
+    - family_theme_score
+    - family_event_score
+  profile_constraints:
+    defensive:
+      max_single_weight: 0.05
+    balanced: {}
+    offensive:
+      max_defensive_family_weight: 0.35
   require_positive_non_quality_confirmation: true
   confirmation_exclude_families:
     - fundamental_quality

@@ -139,6 +139,89 @@ class StageCTests(unittest.TestCase):
 
         self.assertEqual(list(portfolio["instrument"]), ["PASSING_QUALITY", "ALSO_PASSING"])
 
+    def test_target_portfolio_offensive_profile_requires_growth_or_momentum_confirmation(self):
+        signal = pd.DataFrame(
+            {
+                "date": ["2026-04-23"] * 4,
+                "instrument": ["QUALITY_ONLY", "GROWTH_OK", "MOMENTUM_OK", "NEGATIVE_CONFIRM"],
+                "ensemble_score": [10.0, 9.0, 8.0, 7.0],
+                "risk_flags": ["", "", "", ""],
+                "family_fundamental_quality_score": [0.8, 0.2, 0.1, 0.1],
+                "family_growth_improvement_score": [0.0, 0.3, 0.0, -0.1],
+                "family_momentum_score": [0.0, 0.0, 0.2, 0.0],
+            }
+        )
+
+        portfolio = build_target_portfolio(
+            signal,
+            PortfolioConfig(top_k=3, profile="offensive", cash_buffer=0.1, max_single_weight=0.5),
+        )
+
+        self.assertEqual(list(portfolio["instrument"]), ["GROWTH_OK", "MOMENTUM_OK"])
+
+    def test_target_portfolio_offensive_profile_caps_defensive_family_dominance(self):
+        signal = pd.DataFrame(
+            {
+                "date": ["2026-04-23"] * 3,
+                "instrument": ["DEFENSIVE_HEAVY", "GROWTH_LED", "DIVIDEND_HEAVY"],
+                "ensemble_score": [10.0, 9.0, 8.0],
+                "risk_flags": ["", "", ""],
+                "family_fundamental_quality_score": [0.8, 0.1, 0.0],
+                "family_dividend_score": [0.0, 0.0, 0.6],
+                "family_growth_improvement_score": [0.2, 0.4, 0.1],
+                "family_momentum_score": [0.0, 0.0, 0.0],
+            }
+        )
+
+        portfolio = build_target_portfolio(
+            signal,
+            PortfolioConfig(
+                top_k=3,
+                profile="offensive",
+                profile_constraints={"offensive": {"max_defensive_family_weight": 0.5}},
+                cash_buffer=0.1,
+                max_single_weight=0.5,
+            ),
+        )
+
+        self.assertEqual(list(portfolio["instrument"]), ["GROWTH_LED"])
+
+    def test_target_portfolio_defensive_profile_applies_profile_max_single_weight(self):
+        portfolio = build_target_portfolio(
+            self._signal(),
+            PortfolioConfig(
+                top_k=2,
+                cash_buffer=0.0,
+                max_single_weight=0.5,
+                profile="defensive",
+                profile_constraints={"defensive": {"max_single_weight": 0.2}},
+            ),
+        )
+
+        self.assertEqual(list(portfolio["target_weight"]), [0.2, 0.2])
+
+    def test_portfolio_passthrough_keeps_p2_event_evidence_fields(self):
+        signal = self._signal()
+        signal["positive_event_types"] = ["buyback", "", "", "", ""]
+        signal["positive_event_summary"] = ["buyback plan", "", "", "", ""]
+        signal["risk_event_types"] = ["", "lawsuit", "", "", ""]
+        signal["risk_event_summary"] = ["", "pending lawsuit", "", "", ""]
+        signal["event_source_urls"] = ["https://example.com/a", "https://example.com/b", "", "", ""]
+
+        portfolio = build_target_portfolio(
+            signal,
+            PortfolioConfig(top_k=2, cash_buffer=0.1, max_single_weight=0.5),
+        )
+
+        for column in [
+            "positive_event_types",
+            "positive_event_summary",
+            "risk_event_types",
+            "risk_event_summary",
+            "event_source_urls",
+        ]:
+            self.assertIn(column, portfolio.columns)
+
     def test_risk_checks_report_concentration_failure(self):
         portfolio = pd.DataFrame(
             {
@@ -246,6 +329,66 @@ class StageCTests(unittest.TestCase):
         failed = report.to_frame().query("status == 'fail'")
         row = failed[failed["check"] == "max_industry_weight"].iloc[0]
         self.assertEqual(row["detail"], "证券=0.8")
+
+    def test_risk_checks_report_cost_liquidity_and_budget_failures(self):
+        portfolio = pd.DataFrame(
+            {
+                "date": ["2026-04-23", "2026-04-23"],
+                "instrument": ["AAA", "BBB"],
+                "target_weight": [0.4, 0.2],
+                "amount_20d": [100_000_000.0, 5_000_000.0],
+                "turnover_20d": [0.7, 0.1],
+            }
+        )
+
+        report = check_portfolio_risk(
+            portfolio,
+            self._signal(),
+            RiskConfig(
+                max_single_weight=0.5,
+                min_positions=2,
+                min_signal_coverage=0.2,
+                portfolio_value=100_000_000,
+                min_amount_20d=10_000_000,
+                max_position_amount_share=0.3,
+                max_estimated_cost=40_000,
+                commission_bps=5,
+                slippage_bps=10,
+                stamp_tax_bps=10,
+                max_risk_budget_per_position=0.12,
+            ),
+        )
+
+        failed = report.to_frame().query("status == 'fail'")
+        self.assertIn("min_amount_20d", set(failed["check"]))
+        self.assertIn("max_position_amount_share", set(failed["check"]))
+        self.assertIn("max_estimated_cost", set(failed["check"]))
+        self.assertIn("max_risk_budget_per_position", set(failed["check"]))
+
+    def test_configured_risk_check_fails_closed_when_required_source_column_missing(self):
+        portfolio = pd.DataFrame(
+            {
+                "date": ["2026-04-23"],
+                "instrument": ["AAA"],
+                "target_weight": [0.4],
+            }
+        )
+
+        report = check_portfolio_risk(
+            portfolio,
+            self._signal(),
+            RiskConfig(
+                max_single_weight=0.5,
+                min_positions=1,
+                min_signal_coverage=0.2,
+                portfolio_value=100_000_000,
+                min_amount_20d=10_000_000,
+            ),
+        )
+
+        failed = report.to_frame().query("status == 'fail'")
+        row = failed[failed["check"] == "min_amount_20d"].iloc[0]
+        self.assertEqual(row["detail"], "missing required column: amount_20d")
 
     def test_build_target_portfolio_cli_writes_outputs(self):
         with tempfile.TemporaryDirectory() as tmp:

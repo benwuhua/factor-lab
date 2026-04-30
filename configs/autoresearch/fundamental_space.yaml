@@ -5,7 +5,179 @@ logic_buckets:
   - profitability_quality
   - balance_sheet_risk
   - quality_low_leverage
+  - fundamental_value
+  - fundamental_growth
+  - fundamental_dividend
 candidate_factors:
+  - name: fundamental_ep
+    family: value
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_value
+    field: ep
+    components:
+      - field: ep
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: candidate
+    description: "source_table=data/fundamental_quality.csv; source_field=ep; role=value alpha."
+  - name: fundamental_cfp
+    family: value
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_value
+    field: cfp
+    components:
+      - field: cfp
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: candidate
+    description: "source_table=data/fundamental_quality.csv; source_field=cfp; role=cashflow value alpha."
+  - name: fundamental_dividend_yield
+    family: value
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_value
+    field: dividend_yield
+    components:
+      - field: dividend_yield
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: candidate
+    description: "source_table=data/fundamental_quality.csv; source_field=dividend_yield; role=shareholder yield alpha."
+  - name: fundamental_roe
+    family: quality
+    category: candidate_fundamental_csv
+    logic_bucket: profitability_quality
+    field: roe
+    components:
+      - field: roe
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: candidate
+    description: "source_table=data/fundamental_quality.csv; source_field=roe; role=profitability quality alpha."
+  - name: fundamental_roic
+    family: quality
+    category: candidate_fundamental_csv
+    logic_bucket: profitability_quality
+    field: roic
+    components:
+      - field: roic
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: data_gated
+    description: "source_table=data/fundamental_quality.csv; source_field=roic; role=capital efficiency alpha when upstream coverage exists."
+  - name: fundamental_cfo_to_ni
+    family: quality
+    category: candidate_fundamental_csv
+    logic_bucket: profitability_quality
+    field: operating_cashflow_to_net_profit
+    components:
+      - field: operating_cashflow_to_net_profit
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: candidate
+    description: "source_table=data/fundamental_quality.csv; source_field=operating_cashflow_to_net_profit; role=earnings quality alpha."
+  - name: fundamental_low_debt
+    family: quality
+    category: candidate_fundamental_csv
+    logic_bucket: balance_sheet_risk
+    field: debt_ratio
+    components:
+      - field: debt_ratio
+        direction: -1
+        weight: 1.0
+    direction: -1
+    active: true
+    review_status: watch
+    description: "source_table=data/fundamental_quality.csv; source_field=debt_ratio; role=balance-sheet guardrail."
+  - name: fundamental_low_accrual
+    family: quality
+    category: candidate_fundamental_csv
+    logic_bucket: profitability_quality
+    field: accrual_ratio
+    components:
+      - field: accrual_ratio
+        direction: -1
+        weight: 1.0
+    direction: -1
+    active: true
+    review_status: data_gated
+    description: "source_table=data/fundamental_quality.csv; source_field=accrual_ratio; role=accounting quality guardrail."
+  - name: fundamental_revenue_growth_change
+    family: growth_improvement
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_growth
+    field: revenue_growth_change_yoy
+    components:
+      - field: revenue_growth_change_yoy
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: data_gated
+    description: "source_table=data/fundamental_quality.csv; source_field=revenue_growth_change_yoy; role=growth acceleration alpha."
+  - name: fundamental_profit_growth_change
+    family: growth_improvement
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_growth
+    field: net_profit_growth_change_yoy
+    components:
+      - field: net_profit_growth_change_yoy
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: data_gated
+    description: "source_table=data/fundamental_quality.csv; source_field=net_profit_growth_change_yoy; role=earnings acceleration alpha."
+  - name: fundamental_margin_change
+    family: growth_improvement
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_growth
+    field: gross_margin_change_yoy
+    components:
+      - field: gross_margin_change_yoy
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: data_gated
+    description: "source_table=data/fundamental_quality.csv; source_field=gross_margin_change_yoy; role=margin improvement alpha."
+  - name: fundamental_dividend_stability
+    family: dividend
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_dividend
+    field: dividend_stability
+    components:
+      - field: dividend_stability
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: data_gated
+    description: "source_table=data/fundamental_quality.csv; source_field=dividend_stability; role=dividend quality guardrail."
+  - name: fundamental_dividend_cashflow_coverage
+    family: dividend
+    category: candidate_fundamental_csv
+    logic_bucket: fundamental_dividend
+    field: dividend_cashflow_coverage
+    components:
+      - field: dividend_cashflow_coverage
+        direction: 1
+        weight: 1.0
+    direction: 1
+    active: true
+    review_status: data_gated
+    description: "source_table=data/fundamental_quality.csv; source_field=dividend_cashflow_coverage; role=dividend sustainability guardrail."
   - name: roe
     family: quality
     category: candidate_quality
@@ -50,11 +222,19 @@ pit_rules:
   fallback_date_column: announce_date
   cannot_use_unannounced_report_period: true
 families:
+  value:
+    fields:
+      - ep
+      - cfp
+      - dividend_yield
+    direction: 1
   quality:
     fields:
       - roe
+      - roic
       - gross_margin
       - operating_cashflow_to_net_profit
+      - accrual_ratio
     direction: 1
   value_risk:
     fields:
@@ -72,6 +252,17 @@ families:
     fields:
       - revenue_growth_yoy
       - net_profit_growth_yoy
+    direction: 1
+  growth_improvement:
+    fields:
+      - revenue_growth_change_yoy
+      - net_profit_growth_change_yoy
+      - gross_margin_change_yoy
+    direction: 1
+  dividend:
+    fields:
+      - dividend_stability
+      - dividend_cashflow_coverage
     direction: 1
 evaluation:
   horizons:

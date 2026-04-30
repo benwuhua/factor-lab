@@ -30,11 +30,63 @@ EVENT_RISK_SNAPSHOT_COLUMNS = [
     "event_blocked",
     "max_event_severity",
     "active_event_types",
+    "event_classes",
+    "event_actions",
+    "positive_event_types",
+    "positive_event_summary",
+    "risk_event_types",
+    "risk_event_summary",
     "event_risk_summary",
     "event_source_urls",
 ]
 
 _SEVERITY_RANK = {"info": 0, "watch": 1, "risk": 2, "block": 3}
+_POSITIVE_CATALYSTS = {
+    "buyback",
+    "shareholder_increase",
+    "order_contract",
+    "earnings_preannouncement_up",
+    "equity_incentive",
+}
+_WATCH_RISKS = {
+    "shareholder_reduction",
+    "large_unlock",
+    "regulatory_inquiry",
+    "pledge_risk",
+    "guarantee",
+    "lawsuit",
+}
+_BLOCK_RISKS = {
+    "disciplinary_action",
+    "investigation",
+    "st_risk",
+    "delisting_risk",
+    "nonstandard_audit",
+    "major_penalty",
+}
+
+
+def _default_event_taxonomy() -> dict[str, dict[str, str]]:
+    taxonomy: dict[str, dict[str, str]] = {}
+    for event_type in _POSITIVE_CATALYSTS:
+        taxonomy[event_type] = {
+            "event_class": "positive_catalyst",
+            "default_severity": "info",
+            "portfolio_action": "boost",
+        }
+    for event_type in _WATCH_RISKS:
+        taxonomy[event_type] = {
+            "event_class": "watch_risk",
+            "default_severity": "watch",
+            "portfolio_action": "watch",
+        }
+    for event_type in _BLOCK_RISKS:
+        taxonomy[event_type] = {
+            "event_class": "block_risk",
+            "default_severity": "block",
+            "portfolio_action": "block",
+        }
+    return taxonomy
 
 
 @dataclass
@@ -51,6 +103,24 @@ class EventRiskConfig:
     )
     block_severities: tuple[str, ...] = ("block",)
     max_events_per_name: int = 3
+    event_taxonomy: dict[str, dict[str, str]] = field(default_factory=_default_event_taxonomy)
+
+
+def classify_event_type(event_type: str, taxonomy: dict[str, dict[str, str]] | None = None) -> dict[str, str]:
+    normalized = _clean(event_type)
+    lookup = taxonomy or _default_event_taxonomy()
+    if normalized in lookup:
+        entry = lookup[normalized]
+        return {
+            "event_class": str(entry.get("event_class", "watch_risk")),
+            "default_severity": str(entry.get("default_severity", "watch")),
+            "portfolio_action": str(entry.get("portfolio_action", "watch")),
+        }
+    return {
+        "event_class": "watch_risk",
+        "default_severity": "watch",
+        "portfolio_action": "watch",
+    }
 
 
 def load_event_risk_config(path: str | Path | None) -> EventRiskConfig:
@@ -76,6 +146,7 @@ def load_event_risk_config(path: str | Path | None) -> EventRiskConfig:
         block_event_types=tuple(raw_config.get("block_event_types", EventRiskConfig().block_event_types)),
         block_severities=tuple(raw_config.get("block_severities", EventRiskConfig().block_severities)),
         max_events_per_name=int(raw_config.get("max_events_per_name", 3)),
+        event_taxonomy=_event_taxonomy_from_config(raw_config.get("event_taxonomy")),
     )
 
 
@@ -96,6 +167,7 @@ def build_event_risk_snapshot(
     config: EventRiskConfig,
 ) -> pd.DataFrame:
     event_frame = _with_required_columns(events, COMPANY_EVENT_COLUMNS)
+    event_frame = _with_event_taxonomy(event_frame, config)
     snapshots = []
 
     for _, signal_row in signal.iterrows():
@@ -152,9 +224,18 @@ def _snapshot_row(
             "event_blocked": False,
             "max_event_severity": "",
             "active_event_types": "",
+            "event_classes": "",
+            "event_actions": "",
+            "positive_event_types": "",
+            "positive_event_summary": "",
+            "risk_event_types": "",
+            "risk_event_summary": "",
             "event_risk_summary": "",
             "event_source_urls": "",
         }
+
+    positive_events = active_events[active_events["event_class"] == "positive_catalyst"]
+    risk_events = active_events[active_events["event_class"] != "positive_catalyst"]
 
     return {
         "date": signal_row["date"],
@@ -163,6 +244,12 @@ def _snapshot_row(
         "event_blocked": _has_blocking_event(active_events, config),
         "max_event_severity": _max_event_severity(active_events),
         "active_event_types": _join_unique(active_events["event_type"]),
+        "event_classes": _join_unique(active_events["event_class"]),
+        "event_actions": _join_unique(active_events["event_action"]),
+        "positive_event_types": _join_unique(positive_events["event_type"]),
+        "positive_event_summary": _event_summary(positive_events, config.max_events_per_name),
+        "risk_event_types": _join_unique(risk_events["event_type"]),
+        "risk_event_summary": _event_summary(risk_events, config.max_events_per_name),
         "event_risk_summary": _event_summary(active_events, config.max_events_per_name),
         "event_source_urls": _join_unique(active_events["source_url"]),
     }
@@ -188,6 +275,8 @@ def _has_blocking_event(events: pd.DataFrame, config: EventRiskConfig) -> bool:
 
     for _, event_row in events.iterrows():
         if _clean(event_row.get("severity")) in block_severities:
+            return True
+        if _clean(event_row.get("event_action")) == "block":
             return True
         if _clean(event_row.get("event_type")) in block_event_types:
             return True
@@ -220,6 +309,45 @@ def _with_required_columns(frame: pd.DataFrame, columns: list[str]) -> pd.DataFr
         if column not in prepared.columns:
             prepared[column] = pd.NA
     return prepared
+
+
+def _with_event_taxonomy(events: pd.DataFrame, config: EventRiskConfig) -> pd.DataFrame:
+    prepared = events.copy()
+    classes = []
+    actions = []
+    severities = []
+    for _, event_row in prepared.iterrows():
+        taxonomy = classify_event_type(event_row.get("event_type"), config.event_taxonomy)
+        classes.append(taxonomy["event_class"])
+        actions.append(taxonomy["portfolio_action"])
+        explicit_severity = _clean(event_row.get("severity"))
+        severities.append(explicit_severity or taxonomy["default_severity"])
+
+    prepared["event_class"] = classes
+    prepared["event_action"] = actions
+    prepared["severity"] = severities
+    return prepared
+
+
+def _event_taxonomy_from_config(raw: Any) -> dict[str, dict[str, str]]:
+    taxonomy = _default_event_taxonomy()
+    if not isinstance(raw, dict):
+        return taxonomy
+    for event_class, value in raw.items():
+        if not isinstance(value, dict):
+            continue
+        default_severity = str(value.get("default_severity", "watch"))
+        portfolio_action = str(value.get("portfolio_action", "watch"))
+        for event_type in value.get("event_types") or []:
+            normalized = _clean(event_type)
+            if not normalized:
+                continue
+            taxonomy[normalized] = {
+                "event_class": str(event_class),
+                "default_severity": default_severity,
+                "portfolio_action": portfolio_action,
+            }
+    return taxonomy
 
 
 def _join_unique(values: pd.Series) -> str:

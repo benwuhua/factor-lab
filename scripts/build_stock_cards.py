@@ -15,7 +15,7 @@ from _bootstrap import add_src_to_path, project_root
 
 add_src_to_path()
 
-from qlib_factor_lab.stock_cards import build_stock_cards, write_stock_cards
+from qlib_factor_lab.stock_cards import build_stock_cards, write_stock_card_report, write_stock_cards
 
 
 def main() -> int:
@@ -29,6 +29,7 @@ def main() -> int:
     parser.add_argument("--gate-decision", default="")
     parser.add_argument("--factor-version", default="")
     parser.add_argument("--output", default="reports/stock_cards_{run_yyyymmdd}.jsonl")
+    parser.add_argument("--report-output", default="")
     parser.add_argument("--project-root", default=str(default_root))
     args = parser.parse_args()
 
@@ -49,6 +50,12 @@ def main() -> int:
     output = write_stock_cards(cards, _resolve(root, _materialize(args.output, as_of_date)))
     print(f"cards: {len(cards)}")
     print(f"wrote: {output}")
+    if args.report_output:
+        report_output = write_stock_card_report(
+            cards,
+            _resolve(root, _materialize(args.report_output, as_of_date)),
+        )
+        print(f"wrote report: {report_output}")
     return 0
 
 

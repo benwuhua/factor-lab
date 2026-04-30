@@ -20,16 +20,25 @@ FUNDAMENTAL_QUALITY_COLUMNS = [
     "announce_date",
     "available_at",
     "roe",
+    "roic",
     "gross_margin",
     "debt_ratio",
     "revenue_growth_yoy",
     "net_profit_growth_yoy",
+    "cashflow_growth_yoy",
     "operating_cashflow_to_net_profit",
+    "accrual_ratio",
     "eps",
     "operating_cashflow_per_share",
     "ep",
     "cfp",
     "dividend_yield",
+    "gross_margin_change_yoy",
+    "revenue_growth_change_yoy",
+    "net_profit_growth_change_yoy",
+    "cashflow_growth_change_yoy",
+    "dividend_stability",
+    "dividend_cashflow_coverage",
     "valuation_source",
     "source",
 ]
@@ -42,10 +51,13 @@ TUSHARE_FINA_INDICATOR_FIELDS = [
     "cfps",
     "grossprofit_margin",
     "roe",
+    "roic",
     "debt_to_assets",
     "or_yoy",
     "netprofit_yoy",
+    "ocf_yoy",
     "ocf_to_np",
+    "accrual_ratio",
 ]
 
 TUSHARE_DAILY_FIELDS = [
@@ -516,11 +528,14 @@ def normalize_tushare_fina_indicator(
                 "announce_date": announce_date,
                 "available_at": available_at,
                 "roe": _number_from_row(item, ["roe", "roe_waa", "roe_dt"]),
+                "roic": _number_from_row(item, ["roic"]),
                 "gross_margin": _number_from_row(item, ["grossprofit_margin", "gross_margin"]),
                 "debt_ratio": _number_from_row(item, ["debt_to_assets", "debt_asset_ratio"]),
                 "revenue_growth_yoy": _number_from_row(item, ["or_yoy", "tr_yoy", "revenue_yoy"]),
                 "net_profit_growth_yoy": _number_from_row(item, ["netprofit_yoy", "dt_netprofit_yoy"]),
+                "cashflow_growth_yoy": _number_from_row(item, ["ocf_yoy", "cashflow_growth_yoy"]),
                 "operating_cashflow_to_net_profit": _number_from_row(item, ["ocf_to_np", "ocf_to_profit", "cashflow_to_np"]),
+                "accrual_ratio": _number_from_row(item, ["accrual_ratio"]),
                 "eps": _number_from_row(item, ["eps", "basic_eps"]),
                 "operating_cashflow_per_share": _number_from_row(item, ["cfps", "ocfps", "net_cashflow_ps"]),
                 "ep": _number_from_row(item, ["ep", "earnings_to_price"]),
@@ -533,10 +548,11 @@ def normalize_tushare_fina_indicator(
     if not rows:
         return pd.DataFrame(columns=FUNDAMENTAL_QUALITY_COLUMNS)
     frame = pd.DataFrame(rows, columns=FUNDAMENTAL_QUALITY_COLUMNS)
-    return frame.sort_values(["instrument", "report_period", "announce_date"]).drop_duplicates(
+    frame = frame.sort_values(["instrument", "report_period", "announce_date"]).drop_duplicates(
         ["instrument", "report_period"],
         keep="last",
     )
+    return _derive_change_fields(frame)
 
 
 def fetch_fundamental_quality_from_tushare(
@@ -586,10 +602,11 @@ def fetch_fundamental_quality_from_tushare(
             time.sleep(delay)
     if not frames:
         return pd.DataFrame(columns=FUNDAMENTAL_QUALITY_COLUMNS)
-    return pd.concat(frames, ignore_index=True).sort_values(["instrument", "report_period"]).drop_duplicates(
+    combined = pd.concat(frames, ignore_index=True).sort_values(["instrument", "report_period"]).drop_duplicates(
         ["instrument", "report_period"],
         keep="last",
     )
+    return _derive_change_fields(combined)
 
 
 def _post_json(endpoint: str, payload: dict[str, object], timeout: float) -> dict[str, object]:
@@ -670,6 +687,26 @@ def _number_from_row(row: pd.Series, columns: Iterable[str]) -> float | None:
         if pd.notna(value):
             return float(value)
     return None
+
+
+def _derive_change_fields(frame: pd.DataFrame) -> pd.DataFrame:
+    output = frame.copy()
+    for column in FUNDAMENTAL_QUALITY_COLUMNS:
+        if column not in output.columns:
+            output[column] = pd.NA if column not in {"valuation_source", "source"} else ""
+    output["_report_period_dt"] = pd.to_datetime(output["report_period"], errors="coerce")
+    output = output.sort_values(["instrument", "_report_period_dt", "report_period"])
+    for output_column, source_column in {
+        "gross_margin_change_yoy": "gross_margin",
+        "revenue_growth_change_yoy": "revenue_growth_yoy",
+        "net_profit_growth_change_yoy": "net_profit_growth_yoy",
+        "cashflow_growth_change_yoy": "cashflow_growth_yoy",
+    }.items():
+        current = pd.to_numeric(output[source_column], errors="coerce")
+        previous = current.groupby(output["instrument"].astype(str)).shift(1)
+        existing = pd.to_numeric(output[output_column], errors="coerce")
+        output[output_column] = existing.combine_first(current - previous)
+    return output.drop(columns=["_report_period_dt"], errors="ignore").loc[:, FUNDAMENTAL_QUALITY_COLUMNS]
 
 
 def _quarter_periods(*, start_year: int, as_of_date: str) -> list[str]:

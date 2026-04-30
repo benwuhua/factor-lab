@@ -33,6 +33,10 @@ EXECUTION_PASSTHROUGH_COLUMNS = (
     "max_event_severity",
     "active_event_types",
     "event_risk_summary",
+    "positive_event_types",
+    "positive_event_summary",
+    "risk_event_types",
+    "risk_event_summary",
     "event_source_urls",
 )
 EXPLANATION_COLUMNS = (
@@ -55,6 +59,14 @@ class PortfolioConfig:
     confirmation_exclude_families: tuple[str, ...] = ("fundamental_quality",)
     confirmation_min_score: float = 0.0
     required_min_scores: dict[str, float] = field(default_factory=dict)
+    profile: str = "balanced"
+    profile_constraints: dict[str, dict[str, object]] = field(default_factory=dict)
+    profile_confirmation_columns: tuple[str, ...] = (
+        "family_growth_improvement_score",
+        "family_momentum_score",
+        "family_theme_score",
+        "family_event_score",
+    )
     target_output_path: Path = Path("reports/target_portfolio_{run_yyyymmdd}.csv")
     summary_output_path: Path = Path("reports/target_portfolio_summary_{run_yyyymmdd}.md")
 
@@ -64,6 +76,8 @@ def load_portfolio_config(path: str | Path) -> PortfolioConfig:
     raw = data.get("portfolio", data)
     output = data.get("output", {})
     max_new_buys = raw.get("max_new_buys")
+    profile = str(raw.get("profile", "balanced"))
+    profile_constraints = _normalize_profile_constraints(raw.get("profile_constraints", {}))
     return PortfolioConfig(
         top_k=int(raw.get("top_k", 20)),
         cash_buffer=float(raw.get("cash_buffer", 0.05)),
@@ -75,6 +89,23 @@ def load_portfolio_config(path: str | Path) -> PortfolioConfig:
         confirmation_exclude_families=tuple(str(item) for item in raw.get("confirmation_exclude_families", ["fundamental_quality"])),
         confirmation_min_score=float(raw.get("confirmation_min_score", 0.0)),
         required_min_scores={str(key): float(value) for key, value in raw.get("required_min_scores", {}).items()},
+        profile=profile,
+        profile_constraints=profile_constraints,
+        profile_confirmation_columns=tuple(
+            str(item)
+            for item in raw.get(
+                "profile_confirmation_columns",
+                profile_constraints.get(profile, {}).get(
+                    "profile_confirmation_columns",
+                    [
+                        "family_growth_improvement_score",
+                        "family_momentum_score",
+                        "family_theme_score",
+                        "family_event_score",
+                    ],
+                ),
+            )
+        ),
         target_output_path=Path(output.get("target_portfolio", "reports/target_portfolio_{run_yyyymmdd}.csv")),
         summary_output_path=Path(output.get("summary", "reports/target_portfolio_summary_{run_yyyymmdd}.md")),
     )
@@ -98,6 +129,7 @@ def build_target_portfolio(
     eligible = eligible.dropna(subset=[config.score_column]).sort_values(config.score_column, ascending=False)
     eligible = _apply_required_min_score_gates(eligible, config)
     eligible = _apply_non_quality_confirmation_filter(eligible, config)
+    eligible = _apply_profile_filter(eligible, config)
     selected = _select_candidates(eligible, config, current_positions)
     if selected.empty:
         return pd.DataFrame(
@@ -115,7 +147,7 @@ def build_target_portfolio(
 
     investable_weight = max(0.0, 1.0 - config.cash_buffer)
     equal_weight = investable_weight / len(selected)
-    target_weight = min(equal_weight, config.max_single_weight)
+    target_weight = min(equal_weight, _effective_max_single_weight(config))
     output = selected.copy()
     output["rank"] = range(1, len(output) + 1)
     output["target_weight"] = target_weight
@@ -251,6 +283,54 @@ def _apply_required_min_score_gates(eligible: pd.DataFrame, config: PortfolioCon
         values = pd.to_numeric(gated[column], errors="coerce")
         gated = gated[values >= minimum]
     return gated
+
+
+def _apply_profile_filter(eligible: pd.DataFrame, config: PortfolioConfig) -> pd.DataFrame:
+    if config.profile != "offensive":
+        return eligible
+    confirmation_columns = [column for column in config.profile_confirmation_columns if column in eligible.columns]
+    if not confirmation_columns:
+        return eligible.iloc[0:0].copy()
+    confirmation = eligible[confirmation_columns].apply(pd.to_numeric, errors="coerce").clip(lower=0).sum(axis=1)
+    filtered = eligible[confirmation > 0].copy()
+    return _apply_offensive_defensive_family_cap(filtered, config)
+
+
+def _apply_offensive_defensive_family_cap(eligible: pd.DataFrame, config: PortfolioConfig) -> pd.DataFrame:
+    threshold = config.profile_constraints.get("offensive", {}).get("max_defensive_family_weight")
+    if threshold is None:
+        return eligible
+    family_columns = _family_score_columns(eligible)
+    defensive_columns = [
+        column
+        for column in family_columns
+        if _family_name_from_score_column(column) in {"fundamental_quality", "dividend", "low_vol", "low_volatility"}
+    ]
+    if not family_columns or not defensive_columns:
+        return eligible
+    positive_family = eligible[family_columns].apply(pd.to_numeric, errors="coerce").clip(lower=0)
+    total = positive_family.sum(axis=1)
+    defensive = positive_family[defensive_columns].sum(axis=1)
+    defensive_share = defensive.divide(total.where(total > 0))
+    return eligible[(total <= 0) | (defensive_share <= float(threshold))].copy()
+
+
+def _effective_max_single_weight(config: PortfolioConfig) -> float:
+    profile = config.profile_constraints.get(config.profile, {})
+    value = profile.get("max_single_weight")
+    if value is None:
+        return config.max_single_weight
+    return min(config.max_single_weight, float(value))
+
+
+def _normalize_profile_constraints(value: object) -> dict[str, dict[str, object]]:
+    if not isinstance(value, dict):
+        return {}
+    normalized: dict[str, dict[str, object]] = {}
+    for profile, constraints in value.items():
+        if isinstance(constraints, dict):
+            normalized[str(profile)] = {str(key): item for key, item in constraints.items()}
+    return normalized
 
 
 def _selection_explanation(row: pd.Series, score_column: str) -> str:

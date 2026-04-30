@@ -21,6 +21,14 @@ class RiskConfig:
     max_factor_family_concentration: float | None = None
     min_factor_logic_count: int | None = None
     max_factor_logic_concentration: float | None = None
+    portfolio_value: float | None = None
+    min_amount_20d: float | None = None
+    max_position_amount_share: float | None = None
+    max_estimated_cost: float | None = None
+    commission_bps: float = 0.0
+    slippage_bps: float = 0.0
+    stamp_tax_bps: float = 0.0
+    max_risk_budget_per_position: float | None = None
     factor_family_map_path: Path | None = None
     factor_logic_map_path: Path | None = None
     report_output_path: Path = Path("reports/portfolio_risk_{run_yyyymmdd}.md")
@@ -48,6 +56,11 @@ def load_risk_config(path: str | Path) -> RiskConfig:
     max_factor_family_concentration = raw.get("max_factor_family_concentration")
     min_factor_logic_count = raw.get("min_factor_logic_count")
     max_factor_logic_concentration = raw.get("max_factor_logic_concentration")
+    portfolio_value = raw.get("portfolio_value", raw.get("capital_base"))
+    min_amount_20d = raw.get("min_amount_20d")
+    max_position_amount_share = raw.get("max_position_amount_share")
+    max_estimated_cost = raw.get("max_estimated_cost")
+    max_risk_budget_per_position = raw.get("max_risk_budget_per_position")
     factor_family_map_path = raw.get("factor_family_map_path")
     factor_logic_map_path = raw.get("factor_logic_map_path", factor_family_map_path)
     return RiskConfig(
@@ -63,6 +76,18 @@ def load_risk_config(path: str | Path) -> RiskConfig:
         min_factor_logic_count=int(min_factor_logic_count) if min_factor_logic_count is not None else None,
         max_factor_logic_concentration=(
             float(max_factor_logic_concentration) if max_factor_logic_concentration is not None else None
+        ),
+        portfolio_value=float(portfolio_value) if portfolio_value is not None else None,
+        min_amount_20d=float(min_amount_20d) if min_amount_20d is not None else None,
+        max_position_amount_share=(
+            float(max_position_amount_share) if max_position_amount_share is not None else None
+        ),
+        max_estimated_cost=float(max_estimated_cost) if max_estimated_cost is not None else None,
+        commission_bps=float(raw.get("commission_bps", 0.0)),
+        slippage_bps=float(raw.get("slippage_bps", 0.0)),
+        stamp_tax_bps=float(raw.get("stamp_tax_bps", 0.0)),
+        max_risk_budget_per_position=(
+            float(max_risk_budget_per_position) if max_risk_budget_per_position is not None else None
         ),
         factor_family_map_path=Path(str(factor_family_map_path)) if factor_family_map_path else None,
         factor_logic_map_path=Path(str(factor_logic_map_path)) if factor_logic_map_path else None,
@@ -106,6 +131,7 @@ def check_portfolio_risk(
             "; ".join(blocked_detail),
         )
     )
+    rows.extend(_capacity_and_cost_rows(portfolio, config))
     rows.extend(_exposure_maturity_rows(portfolio, config, factor_family_map or {}, factor_logic_map or {}))
     return RiskReport(tuple(rows))
 
@@ -166,6 +192,100 @@ def _event_blocked_detail(portfolio: pd.DataFrame) -> list[str]:
             summary = _clean_event_detail(row.get("max_event_severity"))
         details.append(f"{row['instrument']}: {summary}")
     return details
+
+
+def _capacity_and_cost_rows(portfolio: pd.DataFrame, config: RiskConfig) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if config.min_amount_20d is not None:
+        rows.append(_min_amount_row(portfolio, config.min_amount_20d))
+    if config.max_position_amount_share is not None:
+        rows.append(_max_position_amount_share_row(portfolio, config))
+    if config.max_estimated_cost is not None:
+        rows.append(_max_estimated_cost_row(portfolio, config))
+    if config.max_risk_budget_per_position is not None:
+        rows.append(_max_risk_budget_row(portfolio, config.max_risk_budget_per_position))
+    return rows
+
+
+def _min_amount_row(portfolio: pd.DataFrame, threshold: float) -> dict[str, Any]:
+    missing = _missing_columns(portfolio, ["amount_20d"])
+    if missing:
+        return _row("min_amount_20d", False, "", threshold, f"missing required column: {missing[0]}")
+    values = pd.to_numeric(portfolio["amount_20d"], errors="coerce")
+    min_amount = float(values.min()) if not values.empty else 0.0
+    detail = _below_threshold_detail(portfolio, values, threshold, "amount_20d")
+    return _row("min_amount_20d", bool((values >= threshold).all()), min_amount, threshold, detail)
+
+
+def _max_position_amount_share_row(portfolio: pd.DataFrame, config: RiskConfig) -> dict[str, Any]:
+    missing = _missing_columns(portfolio, ["target_weight", "amount_20d"])
+    if missing:
+        return _row("max_position_amount_share", False, "", config.max_position_amount_share, f"missing required column: {missing[0]}")
+    if config.portfolio_value is None:
+        return _row("max_position_amount_share", False, "", config.max_position_amount_share, "missing required config: portfolio_value")
+    amount = pd.to_numeric(portfolio["amount_20d"], errors="coerce")
+    notional = pd.to_numeric(portfolio["target_weight"], errors="coerce").abs() * config.portfolio_value
+    share = notional / amount.replace(0, pd.NA)
+    max_share = float(share.max()) if not share.empty else 0.0
+    detail = _above_threshold_detail(portfolio, share, float(config.max_position_amount_share), "position_amount_share")
+    return _row(
+        "max_position_amount_share",
+        bool((share <= float(config.max_position_amount_share)).all()),
+        max_share,
+        config.max_position_amount_share,
+        detail,
+    )
+
+
+def _max_estimated_cost_row(portfolio: pd.DataFrame, config: RiskConfig) -> dict[str, Any]:
+    missing = _missing_columns(portfolio, ["target_weight"])
+    if missing:
+        return _row("max_estimated_cost", False, "", config.max_estimated_cost, f"missing required column: {missing[0]}")
+    if config.portfolio_value is None:
+        return _row("max_estimated_cost", False, "", config.max_estimated_cost, "missing required config: portfolio_value")
+    total_bps = config.commission_bps + config.slippage_bps + config.stamp_tax_bps
+    turnover_notional = pd.to_numeric(portfolio["target_weight"], errors="coerce").abs().sum() * config.portfolio_value
+    estimated_cost = float(turnover_notional * total_bps / 10_000.0)
+    return _row(
+        "max_estimated_cost",
+        estimated_cost <= float(config.max_estimated_cost),
+        estimated_cost,
+        config.max_estimated_cost,
+        f"total_bps={total_bps:.6g}",
+    )
+
+
+def _max_risk_budget_row(portfolio: pd.DataFrame, threshold: float) -> dict[str, Any]:
+    missing = _missing_columns(portfolio, ["target_weight", "turnover_20d"])
+    if missing:
+        return _row("max_risk_budget_per_position", False, "", threshold, f"missing required column: {missing[0]}")
+    risk_budget = (
+        pd.to_numeric(portfolio["target_weight"], errors="coerce").abs()
+        * pd.to_numeric(portfolio["turnover_20d"], errors="coerce").abs()
+    )
+    max_budget = float(risk_budget.max()) if not risk_budget.empty else 0.0
+    detail = _above_threshold_detail(portfolio, risk_budget, threshold, "risk_budget")
+    return _row("max_risk_budget_per_position", bool((risk_budget <= threshold).all()), max_budget, threshold, detail)
+
+
+def _missing_columns(frame: pd.DataFrame, columns: list[str]) -> list[str]:
+    return [column for column in columns if column not in frame.columns]
+
+
+def _below_threshold_detail(frame: pd.DataFrame, values: pd.Series, threshold: float, label: str) -> str:
+    details = []
+    for index, value in values.items():
+        if pd.notna(value) and float(value) < threshold:
+            details.append(f"{frame.loc[index, 'instrument']}: {label}={float(value):.6g}")
+    return "; ".join(details)
+
+
+def _above_threshold_detail(frame: pd.DataFrame, values: pd.Series, threshold: float, label: str) -> str:
+    details = []
+    for index, value in values.items():
+        if pd.notna(value) and float(value) > threshold:
+            details.append(f"{frame.loc[index, 'instrument']}: {label}={float(value):.6g}")
+    return "; ".join(details)
 
 
 def load_configured_factor_family_map(config: RiskConfig, root: str | Path = ".") -> dict[str, str]:

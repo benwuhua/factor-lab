@@ -208,6 +208,34 @@ class ComboSpecTests(unittest.TestCase):
         self.assertLessEqual(by_family.get("dividend", 0.0), 0.05)
         self.assertIn("growth_improvement", [member.name for member in active])
 
+    def test_p1_combo_specs_register_csv_backed_fundamental_factor_members(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        required = {
+            "fundamental_ep": ("value", "ep"),
+            "fundamental_cfp": ("value", "cfp"),
+            "fundamental_dividend_yield": ("value", "dividend_yield"),
+            "fundamental_roe": ("quality", "roe"),
+            "fundamental_roic": ("quality", "roic"),
+            "fundamental_cfo_to_ni": ("quality", "operating_cashflow_to_net_profit"),
+            "fundamental_low_debt": ("quality", "debt_ratio"),
+            "fundamental_low_accrual": ("quality", "accrual_ratio"),
+            "fundamental_revenue_growth_change": ("growth_improvement", "revenue_growth_change_yoy"),
+            "fundamental_profit_growth_change": ("growth_improvement", "net_profit_growth_change_yoy"),
+            "fundamental_margin_change": ("growth_improvement", "gross_margin_change_yoy"),
+            "fundamental_dividend_stability": ("dividend", "dividend_stability"),
+            "fundamental_dividend_cashflow_coverage": ("dividend", "dividend_cashflow_coverage"),
+        }
+
+        for spec_name in ["balanced_multifactor_v1.yaml", "offensive_multifactor_v1.yaml"]:
+            spec = load_combo_spec(repo_root / "configs/combo_specs" / spec_name)
+            by_name = {member.name: member for member in spec.members}
+            for name, (family, field) in required.items():
+                self.assertIn(name, by_name, spec_name)
+                member = by_name[name]
+                self.assertEqual("fundamental_quality", member.source, name)
+                self.assertEqual(family, member.family, name)
+                self.assertTrue(any(component.get("field") == field for component in member.components), name)
+
     def test_tushare_market_enriched_spec_uses_daily_basic_value_dividend_liquidity_fields(self):
         spec = load_combo_spec(Path(__file__).resolve().parents[1] / "configs/combo_specs/tushare_market_enriched_v1.yaml")
         by_name = {member.name: member for member in spec.members}
