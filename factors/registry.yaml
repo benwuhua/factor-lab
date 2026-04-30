@@ -52,8 +52,8 @@ factors:
   - name: tushare_amount_20
     expression: "Mean($amount, 20)"
     direction: 1
-    category: liquidity
-    description: "20 day average traded amount from the Tushare-backed Qlib market data."
+    category: liquidity_guardrail
+    description: "20 day average traded amount from the Tushare-backed Qlib market data; use as a portfolio liquidity guardrail, not as a positive alpha factor."
   - name: tushare_free_float_turnover_20
     expression: "Mean($turnover_rate_f, 20)"
     direction: 1

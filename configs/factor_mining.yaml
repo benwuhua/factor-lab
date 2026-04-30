@@ -101,12 +101,6 @@ templates:
     direction: -1
     category: candidate_technical
     description: "JoinQuant Bollinger-band position proxy; lower price position inside the band is ranked higher."
-  - name: amount_mean_{window}
-    expression: "Mean($amount, {window})"
-    windows: [5, 20, 60]
-    direction: 1
-    category: candidate_liquidity
-    description: "{window} day average traded amount as a liquidity proxy."
   - name: tushare_ep_ttm
     expression: "1 / ($pe_ttm + 0.000001)"
     direction: 1
@@ -122,11 +116,6 @@ templates:
     direction: 1
     category: candidate_dividend
     description: "Tushare daily_basic dividend yield candidate."
-  - name: tushare_amount_20
-    expression: "Mean($amount, 20)"
-    direction: 1
-    category: candidate_liquidity
-    description: "20 day average traded amount from the Tushare-backed market data."
   - name: tushare_free_float_turnover_20
     expression: "Mean($turnover_rate_f, 20)"
     direction: 1

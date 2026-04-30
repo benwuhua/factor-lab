@@ -130,7 +130,7 @@ class FactorMiningTests(unittest.TestCase):
                 self.assertIn(expression_fragment, factor.expression)
                 self.assertEqual(factor.direction, direction)
 
-    def test_default_mining_config_includes_tushare_market_enrichment_factors(self):
+    def test_default_mining_config_includes_tushare_market_enrichment_alpha_factors(self):
         root = Path(__file__).resolve().parents[1]
 
         factors = generate_candidate_factors(load_mining_config(root / "configs/factor_mining.yaml"))
@@ -140,7 +140,6 @@ class FactorMiningTests(unittest.TestCase):
             "tushare_ep_ttm": ("candidate_value", "$pe_ttm", 1),
             "tushare_bp": ("candidate_value", "$pb", 1),
             "tushare_dividend_yield": ("candidate_dividend", "$dividend_yield", 1),
-            "tushare_amount_20": ("candidate_liquidity", "Mean($amount, 20)", 1),
             "tushare_free_float_turnover_20": ("candidate_liquidity", "$turnover_rate_f", 1),
             "tushare_total_mv": ("candidate_size_capacity", "$total_mv", 1),
         }
@@ -150,6 +149,9 @@ class FactorMiningTests(unittest.TestCase):
                 self.assertEqual(category, factor.category)
                 self.assertIn(expression_fragment, factor.expression)
                 self.assertEqual(direction, factor.direction)
+
+        self.assertNotIn("tushare_amount_20", factor_by_name)
+        self.assertNotIn("amount_mean_20", factor_by_name)
 
     def test_default_mining_config_avoids_unary_minus_expressions(self):
         root = Path(__file__).resolve().parents[1]

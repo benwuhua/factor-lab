@@ -120,7 +120,6 @@ class FactorRegistryTests(unittest.TestCase):
             "tushare_ep_ttm": "$pe_ttm",
             "tushare_bp": "$pb",
             "tushare_dividend_yield": "$dividend_yield",
-            "tushare_amount_20": "$amount",
             "tushare_free_float_turnover_20": "$turnover_rate_f",
             "tushare_total_mv": "$total_mv",
         }
@@ -128,6 +127,10 @@ class FactorRegistryTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, by_name)
                 self.assertIn(field, by_name[name].expression)
+
+        self.assertIn("tushare_amount_20", by_name)
+        self.assertEqual("liquidity_guardrail", by_name["tushare_amount_20"].category)
+        self.assertIn("guardrail", by_name["tushare_amount_20"].description)
 
 
 if __name__ == "__main__":

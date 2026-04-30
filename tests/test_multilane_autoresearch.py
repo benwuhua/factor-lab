@@ -256,7 +256,6 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                 yaml.safe_dump(
                     {
                         "templates": [
-                            {"name": "amount_mean_{window}", "expression": "$amount", "windows": [5], "direction": 1, "category": "candidate_liquidity"},
                             {"name": "amihud_illiq_{window}", "expression": "$close", "windows": [20], "direction": -1, "category": "candidate_liquidity"},
                         ]
                     }
@@ -267,7 +266,7 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             with patch("qlib_factor_lab.autoresearch.multilane.run_cross_sectional_lane_oracle") as oracle:
                 oracle.return_value = (
                     {
-                        "candidate": "amount_mean_5",
+                        "candidate": "amihud_illiq_20",
                         "status": "review",
                         "primary_metric": 0.014,
                         "artifact_dir": "reports/autoresearch/runs/liquidity",
@@ -288,7 +287,7 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertEqual(oracle.call_args.kwargs["end_time"], "2026-04-20")
             frame = report.to_frame().set_index("lane")
             self.assertEqual(frame.loc["liquidity_microstructure", "run_status"], "completed")
-            self.assertEqual(frame.loc["liquidity_microstructure", "candidate"], "amount_mean_5")
+            self.assertEqual(frame.loc["liquidity_microstructure", "candidate"], "amihud_illiq_20")
 
     def test_runner_dispatches_risk_cross_sectional_oracle(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -534,12 +533,12 @@ class MultilaneAutoresearchTests(unittest.TestCase):
         self.assertIn("heat_cooling_5_20", names)
         self.assertIn("breadth_proxy_20", names)
 
-    def test_liquidity_lane_includes_amount_amihud_and_turnover_factors(self):
+    def test_liquidity_lane_excludes_amount_guardrails_and_includes_microstructure_factors(self):
         repo_root = Path(__file__).resolve().parents[1]
 
         names = {spec["name"] for spec in _lane_factor_specs(repo_root, "configs/factor_mining.yaml", "liquidity_microstructure")}
 
-        self.assertIn("amount_mean_20", names)
+        self.assertNotIn("amount_mean_20", names)
         self.assertIn("amihud_illiq_20", names)
         self.assertIn("turnover_mean_20", names)
         self.assertIn("turnover_volatility_20", names)

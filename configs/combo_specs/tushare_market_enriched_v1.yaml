@@ -32,11 +32,12 @@ members:
   - name: tushare_amount_20
     source: qlib_expression
     expression: "Mean($amount, 20)"
-    family: liquidity_capacity
-    logic_bucket: liquidity_capacity
+    active: false
+    family: liquidity_guardrail
+    logic_bucket: capacity_guardrail
     direction: 1
-    weight: 0.08
-    approval_status: challenger
+    weight: 0.0
+    approval_status: guardrail
     regime_profile: all_weather
   - name: tushare_free_float_turnover_20
     source: qlib_expression

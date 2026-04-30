@@ -5,7 +5,6 @@ logic_buckets:
   - liquidity_recovery
   - volume_dry_up
 editable_fields:
-  - amount_window
   - turnover_window
   - dry_up_window
   - shock_window
@@ -20,11 +19,6 @@ templates:
     family: liquidity_microstructure
     windows: [10, 20, 60]
     direction: -1
-  - name: amount_stability
-    logic_bucket: liquidity_quality
-    family: amount_stability
-    windows: [20, 60]
-    direction: 1
   - name: volume_dry_up
     logic_bucket: volume_dry_up
     family: volume_dry_up

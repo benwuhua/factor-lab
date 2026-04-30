@@ -218,6 +218,9 @@ class ComboSpecTests(unittest.TestCase):
         self.assertIn("$turnover_rate_f", by_name["tushare_free_float_turnover_20"].expression)
         self.assertIn("$total_mv", by_name["tushare_total_mv"].expression)
         self.assertEqual("qlib_expression", by_name["tushare_amount_20"].source)
+        self.assertFalse(by_name["tushare_amount_20"].active)
+        self.assertEqual(0.0, by_name["tushare_amount_20"].weight)
+        self.assertEqual("guardrail", by_name["tushare_amount_20"].approval_status)
 
 
 if __name__ == "__main__":

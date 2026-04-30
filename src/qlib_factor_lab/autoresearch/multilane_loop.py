@@ -39,9 +39,6 @@ DEFAULT_ROTATION_FACTOR_NAMES: dict[str, list[str]] = {
         "turnover_mean_20",
     ],
     "liquidity_microstructure": [
-        "amount_mean_5",
-        "amount_mean_20",
-        "amount_mean_60",
         "amihud_illiq_10",
         "amihud_illiq_20",
         "amihud_illiq_60",

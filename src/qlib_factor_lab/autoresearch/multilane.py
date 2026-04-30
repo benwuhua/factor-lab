@@ -329,9 +329,6 @@ def _lane_factor_names(lane_name: str, lane_factor_name_overrides: dict[str, lis
         }
     if lane_name == "liquidity_microstructure":
         return {
-            "amount_mean_5",
-            "amount_mean_20",
-            "amount_mean_60",
             "amihud_illiq_10",
             "amihud_illiq_20",
             "amihud_illiq_60",
