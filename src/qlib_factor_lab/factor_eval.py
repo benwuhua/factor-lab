@@ -58,6 +58,8 @@ def evaluate_factor(
     if initialize:
         init_qlib(config)
     frame = fetch_factor_frame(config, factor, include_volume=eval_config.neutralize_size)
+    if frame.empty:
+        return _empty_factor_eval_result(factor, eval_config)
     results: list[dict[str, float | int | str]] = []
     for horizon in eval_config.horizons:
         scored = prepare_factor_signal(frame, factor, eval_config)
@@ -109,6 +111,31 @@ def evaluate_factor(
         row.update(quantile_summary)
         results.append(row)
     return pd.DataFrame(results)
+
+
+def _empty_factor_eval_result(factor: FactorDef, eval_config: EvalConfig) -> pd.DataFrame:
+    rows: list[dict[str, float | int | str]] = []
+    empty_scored = pd.DataFrame(columns=["signal", "future_ret"])
+    quantile_summary = compute_quantile_return_summary(empty_scored, "signal", "future_ret", eval_config.quantiles)
+    for horizon in eval_config.horizons:
+        row = {
+            "factor": factor.name,
+            "category": factor.category,
+            "direction": factor.direction,
+            "horizon": horizon,
+            "neutralization": "none",
+            "ic_mean": float("nan"),
+            "ic_std": float("nan"),
+            "icir": float("nan"),
+            "rank_ic_mean": float("nan"),
+            "rank_ic_std": float("nan"),
+            "rank_icir": float("nan"),
+            "top_quantile_turnover": float("nan"),
+            "observations": 0,
+        }
+        row.update(quantile_summary)
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def with_directional_signal(frame: pd.DataFrame, factor: FactorDef) -> pd.DataFrame:

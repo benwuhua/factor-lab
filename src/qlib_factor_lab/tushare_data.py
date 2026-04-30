@@ -437,6 +437,7 @@ def download_tushare_history_csvs(
     end: str,
     delay: float = 0.2,
     limit: int | None = None,
+    retries: int = 2,
     token: str | None = None,
     transport: Transport | None = None,
 ) -> list[Path]:
@@ -447,24 +448,32 @@ def download_tushare_history_csvs(
     for index, symbol in enumerate(selected, start=1):
         ts_code = tushare_code_from_qlib(symbol)
         params = {"ts_code": ts_code, "start_date": _yyyymmdd(start), "end_date": _yyyymmdd(end)}
-        try:
-            daily = call_tushare_api("daily", params=params, fields=TUSHARE_DAILY_FIELDS, token=token, transport=transport)
-            adj_factors = call_tushare_api(
-                "adj_factor",
-                params=params,
-                fields=TUSHARE_ADJ_FACTOR_FIELDS,
-                token=token,
-                transport=transport,
-            )
-            basic = call_tushare_api(
-                "daily_basic",
-                params=params,
-                fields=TUSHARE_DAILY_BASIC_FIELDS,
-                token=token,
-                transport=transport,
-            )
-        except Exception as exc:  # pragma: no cover - network/vendor dependent
-            print(f"skip tushare history {symbol}: {exc}")
+        for attempt in range(max(0, int(retries)) + 1):
+            try:
+                daily = call_tushare_api("daily", params=params, fields=TUSHARE_DAILY_FIELDS, token=token, transport=transport)
+                adj_factors = call_tushare_api(
+                    "adj_factor",
+                    params=params,
+                    fields=TUSHARE_ADJ_FACTOR_FIELDS,
+                    token=token,
+                    transport=transport,
+                )
+                basic = call_tushare_api(
+                    "daily_basic",
+                    params=params,
+                    fields=TUSHARE_DAILY_BASIC_FIELDS,
+                    token=token,
+                    transport=transport,
+                )
+                break
+            except Exception as exc:  # pragma: no cover - network/vendor dependent
+                if attempt < max(0, int(retries)):
+                    print(f"retry tushare history {symbol}: {exc}")
+                    if delay > 0:
+                        time.sleep(delay)
+                    continue
+                print(f"skip tushare history {symbol}: {exc}")
+        else:
             continue
         frame = normalize_tushare_history(daily, adj_factors=adj_factors, daily_basic=basic)
         if frame.empty:

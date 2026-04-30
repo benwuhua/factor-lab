@@ -192,6 +192,50 @@ class TushareDataTest(unittest.TestCase):
                 calls,
             )
 
+    def test_download_tushare_history_csvs_retries_transient_vendor_errors(self) -> None:
+        attempts = {"daily": 0}
+
+        def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
+            api_name = str(payload["api_name"])
+            if api_name == "daily":
+                attempts["daily"] += 1
+                if attempts["daily"] == 1:
+                    raise OSError("temporary ssl eof")
+                return {
+                    "code": 0,
+                    "msg": "",
+                    "data": {
+                        "fields": ["ts_code", "trade_date", "open", "high", "low", "close", "vol", "amount"],
+                        "items": [["000001.SZ", "20260430", 10.0, 11.0, 9.5, 10.5, 1000.0, 1050.0]],
+                    },
+                }
+            if api_name == "adj_factor":
+                return {
+                    "code": 0,
+                    "msg": "",
+                    "data": {"fields": ["ts_code", "trade_date", "adj_factor"], "items": [["000001.SZ", "20260430", 2.5]]},
+                }
+            if api_name == "daily_basic":
+                return {
+                    "code": 0,
+                    "msg": "",
+                    "data": {"fields": ["ts_code", "trade_date", "pe_ttm"], "items": [["000001.SZ", "20260430", 8.5]]},
+                }
+            raise AssertionError(payload)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            paths = download_tushare_history_csvs(
+                ["SZ000001"],
+                Path(tmp),
+                start="20260430",
+                end="20260430",
+                token="token",
+                transport=fake_transport,
+            )
+
+            self.assertEqual(1, len(paths))
+            self.assertEqual(2, attempts["daily"])
+
     def test_probe_tushare_permissions_marks_required_endpoints(self) -> None:
         def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
             api_name = str(payload["api_name"])

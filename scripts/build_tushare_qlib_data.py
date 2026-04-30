@@ -38,6 +38,7 @@ def main() -> int:
     parser.add_argument("--skip-dump", action="store_true", help="Only download normalized CSV files.")
     parser.add_argument("--max-workers", type=int, default=4, help="Workers for Qlib dump_bin conversion.")
     parser.add_argument("--full-rebuild", action="store_true", help="Rebuild the Qlib directory from scratch instead of appending new dates.")
+    parser.add_argument("--force-start", default=None, help="Force an incremental refresh start date even when the local calendar is newer.")
     parser.add_argument(
         "--no-resolve-end-date",
         action="store_true",
@@ -57,6 +58,9 @@ def main() -> int:
     effective_start = _yyyymmdd(args.start)
     if incremental:
         effective_start = _next_yyyymmdd(existing_latest)
+    if args.force_start:
+        effective_start = _yyyymmdd(args.force_start)
+        incremental = bool(existing_latest) and not args.full_rebuild
     print(f"universe: {spec.name}")
     print(f"benchmark: {spec.benchmark}")
     print(f"symbols: {len(symbols)} of {len(spec.symbols)}")
@@ -94,6 +98,7 @@ def main() -> int:
             python_bin=sys.executable,
             max_workers=args.max_workers,
             update=incremental,
+            update_existing_fields_only=incremental,
         )
     if not args.skip_dump:
         write_instrument_alias(qlib_dir, spec.name)

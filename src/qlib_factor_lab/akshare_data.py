@@ -662,13 +662,19 @@ def dump_csvs_to_qlib(
     python_bin: str = sys.executable,
     max_workers: int = 4,
     update: bool = False,
+    update_existing_fields_only: bool = False,
 ) -> None:
     qlib_path = Path(qlib_dir)
     if qlib_path.exists() and not update:
         shutil.rmtree(qlib_path)
+    effective_source_dir = Path(source_dir)
+    if update and update_existing_fields_only:
+        effective_source_dir, dropped = filter_source_csvs_to_existing_qlib_fields(source_dir, qlib_path)
+        if dropped:
+            print(f"drop new incremental Qlib fields without historical backfill: {','.join(sorted(dropped))}")
     command = build_dump_bin_command(
         dump_bin_path,
-        source_dir,
+        effective_source_dir,
         qlib_path,
         python_bin=python_bin,
         max_workers=max_workers,
@@ -676,6 +682,36 @@ def dump_csvs_to_qlib(
     )
     print("+", " ".join(command))
     subprocess.run(command, check=True)
+
+
+def filter_source_csvs_to_existing_qlib_fields(source_dir: str | Path, qlib_dir: str | Path) -> tuple[Path, set[str]]:
+    source_path = Path(source_dir).expanduser().resolve()
+    existing_fields = _existing_qlib_feature_fields(qlib_dir)
+    if not existing_fields:
+        return source_path, set()
+    output_dir = source_path.with_name(f"{source_path.name}_existing_fields")
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    keep = {"date", "symbol"} | existing_fields
+    dropped: set[str] = set()
+    for path in source_path.glob("*.csv"):
+        frame = pd.read_csv(path)
+        drop_columns = [column for column in frame.columns if column not in keep]
+        dropped.update(drop_columns)
+        frame = frame[[column for column in frame.columns if column in keep]]
+        frame.to_csv(output_dir / path.name, index=False)
+    return output_dir, dropped
+
+
+def _existing_qlib_feature_fields(qlib_dir: str | Path) -> set[str]:
+    feature_root = Path(qlib_dir).expanduser() / "features"
+    if not feature_root.exists():
+        return set()
+    fields: set[str] = set()
+    for path in feature_root.glob("*/*.day.bin"):
+        fields.add(path.name.removesuffix(".day.bin"))
+    return fields
 
 
 def _first_present(frame: pd.DataFrame, candidates: list[str], required: bool = True) -> str | None:

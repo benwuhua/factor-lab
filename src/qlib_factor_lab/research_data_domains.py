@@ -379,7 +379,7 @@ def read_close_prices_from_source_dirs(root: str | Path, source_dirs: Iterable[s
         directory = _resolve(base, source_dir)
         if not directory.exists():
             continue
-        for path in directory.glob("*.csv"):
+        for path in directory.rglob("*.csv"):
             frame = pd.read_csv(path, usecols=lambda column: column in {"date", "symbol", "close"})
             if frame.empty or {"date", "symbol", "close"} - set(frame.columns):
                 continue
@@ -402,7 +402,12 @@ def write_research_data_domains(
     evidence_output: str | Path = "data/announcement_evidence.csv",
     evidence_jsonl_output: str | Path = "data/announcement_evidence.jsonl",
     dividend_output: str | Path = "data/cninfo_dividends.csv",
-    price_source_dirs: Iterable[str | Path] = ("data/akshare/source_csi300", "data/akshare/source_csi500"),
+    price_source_dirs: Iterable[str | Path] = (
+        "data/tushare/source_csi300",
+        "data/tushare/source_csi500",
+        "data/akshare/source_csi300",
+        "data/akshare/source_csi500",
+    ),
     fetch_fundamentals: bool = False,
     fundamental_provider: str = "akshare",
     derive_valuation_fields: bool = False,

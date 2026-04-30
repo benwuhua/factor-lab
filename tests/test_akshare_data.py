@@ -16,6 +16,7 @@ from qlib_factor_lab.akshare_data import (
     build_dump_bin_command,
     dump_csvs_to_qlib,
     enrich_security_master_industries,
+    filter_source_csvs_to_existing_qlib_fields,
     filter_frame_to_universes,
     fetch_company_notices,
     fetch_security_industry_overrides,
@@ -142,6 +143,25 @@ class AkShareDataTests(unittest.TestCase):
             self.assertTrue(sentinel.exists())
             self.assertEqual(run.call_args.args[0][1], str(root / "dump_bin.py"))
             self.assertEqual(run.call_args.args[0][2], "dump_update")
+
+    def test_filter_source_csvs_to_existing_qlib_fields_drops_new_incremental_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            source.mkdir()
+            pd.DataFrame(
+                [
+                    {"date": "2026-04-30", "symbol": "SH600000", "close": 10.0, "pe_ttm": 8.0},
+                ]
+            ).to_csv(source / "sh600000.csv", index=False)
+            (root / "qlib/features/sh600000").mkdir(parents=True)
+            (root / "qlib/features/sh600000/close.day.bin").write_bytes(b"existing")
+
+            filtered, dropped = filter_source_csvs_to_existing_qlib_fields(source, root / "qlib")
+
+            result = pd.read_csv(filtered / "sh600000.csv")
+            self.assertEqual(["date", "symbol", "close"], result.columns.tolist())
+            self.assertEqual({"pe_ttm"}, dropped)
 
     def test_read_latest_qlib_calendar_date_reads_last_calendar_row(self):
         with tempfile.TemporaryDirectory() as tmp:

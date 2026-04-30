@@ -4,4 +4,4 @@ market: csi300_current
 benchmark: SH000300
 freq: day
 start_time: '2015-01-01'
-end_time: '2026-04-29'
+end_time: '2026-04-30'

@@ -11,6 +11,7 @@ class DailyDataUpdateConfig:
     project_root: Path
     as_of_date: str
     market_data_provider: str = "tushare"
+    force_market_start: str | None = None
     skip_market_data: bool = False
     skip_research_context: bool = False
     fetch_fundamentals: bool = False
@@ -59,6 +60,7 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
                         "--provider-config",
                         "configs/provider_current.yaml",
                     )
+                    + _force_start_args(config.force_market_start)
                     + _limit_args(config.limit)
                     + ("--delay", str(config.delay)),
                 ),
@@ -78,6 +80,7 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
                         "--provider-config",
                         "configs/provider_csi300_current.yaml",
                     )
+                    + _force_start_args(config.force_market_start)
                     + _limit_args(config.limit)
                     + ("--delay", str(config.delay)),
                 ),
@@ -215,6 +218,12 @@ def _offset_args(offset: int) -> tuple[str, ...]:
     if int(offset) <= 0:
         return ()
     return ("--offset", str(int(offset)))
+
+
+def _force_start_args(force_start: str | None) -> tuple[str, ...]:
+    if not force_start:
+        return ()
+    return ("--force-start", str(force_start))
 
 
 def _yyyymmdd(value: str) -> str:

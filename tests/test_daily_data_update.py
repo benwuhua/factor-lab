@@ -39,6 +39,20 @@ class DailyDataUpdateTest(unittest.TestCase):
         self.assertIn("scripts/build_akshare_qlib_data.py", steps[0].command)
         self.assertIn("data/akshare/source_csi500", steps[0].command)
 
+    def test_plan_can_force_market_data_start_date(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-30",
+            market_data_provider="tushare",
+            force_market_start="20260430",
+        )
+
+        steps = build_daily_data_update_plan(config)
+
+        self.assertIn("--force-start", steps[0].command)
+        self.assertIn("20260430", steps[0].command)
+        self.assertIn("--force-start", steps[1].command)
+
     def test_plan_can_use_tushare_market_data_provider_for_both_universes(self) -> None:
         config = DailyDataUpdateConfig(project_root=Path("/repo"), as_of_date="2026-04-27", market_data_provider="tushare")
 

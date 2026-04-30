@@ -13,6 +13,7 @@ from qlib_factor_lab.research_data_domains import (
     derive_fundamental_valuation_fields,
     normalize_fundamental_quality,
     normalize_cninfo_dividend,
+    read_close_prices_from_source_dirs,
     write_research_data_domains,
 )
 
@@ -152,6 +153,23 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertAlmostEqual(5.0, float(result.loc[0, "ep"]))
         self.assertTrue(pd.isna(pd.to_numeric(result.loc[0, "cfp"], errors="coerce")))
         self.assertEqual("eps_to_pit_close", result.loc[0, "valuation_source"])
+
+    def test_read_close_prices_from_source_dirs_reads_nested_tushare_refresh_dirs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "data/tushare/source_csi300/csi300_current_20260430_20260430"
+            source.mkdir(parents=True)
+            pd.DataFrame(
+                [
+                    {"date": "2026-04-30", "symbol": "SH600000", "close": 12.3},
+                ]
+            ).to_csv(source / "sh600000.csv", index=False)
+
+            result = read_close_prices_from_source_dirs(root, ["data/tushare/source_csi300"])
+
+        self.assertEqual(["SH600000"], result["instrument"].tolist())
+        self.assertEqual(["2026-04-30"], result["trade_date"].tolist())
+        self.assertEqual([12.3], result["close"].tolist())
 
     def test_normalize_fundamental_quality_accepts_compact_as_of_date(self) -> None:
         raw = pd.DataFrame([{"证券代码": "000001", "报告期": "2026-03-31", "公告日期": "2026-04-20"}])

@@ -1,8 +1,9 @@
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
-from qlib_factor_lab.factor_eval import EvalConfig, prepare_factor_signal, with_directional_signal
+from qlib_factor_lab.factor_eval import EvalConfig, evaluate_factor, prepare_factor_signal, with_directional_signal
 from qlib_factor_lab.factor_registry import FactorDef
 
 
@@ -36,6 +37,18 @@ class FactorEvalTests(unittest.TestCase):
 
         self.assertEqual(result["signal"].round(6).tolist(), [-0.375, -0.125, 0.125, 0.375])
         self.assertEqual(set(result["purification"]), {"mad+rank"})
+
+    def test_evaluate_factor_reports_zero_observations_for_empty_factor_frame(self):
+        factor = FactorDef(name="missing_value_factor", expression="$missing", direction=1)
+        empty = pd.DataFrame(columns=["missing_value_factor", "close"])
+
+        with patch("qlib_factor_lab.factor_eval.fetch_factor_frame", return_value=empty):
+            result = evaluate_factor(object(), factor, initialize=False)
+
+        self.assertEqual([1, 5, 10, 20], result["horizon"].tolist())
+        self.assertEqual([0, 0, 0, 0], result["observations"].tolist())
+        self.assertTrue(result["ic_mean"].isna().all())
+        self.assertTrue(result["long_short_mean_return"].isna().all())
 
 
 if __name__ == "__main__":
