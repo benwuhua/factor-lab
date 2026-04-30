@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -672,6 +673,10 @@ def dump_csvs_to_qlib(
         effective_source_dir, dropped = filter_source_csvs_to_existing_qlib_fields(source_dir, qlib_path)
         if dropped:
             print(f"drop new incremental Qlib fields without historical backfill: {','.join(sorted(dropped))}")
+        _rewind_instrument_end_dates_to_feature_bins(qlib_path, effective_source_dir)
+        if not any(effective_source_dir.glob("*.csv")):
+            print(f"skip Qlib dump_update: no source rows need appending in {effective_source_dir}")
+            return
     command = build_dump_bin_command(
         dump_bin_path,
         effective_source_dir,
@@ -686,9 +691,12 @@ def dump_csvs_to_qlib(
 
 def filter_source_csvs_to_existing_qlib_fields(source_dir: str | Path, qlib_dir: str | Path) -> tuple[Path, set[str]]:
     source_path = Path(source_dir).expanduser().resolve()
-    existing_fields = _existing_qlib_feature_fields(qlib_dir)
+    qlib_path = Path(qlib_dir).expanduser()
+    existing_fields = _existing_qlib_feature_fields(qlib_path)
     if not existing_fields:
         return source_path, set()
+    calendar = _read_qlib_calendar(qlib_path)
+    calendar_index = {date: idx for idx, date in enumerate(calendar)}
     output_dir = source_path.with_name(f"{source_path.name}_existing_fields")
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -700,7 +708,9 @@ def filter_source_csvs_to_existing_qlib_fields(source_dir: str | Path, qlib_dir:
         drop_columns = [column for column in frame.columns if column not in keep]
         dropped.update(drop_columns)
         frame = frame[[column for column in frame.columns if column in keep]]
-        frame.to_csv(output_dir / path.name, index=False)
+        frame = _pad_incremental_frame_to_qlib_calendar(frame, qlib_path, calendar, calendar_index)
+        if not frame.empty:
+            frame.to_csv(output_dir / path.name, index=False)
     return output_dir, dropped
 
 
@@ -712,6 +722,86 @@ def _existing_qlib_feature_fields(qlib_dir: str | Path) -> set[str]:
     for path in feature_root.glob("*/*.day.bin"):
         fields.add(path.name.removesuffix(".day.bin"))
     return fields
+
+
+def _read_qlib_calendar(qlib_dir: str | Path) -> list[str]:
+    path = Path(qlib_dir).expanduser() / "calendars" / "day.txt"
+    if not path.exists():
+        return []
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _pad_incremental_frame_to_qlib_calendar(
+    frame: pd.DataFrame,
+    qlib_dir: Path,
+    calendar: list[str],
+    calendar_index: dict[str, int],
+) -> pd.DataFrame:
+    if frame.empty or not calendar or "date" not in frame.columns or "symbol" not in frame.columns:
+        return frame
+    symbol = str(frame["symbol"].dropna().astype(str).iloc[0]).lower()
+    current_end = _existing_symbol_feature_end_index(qlib_dir, symbol)
+    if current_end is None:
+        return frame
+    frame = frame.copy()
+    frame["date"] = pd.to_datetime(frame["date"]).dt.strftime("%Y-%m-%d")
+    source_indexes = [calendar_index[date] for date in frame["date"].tolist() if date in calendar_index]
+    if not source_indexes:
+        return frame
+    max_source_index = max(source_indexes)
+    if current_end >= max_source_index:
+        return pd.DataFrame(columns=frame.columns)
+    pad_dates = calendar[current_end + 1 : max_source_index + 1]
+    skeleton = pd.DataFrame({"date": pad_dates, "symbol": str(frame["symbol"].dropna().astype(str).iloc[0])})
+    return skeleton.merge(frame, on=["date", "symbol"], how="left")
+
+
+def _existing_symbol_feature_end_index(qlib_dir: Path, symbol: str) -> int | None:
+    feature_dir = qlib_dir / "features" / symbol.lower()
+    if not feature_dir.exists():
+        return None
+    for path in sorted(feature_dir.glob("*.day.bin")):
+        size = path.stat().st_size
+        if size < 8 or size % 4:
+            continue
+        with path.open("rb") as handle:
+            start = int(struct.unpack("<f", handle.read(4))[0])
+        value_count = size // 4 - 1
+        return start + value_count - 1
+    return None
+
+
+def _rewind_instrument_end_dates_to_feature_bins(qlib_dir: Path, source_dir: Path) -> None:
+    calendar = _read_qlib_calendar(qlib_dir)
+    if not calendar:
+        return
+    source_symbols = {path.stem.upper() for path in source_dir.glob("*.csv")}
+    if not source_symbols:
+        return
+    instruments_dir = qlib_dir / "instruments"
+    if not instruments_dir.exists():
+        return
+    for path in instruments_dir.glob("*.txt"):
+        try:
+            frame = pd.read_csv(path, sep="\t", header=None, names=["instrument", "start", "end"], dtype=str)
+        except Exception:
+            continue
+        if frame.empty:
+            continue
+        changed = False
+        for idx, row in frame.iterrows():
+            symbol = str(row["instrument"]).upper()
+            if symbol not in source_symbols:
+                continue
+            end_index = _existing_symbol_feature_end_index(qlib_dir, symbol.lower())
+            if end_index is None or end_index >= len(calendar):
+                continue
+            feature_end = calendar[end_index]
+            if str(row["end"]) > feature_end:
+                frame.loc[idx, "end"] = feature_end
+                changed = True
+        if changed:
+            frame.to_csv(path, sep="\t", header=False, index=False)
 
 
 def _first_present(frame: pd.DataFrame, candidates: list[str], required: bool = True) -> str | None:

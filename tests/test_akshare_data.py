@@ -163,6 +163,56 @@ class AkShareDataTests(unittest.TestCase):
             self.assertEqual(["date", "symbol", "close"], result.columns.tolist())
             self.assertEqual({"pe_ttm"}, dropped)
 
+    def test_filter_source_csvs_to_existing_qlib_fields_pads_symbol_calendar_gaps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            source.mkdir()
+            pd.DataFrame(
+                [
+                    {"date": "2026-04-30", "symbol": "SH600000", "close": 10.0, "pe_ttm": 8.0},
+                ]
+            ).to_csv(source / "sh600000.csv", index=False)
+            (root / "qlib/calendars").mkdir(parents=True)
+            (root / "qlib/calendars/day.txt").write_text("2026-04-28\n2026-04-29\n2026-04-30\n", encoding="utf-8")
+            (root / "qlib/features/sh600000").mkdir(parents=True)
+            # Qlib .bin stores the calendar start index as the first float, followed by values.
+            (root / "qlib/features/sh600000/close.day.bin").write_bytes(pd.Series([0.0, 9.0], dtype="float32").values.tobytes())
+
+            filtered, dropped = filter_source_csvs_to_existing_qlib_fields(source, root / "qlib")
+
+            result = pd.read_csv(filtered / "sh600000.csv")
+            self.assertEqual(["2026-04-29", "2026-04-30"], result["date"].tolist())
+            self.assertTrue(pd.isna(result.loc[0, "close"]))
+            self.assertEqual(10.0, result.loc[1, "close"])
+            self.assertEqual({"pe_ttm"}, dropped)
+
+    def test_dump_csvs_to_qlib_update_rewinds_instrument_end_to_feature_bin_before_dump(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            source.mkdir()
+            pd.DataFrame([{"date": "2026-04-30", "symbol": "SH600000", "close": 10.0}]).to_csv(source / "sh600000.csv", index=False)
+            (root / "qlib/calendars").mkdir(parents=True)
+            (root / "qlib/calendars/day.txt").write_text("2026-04-28\n2026-04-29\n2026-04-30\n", encoding="utf-8")
+            (root / "qlib/instruments").mkdir(parents=True)
+            (root / "qlib/instruments/all.txt").write_text("SH600000\t2026-04-28\t2026-04-30\n", encoding="utf-8")
+            (root / "qlib/features/sh600000").mkdir(parents=True)
+            (root / "qlib/features/sh600000/close.day.bin").write_bytes(pd.Series([0.0, 9.0], dtype="float32").values.tobytes())
+
+            with patch("qlib_factor_lab.akshare_data.subprocess.run"):
+                dump_csvs_to_qlib(
+                    source,
+                    root / "qlib",
+                    root / "dump_bin.py",
+                    python_bin="python",
+                    max_workers=1,
+                    update=True,
+                    update_existing_fields_only=True,
+                )
+
+            self.assertEqual("SH600000\t2026-04-28\t2026-04-28\n", (root / "qlib/instruments/all.txt").read_text(encoding="utf-8"))
+
     def test_read_latest_qlib_calendar_date_reads_last_calendar_row(self):
         with tempfile.TemporaryDirectory() as tmp:
             calendar = Path(tmp) / "calendars"
