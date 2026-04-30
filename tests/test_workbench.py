@@ -11,6 +11,8 @@ from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
     build_execution_gate_card,
     build_event_evidence_library,
+    build_execution_performance_attribution,
+    build_portfolio_layer_comparison,
     build_portfolio_gate_explanation,
     build_portfolio_gate_trend,
     build_research_context_health,
@@ -194,6 +196,79 @@ class WorkbenchTests(unittest.TestCase):
         self.assertAlmostEqual(float(row["event_coverage"]), 0.5)
         self.assertAlmostEqual(float(row["factor_family_concentration"]), 0.75)
         self.assertAlmostEqual(float(row["factor_logic_concentration"]), 0.75)
+
+    def test_portfolio_layer_comparison_separates_research_and_execution_weights(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs/20260430"
+            run.mkdir(parents=True)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB"],
+                    "rank": [1, 2],
+                    "target_weight": [0.5, 0.5],
+                    "ensemble_score": [2.0, 1.0],
+                }
+            ).to_csv(run / "research_portfolio.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB"],
+                    "rank": [1, 2],
+                    "target_weight": [0.25, 0.25],
+                    "ensemble_score": [2.0, 1.0],
+                    "risk_flags": ["expert_review_caution_scaled", "expert_review_caution_scaled"],
+                }
+            ).to_csv(run / "execution_portfolio.csv", index=False)
+            pd.DataFrame({"instrument": ["AAA"], "target_weight": [0.25]}).to_csv(run / "target_portfolio.csv", index=False)
+
+            comparison = build_portfolio_layer_comparison(root)
+
+        self.assertEqual(comparison["status"], "separated")
+        self.assertEqual(comparison["run_dir"], str(run))
+        self.assertAlmostEqual(comparison["cards"]["research_gross_weight"], 1.0)
+        self.assertAlmostEqual(comparison["cards"]["execution_gross_weight"], 0.5)
+        self.assertAlmostEqual(comparison["cards"]["weight_delta"], -0.5)
+        detail = comparison["detail"].set_index("instrument")
+        self.assertEqual(detail.loc["AAA", "action"], "scaled")
+        self.assertAlmostEqual(float(detail.loc["AAA", "execution_weight"]), 0.25)
+
+    def test_execution_performance_attribution_groups_intraday_pnl_by_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "runs/20260430"
+            run.mkdir(parents=True)
+            (root / "reports").mkdir()
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB", "CCC"],
+                    "target_weight": [0.2, 0.3, 0.5],
+                    "event_count": [1, 0, 0],
+                    "event_blocked": [False, False, True],
+                    "event_risk_summary": ["earnings watch", "", "disciplinary action"],
+                }
+            ).to_csv(run / "execution_portfolio.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB", "CCC"],
+                    "industry_sw": ["tech", "tech", "energy"],
+                    "target_weight": [0.2, 0.3, 0.5],
+                    "top_factor_1": ["momentum", "value", "value"],
+                    "pct_today": [2.0, -1.0, -3.0],
+                    "weighted_return_pct": [0.4, -0.3, -1.5],
+                    "direction": ["up", "down", "down"],
+                }
+            ).to_csv(root / "reports/portfolio_top20_intraday_20260430.csv", index=False)
+
+            attribution = build_execution_performance_attribution(root)
+
+        self.assertAlmostEqual(attribution["summary"]["weighted_return_pct"], -1.4)
+        industry = attribution["industry"].set_index("industry")
+        self.assertAlmostEqual(float(industry.loc["tech", "weighted_return_pct"]), 0.1)
+        factor = attribution["factor"].set_index("factor")
+        self.assertAlmostEqual(float(factor.loc["value", "weighted_return_pct"]), -1.8)
+        event = attribution["event"].set_index("event_bucket")
+        self.assertAlmostEqual(float(event.loc["event_block", "weighted_return_pct"]), -1.5)
+        self.assertEqual(attribution["contributors"].iloc[0]["instrument"], "CCC")
 
     def test_workbench_snapshot_counts_approved_factors_and_latest_target(self):
         with tempfile.TemporaryDirectory() as tmp:

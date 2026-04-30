@@ -87,6 +87,12 @@ runs/<date>/replay_report.md
 runs/<date>/replay_report.json
 ```
 
+Daily portfolio outputs are intentionally split:
+
+- `research_portfolio.csv`: pre-review research candidates generated from signals.
+- `execution_portfolio.csv`: post-review, post-gate execution candidates used by risk checks and paper orders.
+- `target_portfolio.csv`: legacy alias for `execution_portfolio.csv` kept for older scripts.
+
 Execution outputs are generated through `BrokerAdapter` implementations:
 
 - `paper`: default simulated fills, positions, and reconciliation.

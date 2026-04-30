@@ -88,6 +88,8 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
         execution = self.run_page("07 纸面执行")
 
         self.assertIn("为什么被 caution / reject", _app_text(portfolio))
+        self.assertIn("研究组合 vs 执行组合", _app_text(portfolio))
+        self.assertIn("今日涨跌归因", _app_text(portfolio))
         self.assertIn("门禁趋势", _app_text(portfolio))
         self.assertIn("交易逻辑桶暴露", _app_text(portfolio))
         self.assertIn("专家硬复核名单", _app_text(portfolio))

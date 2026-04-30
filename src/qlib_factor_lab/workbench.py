@@ -163,6 +163,20 @@ def find_latest_target_portfolio(root: str | Path = ".") -> Path | None:
     return _latest_path(candidates)
 
 
+def find_latest_research_portfolio(root: str | Path = ".") -> Path | None:
+    root_path = Path(root)
+    candidates = list((root_path / "reports").glob("research_portfolio_*.csv"))
+    candidates.extend((root_path / "runs").glob("*/research_portfolio.csv"))
+    return _latest_path(candidates)
+
+
+def find_latest_execution_portfolio(root: str | Path = ".") -> Path | None:
+    root_path = Path(root)
+    candidates = list((root_path / "reports").glob("execution_portfolio_*.csv"))
+    candidates.extend((root_path / "runs").glob("*/execution_portfolio.csv"))
+    return _latest_path(candidates)
+
+
 def find_latest_stock_cards(root: str | Path = ".") -> Path | None:
     root_path = Path(root)
     candidates = list((root_path / "reports").glob("stock_cards_*.jsonl"))
@@ -536,6 +550,123 @@ def build_portfolio_gate_trend(root: str | Path = ".", *, limit: int = 20) -> pd
     return pd.DataFrame(rows).tail(limit).reset_index(drop=True)
 
 
+def build_portfolio_layer_comparison(root: str | Path = ".") -> dict[str, Any]:
+    root_path = Path(root)
+    run_dir = find_latest_run_dir(root_path)
+    research_path = _run_artifact_or_latest(run_dir, "research_portfolio.csv", find_latest_research_portfolio(root_path))
+    execution_path = _run_artifact_or_latest(run_dir, "execution_portfolio.csv", find_latest_execution_portfolio(root_path))
+    target_path = _run_artifact_or_latest(run_dir, "target_portfolio.csv", find_latest_target_portfolio(root_path))
+    if execution_path is None:
+        execution_path = target_path
+
+    research = _read_csv_if_exists(research_path) if research_path is not None else pd.DataFrame()
+    execution = _read_csv_if_exists(execution_path) if execution_path is not None else pd.DataFrame()
+    detail = _portfolio_layer_detail(research, execution)
+    research_weight = _gross_weight(research)
+    execution_weight = _gross_weight(execution)
+    status = "missing"
+    if research_path is not None and execution_path is not None and execution_path != target_path:
+        status = "separated"
+    elif execution_path is not None:
+        status = "legacy_target_only"
+
+    return {
+        "status": status,
+        "run_dir": str(run_dir) if run_dir is not None else "",
+        "paths": {
+            "research": str(research_path or ""),
+            "execution": str(execution_path or ""),
+            "target": str(target_path or ""),
+        },
+        "cards": {
+            "research_positions": int(len(research)),
+            "execution_positions": int(len(execution)),
+            "research_gross_weight": research_weight,
+            "execution_gross_weight": execution_weight,
+            "weight_delta": execution_weight - research_weight,
+            "removed_positions": int((detail["action"] == "removed").sum()) if not detail.empty else 0,
+            "scaled_positions": int((detail["action"] == "scaled").sum()) if not detail.empty else 0,
+        },
+        "detail": detail,
+    }
+
+
+def build_execution_performance_attribution(
+    root: str | Path = ".",
+    *,
+    intraday_path: str | Path | None = None,
+) -> dict[str, Any]:
+    root_path = Path(root)
+    path = _resolve(root_path, intraday_path) if intraday_path is not None else _latest_intraday_portfolio_path(root_path)
+    performance = _read_csv_if_exists(path) if path is not None else pd.DataFrame()
+    layers = build_portfolio_layer_comparison(root_path)
+    execution_path = Path(layers["paths"]["execution"]) if layers["paths"].get("execution") else None
+    execution = _read_csv_if_exists(execution_path) if execution_path is not None else pd.DataFrame()
+    if performance.empty:
+        return _empty_execution_performance_attribution(path)
+
+    frame = performance.copy()
+    if not execution.empty:
+        event_columns = [
+            column
+            for column in [
+                "instrument",
+                "event_count",
+                "event_blocked",
+                "active_event_types",
+                "event_risk_summary",
+                "announcement_flag",
+                "risk_flags",
+            ]
+            if column in execution.columns
+        ]
+        if "instrument" in event_columns:
+            frame = frame.merge(execution.loc[:, event_columns], on="instrument", how="left", suffixes=("", "_execution"))
+    frame["target_weight"] = pd.to_numeric(frame.get("target_weight", pd.Series(dtype=float)), errors="coerce").fillna(0.0)
+    frame["pct_today"] = pd.to_numeric(frame.get("pct_today", pd.Series(dtype=float)), errors="coerce").fillna(0.0)
+    frame["weighted_return_pct"] = pd.to_numeric(
+        frame.get("weighted_return_pct", frame["target_weight"] * frame["pct_today"]),
+        errors="coerce",
+    ).fillna(0.0)
+    frame["industry"] = _first_nonblank_column(frame, ["industry_sw", "industry", "industry_csrc"], default="unknown")
+    frame["factor"] = _first_nonblank_column(frame, ["top_factor_1", "factor", "family"], default="unknown")
+    frame["event_bucket"] = frame.apply(_performance_event_bucket, axis=1)
+    contributors = frame.sort_values("weighted_return_pct", ascending=True).reset_index(drop=True)
+    keep = [
+        column
+        for column in [
+            "instrument",
+            "display_name",
+            "industry",
+            "factor",
+            "event_bucket",
+            "target_weight",
+            "pct_today",
+            "weighted_return_pct",
+            "direction",
+        ]
+        if column in contributors.columns
+    ]
+    return {
+        "path": str(path or ""),
+        "summary": {
+            "positions": int(len(frame)),
+            "weighted_return_pct": float(frame["weighted_return_pct"].sum()),
+            "up_count": int((frame.get("direction", pd.Series(dtype=str)).astype(str) == "up").sum())
+            if "direction" in frame.columns
+            else int((frame["pct_today"] > 0).sum()),
+            "down_count": int((frame.get("direction", pd.Series(dtype=str)).astype(str) == "down").sum())
+            if "direction" in frame.columns
+            else int((frame["pct_today"] < 0).sum()),
+            "quote_time": str(frame["quote_time"].dropna().astype(str).max()) if "quote_time" in frame.columns and frame["quote_time"].notna().any() else "",
+        },
+        "industry": _performance_group(frame, "industry", "industry"),
+        "factor": _performance_group(frame, "factor", "factor"),
+        "event": _performance_group(frame, "event_bucket", "event_bucket"),
+        "contributors": contributors.loc[:, keep] if keep else contributors,
+    }
+
+
 def build_workbench_freshness(root: str | Path = ".", *, now: pd.Timestamp | None = None) -> list[dict[str, Any]]:
     root_path = Path(root)
     current = pd.Timestamp.now() if now is None else pd.Timestamp(now)
@@ -874,6 +1005,162 @@ def _signal_for_portfolio(portfolio: pd.DataFrame) -> pd.DataFrame:
     signal = portfolio.copy()
     signal["eligible"] = True
     return signal
+
+
+def _run_artifact_or_latest(run_dir: Path | None, filename: str, latest: Path | None) -> Path | None:
+    if run_dir is not None:
+        candidate = run_dir / filename
+        if candidate.exists():
+            return candidate
+    return latest
+
+
+def _gross_weight(portfolio: pd.DataFrame) -> float:
+    if portfolio.empty or "target_weight" not in portfolio.columns:
+        return 0.0
+    return float(pd.to_numeric(portfolio["target_weight"], errors="coerce").fillna(0.0).sum())
+
+
+def _portfolio_layer_detail(research: pd.DataFrame, execution: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "instrument",
+        "research_rank",
+        "execution_rank",
+        "research_weight",
+        "execution_weight",
+        "weight_delta",
+        "action",
+        "ensemble_score",
+        "risk_flags",
+    ]
+    if research.empty and execution.empty:
+        return pd.DataFrame(columns=columns)
+    left = _portfolio_layer_subset(research, "research")
+    right = _portfolio_layer_subset(execution, "execution")
+    detail = left.merge(right, on="instrument", how="outer")
+    for column in ["research_weight", "execution_weight"]:
+        if column not in detail.columns:
+            detail[column] = 0.0
+        detail[column] = pd.to_numeric(detail[column], errors="coerce").fillna(0.0)
+    detail["weight_delta"] = detail["execution_weight"] - detail["research_weight"]
+    detail["action"] = detail.apply(_portfolio_layer_action, axis=1)
+    if "execution_ensemble_score" in detail.columns:
+        detail["ensemble_score"] = detail["execution_ensemble_score"]
+    elif "research_ensemble_score" in detail.columns:
+        detail["ensemble_score"] = detail["research_ensemble_score"]
+    else:
+        detail["ensemble_score"] = pd.NA
+    if "execution_risk_flags" in detail.columns:
+        detail["risk_flags"] = detail["execution_risk_flags"].fillna("")
+    else:
+        detail["risk_flags"] = ""
+    for column in columns:
+        if column not in detail.columns:
+            detail[column] = pd.NA
+    return detail.loc[:, columns].sort_values(["action", "instrument"]).reset_index(drop=True)
+
+
+def _portfolio_layer_subset(portfolio: pd.DataFrame, prefix: str) -> pd.DataFrame:
+    if portfolio.empty or "instrument" not in portfolio.columns:
+        return pd.DataFrame(columns=["instrument"])
+    frame = portfolio.copy()
+    frame["instrument"] = frame["instrument"].astype(str)
+    rename = {}
+    if "rank" in frame.columns:
+        rename["rank"] = f"{prefix}_rank"
+    if "target_weight" in frame.columns:
+        rename["target_weight"] = f"{prefix}_weight"
+    if "ensemble_score" in frame.columns:
+        rename["ensemble_score"] = f"{prefix}_ensemble_score"
+    if "risk_flags" in frame.columns:
+        rename["risk_flags"] = f"{prefix}_risk_flags"
+    keep = ["instrument", *rename.keys()]
+    return frame.loc[:, keep].rename(columns=rename)
+
+
+def _portfolio_layer_action(row: pd.Series) -> str:
+    research_weight = float(row.get("research_weight", 0.0) or 0.0)
+    execution_weight = float(row.get("execution_weight", 0.0) or 0.0)
+    if research_weight > 0 and execution_weight <= 0:
+        return "removed"
+    if research_weight <= 0 and execution_weight > 0:
+        return "added"
+    if abs(execution_weight - research_weight) > 1e-9:
+        return "scaled"
+    return "unchanged"
+
+
+def _latest_intraday_portfolio_path(root: Path) -> Path | None:
+    candidates = list((root / "reports").glob("portfolio_top*_intraday_*.csv"))
+    candidates.extend((root / "runs").glob("*/portfolio_top*_intraday_*.csv"))
+    return _latest_path(candidates)
+
+
+def _empty_execution_performance_attribution(path: Path | None) -> dict[str, Any]:
+    group_columns = ["count", "target_weight", "pct_today", "weighted_return_pct"]
+    return {
+        "path": str(path or ""),
+        "summary": {"positions": 0, "weighted_return_pct": 0.0, "up_count": 0, "down_count": 0, "quote_time": ""},
+        "industry": pd.DataFrame(columns=["industry", *group_columns]),
+        "factor": pd.DataFrame(columns=["factor", *group_columns]),
+        "event": pd.DataFrame(columns=["event_bucket", *group_columns]),
+        "contributors": pd.DataFrame(
+            columns=[
+                "instrument",
+                "display_name",
+                "industry",
+                "factor",
+                "event_bucket",
+                "target_weight",
+                "pct_today",
+                "weighted_return_pct",
+                "direction",
+            ]
+        ),
+    }
+
+
+def _first_nonblank_column(frame: pd.DataFrame, columns: list[str], *, default: str) -> pd.Series:
+    output = pd.Series(default, index=frame.index, dtype="object")
+    filled = pd.Series(False, index=frame.index)
+    for column in columns:
+        if column not in frame.columns:
+            continue
+        values = frame[column].fillna("").astype(str).str.strip()
+        mask = (~filled) & values.ne("")
+        output.loc[mask] = values.loc[mask]
+        filled = filled | mask
+    return output
+
+
+def _performance_event_bucket(row: pd.Series) -> str:
+    if _truthy(row.get("event_blocked")):
+        return "event_block"
+    if _number(row.get("event_count")) > 0 or not _blank(row.get("event_risk_summary")) or not _blank(row.get("active_event_types")):
+        return "event_watch"
+    if _truthy(row.get("announcement_flag")):
+        return "announcement_watch"
+    return "no_event"
+
+
+def _performance_group(frame: pd.DataFrame, group_column: str, label: str) -> pd.DataFrame:
+    columns = [label, "count", "target_weight", "pct_today", "weighted_return_pct"]
+    if frame.empty or group_column not in frame.columns:
+        return pd.DataFrame(columns=columns)
+    grouped = (
+        frame.groupby(group_column, dropna=False)
+        .agg(
+            count=("instrument", "count"),
+            target_weight=("target_weight", "sum"),
+            pct_today=("pct_today", "mean"),
+            weighted_return_pct=("weighted_return_pct", "sum"),
+        )
+        .reset_index()
+        .rename(columns={group_column: label})
+        .sort_values("weighted_return_pct", ascending=True)
+        .reset_index(drop=True)
+    )
+    return grouped.loc[:, columns]
 
 
 def _latest_path(paths: list[Path]) -> Path | None:

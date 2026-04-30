@@ -109,6 +109,10 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertTrue((run_dir / "signal_summary.md").exists())
             self.assertTrue((run_dir / "data_governance.md").exists())
             self.assertTrue((run_dir / "data_governance.csv").exists())
+            self.assertTrue((run_dir / "research_portfolio.csv").exists())
+            self.assertTrue((run_dir / "research_portfolio_summary.md").exists())
+            self.assertTrue((run_dir / "execution_portfolio.csv").exists())
+            self.assertTrue((run_dir / "execution_portfolio_summary.md").exists())
             self.assertTrue((run_dir / "target_portfolio.csv").exists())
             self.assertTrue((run_dir / "target_portfolio_summary.md").exists())
             self.assertTrue((run_dir / "stock_cards.jsonl").exists())
@@ -128,6 +132,11 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertIn("signals", manifest["artifacts"])
             self.assertIn("data_governance", manifest["artifacts"])
             self.assertIn("data_governance_csv", manifest["artifacts"])
+            self.assertIn("research_portfolio", manifest["artifacts"])
+            self.assertIn("research_portfolio_summary", manifest["artifacts"])
+            self.assertIn("execution_portfolio", manifest["artifacts"])
+            self.assertIn("execution_portfolio_summary", manifest["artifacts"])
+            self.assertIn("target_portfolio", manifest["artifacts"])
             self.assertIn("stock_cards", manifest["artifacts"])
             self.assertIn("expert_review_packet", manifest["artifacts"])
             self.assertIn("expert_review_result", manifest["artifacts"])
@@ -138,6 +147,8 @@ class DailyPipelineTests(unittest.TestCase):
             packet = (run_dir / "expert_review_packet.md").read_text(encoding="utf-8")
             self.assertIn("## Stock Research Cards", packet)
             self.assertIn("AAA", packet)
+            self.assertIn("# Research Portfolio Summary", (run_dir / "research_portfolio_summary.md").read_text(encoding="utf-8"))
+            self.assertIn("# Execution Portfolio Summary", (run_dir / "execution_portfolio_summary.md").read_text(encoding="utf-8"))
             self.assertIn("wrote:", result.stdout)
 
     def test_daily_pipeline_stops_before_orders_when_risk_fails(self):
@@ -283,11 +294,18 @@ class DailyPipelineTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            portfolio = pd.read_csv(root / "runs/20260423/target_portfolio.csv")
-            self.assertAlmostEqual(float(portfolio["target_weight"].sum()), 0.5)
-            self.assertTrue(portfolio["risk_flags"].str.contains("expert_review_caution_scaled").all())
+            run_dir = root / "runs/20260423"
+            research = pd.read_csv(run_dir / "research_portfolio.csv")
+            execution = pd.read_csv(run_dir / "execution_portfolio.csv")
+            target = pd.read_csv(run_dir / "target_portfolio.csv")
+            self.assertAlmostEqual(float(research["target_weight"].sum()), 1.0)
+            self.assertAlmostEqual(float(execution["target_weight"].sum()), 0.5)
+            self.assertAlmostEqual(float(target["target_weight"].sum()), 0.5)
+            self.assertTrue(execution["risk_flags"].str.contains("expert_review_caution_scaled").all())
+            self.assertFalse(research.get("risk_flags", pd.Series(dtype=str)).astype(str).str.contains("expert_review_caution_scaled").any())
             manifest = json.loads((root / "runs/20260423/manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["expert_review_gate"]["status"], "scaled")
+            self.assertEqual(Path(manifest["artifacts"]["execution_portfolio"]).resolve(), (run_dir / "execution_portfolio.csv").resolve())
 
     def test_daily_pipeline_blocks_orders_when_expert_review_rejects(self):
         with tempfile.TemporaryDirectory() as tmp:

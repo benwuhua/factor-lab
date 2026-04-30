@@ -112,11 +112,17 @@ make autoresearch-codex-loop AUTORESEARCH_CODEX_UNTIL=08:30 AUTORESEARCH_CODEX_I
 make daily-signal SIGNAL_PROVIDER_CONFIG=configs/provider_current.yaml
 ```
 
-目标组合生成：
+研究组合与执行组合生成：
 
 ```bash
 make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv
 ```
+
+正式日流水线会同时产出三类组合文件：
+
+- `research_portfolio.csv`: 因子和信号层给出的研究候选，回答“值得研究谁”。
+- `execution_portfolio.csv`: 专家复核、风险门禁和交易约束后的执行候选，回答“允许纸面执行多少权重”。
+- `target_portfolio.csv`: 兼容旧脚本的执行组合别名，新代码应优先读取 `execution_portfolio.csv`。
 
 组合会保留 top factor driver 字段，用于后续解释：
 
@@ -152,6 +158,8 @@ make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv
 - style
 
 这一步回答的问题不是“组合会不会涨”，而是“组合到底押了什么”。
+
+组合层参考框架见 [portfolio-construction-reading-spine.md](portfolio-construction-reading-spine.md)。当前阶段遵循的原则是：因子分数只生成研究候选，执行权重必须经过风险、成本、约束和复核。
 
 ## 7. 专家复核与纸面执行
 

@@ -19,9 +19,11 @@ import streamlit as st
 from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
     build_event_evidence_library,
+    build_execution_performance_attribution,
     build_gate_review_items,
     build_multilane_queue,
     build_portfolio_gate_explanation,
+    build_portfolio_layer_comparison,
     build_pretrade_review,
     build_portfolio_gate_trend,
     build_research_context_health,
@@ -372,6 +374,8 @@ def render_portfolio_gate() -> None:
     evidence = build_research_evidence_summary(portfolio)
     trend = build_portfolio_gate_trend(ROOT)
     execution_card = load_execution_gate_card(ROOT)
+    layer_comparison = build_portfolio_layer_comparison(ROOT)
+    performance = build_execution_performance_attribution(ROOT)
     review_items = build_gate_review_items(gate.checks)
     pretrade_blocks = int((pretrade["status"].astype(str) == "reject").sum()) if not pretrade.empty else 0
 
@@ -381,12 +385,19 @@ def render_portfolio_gate() -> None:
             ("Expert Review", str(expert["decision"]).upper()),
             ("Watchlist", len(expert["watchlist"])),
             ("Pretrade Blocks", pretrade_blocks),
-            ("Target Rows", len(portfolio)),
+            ("Research Rows", layer_comparison["cards"]["research_positions"]),
+            ("Execution Rows", layer_comparison["cards"]["execution_positions"]),
         ]
     )
 
     main_col, rail_col = st.columns([3.1, 1.05], gap="large")
     with main_col:
+        st.markdown(_section_header_html("研究组合 vs 执行组合", "candidate list before and after gates"), unsafe_allow_html=True)
+        _render_portfolio_layer_comparison(layer_comparison)
+
+        st.markdown(_section_header_html("今日涨跌归因", "industry, factor, event and single-name contribution"), unsafe_allow_html=True)
+        _render_execution_performance_attribution(performance)
+
         _execution_gate_panel(execution_card)
         portfolio_rows = _portfolio_gate_rows()
         st.markdown(_section_header_html("组合门禁动作", "portfolio workflow"), unsafe_allow_html=True)
@@ -937,6 +948,101 @@ def _detail_card_html(title: str, rows: list[tuple[str, object]], *, note: str =
         f"{note_html}"
         "</section>"
     )
+
+
+def _render_portfolio_layer_comparison(comparison: dict[str, object]) -> None:
+    cards = comparison.get("cards", {})
+    paths = comparison.get("paths", {})
+    cols = st.columns(3)
+    with cols[0]:
+        st.markdown(
+            _detail_card_html(
+                "Research Portfolio",
+                [
+                    ("positions", cards.get("research_positions", 0)),
+                    ("gross weight", _pct_text(cards.get("research_gross_weight", 0.0))),
+                    ("file", Path(str(paths.get("research", "") or "n/a")).name),
+                ],
+                note="因子和信号给出的研究候选，不直接代表可下单权重。",
+            ),
+            unsafe_allow_html=True,
+        )
+    with cols[1]:
+        st.markdown(
+            _detail_card_html(
+                "Execution Portfolio",
+                [
+                    ("positions", cards.get("execution_positions", 0)),
+                    ("gross weight", _pct_text(cards.get("execution_gross_weight", 0.0))),
+                    ("file", Path(str(paths.get("execution", "") or "n/a")).name),
+                ],
+                note="经过专家复核和门禁后的执行候选，订单与风控读取这一层。",
+            ),
+            unsafe_allow_html=True,
+        )
+    with cols[2]:
+        st.markdown(
+            _detail_card_html(
+                "Gate Effect",
+                [
+                    ("status", comparison.get("status", "missing")),
+                    ("weight delta", _pct_text(cards.get("weight_delta", 0.0))),
+                    ("scaled", cards.get("scaled_positions", 0)),
+                    ("removed", cards.get("removed_positions", 0)),
+                ],
+                note="用来解释 caution 降仓、reject 清空或人工确认后的权重变化。",
+            ),
+            unsafe_allow_html=True,
+        )
+    detail = comparison.get("detail")
+    if isinstance(detail, pd.DataFrame) and not detail.empty:
+        st.dataframe(detail, width="stretch", hide_index=True)
+    else:
+        st.info("还没有 research/execution portfolio 对照明细。")
+
+
+def _render_execution_performance_attribution(performance: dict[str, object]) -> None:
+    summary = performance.get("summary", {})
+    if not summary or int(summary.get("positions", 0) or 0) == 0:
+        st.info("还没有找到今日组合涨跌归因文件。可先生成 reports/portfolio_top20_intraday_YYYYMMDD.csv。")
+        return
+    _metric_strip(
+        [
+            ("Weighted Return", f"{float(summary.get('weighted_return_pct', 0.0)):.3f}%"),
+            ("Up / Down", f"{summary.get('up_count', 0)} / {summary.get('down_count', 0)}"),
+            ("Positions", summary.get("positions", 0)),
+            ("Quote Time", summary.get("quote_time", "") or "n/a"),
+            ("Source", Path(str(performance.get("path", ""))).name),
+        ]
+    )
+    chart_cols = st.columns(3)
+    with chart_cols[0]:
+        st.subheader("行业贡献")
+        _render_weighted_return_chart(performance.get("industry"), "industry")
+    with chart_cols[1]:
+        st.subheader("因子贡献")
+        _render_weighted_return_chart(performance.get("factor"), "factor")
+    with chart_cols[2]:
+        st.subheader("事件贡献")
+        _render_weighted_return_chart(performance.get("event"), "event_bucket")
+    contributors = performance.get("contributors")
+    if isinstance(contributors, pd.DataFrame) and not contributors.empty:
+        st.subheader("个股拖累 / 贡献")
+        st.dataframe(contributors.head(12), width="stretch", hide_index=True)
+
+
+def _render_weighted_return_chart(frame: object, index_column: str) -> None:
+    if not isinstance(frame, pd.DataFrame) or frame.empty or "weighted_return_pct" not in frame.columns:
+        st.info("暂无数据。")
+        return
+    st.bar_chart(frame.set_index(index_column)["weighted_return_pct"])
+
+
+def _pct_text(value: object) -> str:
+    try:
+        return f"{float(value):.2%}"
+    except (TypeError, ValueError):
+        return "n/a"
 
 
 def _portfolio_detail_rail(latest: Path, gate, expert: dict, pretrade: pd.DataFrame) -> None:

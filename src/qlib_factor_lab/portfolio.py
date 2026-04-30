@@ -149,11 +149,16 @@ def write_target_portfolio(portfolio: pd.DataFrame, output_path: str | Path) -> 
     return output
 
 
-def write_portfolio_summary(portfolio: pd.DataFrame, output_path: str | Path) -> Path:
+def write_portfolio_summary(
+    portfolio: pd.DataFrame,
+    output_path: str | Path,
+    *,
+    title: str = "Target Portfolio Summary",
+) -> Path:
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     lines = [
-        "# Target Portfolio Summary",
+        f"# {title}",
         "",
         f"- positions: {len(portfolio)}",
         f"- gross_target_weight: {float(portfolio['target_weight'].sum()) if 'target_weight' in portfolio else 0.0:.6g}",

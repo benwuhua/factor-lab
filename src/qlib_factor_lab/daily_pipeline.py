@@ -219,10 +219,17 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
 
     current_positions = _load_current_positions(root_path, inputs.current_positions_csv)
     tradable_signal = apply_tradability_filter(signal, load_trading_config(_resolve(root_path, inputs.trading_config_path)))
-    portfolio = build_target_portfolio(
+    research_portfolio = build_target_portfolio(
         tradable_signal,
         load_portfolio_config(_resolve(root_path, inputs.portfolio_config_path)),
         current_positions=current_positions,
+    )
+    _write_pipeline_portfolio_outputs(
+        research_portfolio,
+        run_dir,
+        artifacts,
+        artifact_prefix="research",
+        summary_title="Research Portfolio Summary",
     )
 
     diagnostics = (
@@ -231,13 +238,18 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         else _load_factor_diagnostics(root_path, run_date)
     )
     pre_review_stock_cards = build_stock_cards(
-        portfolio,
+        research_portfolio,
         run_id=f"daily_{run_date.replace('-', '')}",
         as_of_date=run_date,
         gate_decision="pending",
     )
     expert_review_path = run_dir / "expert_review_packet.md"
-    expert_review_packet = build_expert_review_packet(portfolio, diagnostics, run_date=run_date, stock_cards=pre_review_stock_cards)
+    expert_review_packet = build_expert_review_packet(
+        research_portfolio,
+        diagnostics,
+        run_date=run_date,
+        stock_cards=pre_review_stock_cards,
+    )
     expert_review_path.write_text(expert_review_packet, encoding="utf-8")
     artifacts["expert_review_packet"] = str(expert_review_path)
     expert_review_config = load_expert_review_run_config(execution_config)
@@ -248,8 +260,8 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     )
     expert_review_result_path = write_expert_review_result(expert_review, run_dir / "expert_review_result.md")
     artifacts["expert_review_result"] = str(expert_review_result_path)
-    portfolio, expert_review_gate = apply_expert_review_portfolio_gate(
-        portfolio,
+    execution_portfolio, expert_review_gate = apply_expert_review_portfolio_gate(
+        research_portfolio,
         decision=expert_review.decision,
         review_status=expert_review.status,
         review_required=expert_review_config.required,
@@ -258,11 +270,22 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         review_output=expert_review.output,
         manual_confirmation=expert_review_config.manual_confirmation,
     )
-    portfolio_path = write_target_portfolio(portfolio, run_dir / "target_portfolio.csv")
-    portfolio_summary_path = write_portfolio_summary(portfolio, run_dir / "target_portfolio_summary.md")
+    _write_pipeline_portfolio_outputs(
+        execution_portfolio,
+        run_dir,
+        artifacts,
+        artifact_prefix="execution",
+        summary_title="Execution Portfolio Summary",
+    )
+    portfolio_path = write_target_portfolio(execution_portfolio, run_dir / "target_portfolio.csv")
+    portfolio_summary_path = write_portfolio_summary(
+        execution_portfolio,
+        run_dir / "target_portfolio_summary.md",
+        title="Execution Portfolio Summary",
+    )
     artifacts.update({"target_portfolio": str(portfolio_path), "target_portfolio_summary": str(portfolio_summary_path)})
     stock_cards = build_stock_cards(
-        portfolio,
+        execution_portfolio,
         run_id=f"daily_{run_date.replace('-', '')}",
         as_of_date=run_date,
         gate_decision=expert_review_gate["status"],
@@ -302,7 +325,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
 
     risk_config = load_risk_config(_resolve(root_path, inputs.risk_config_path))
     risk_report = check_portfolio_risk(
-        portfolio,
+        execution_portfolio,
         tradable_signal,
         risk_config,
         current_positions=current_positions,
@@ -352,7 +375,9 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
 
     execution_path = _resolve(root_path, inputs.execution_config_path)
     broker = load_broker_adapter(load_yaml(execution_path), run_id=f"{run_date.replace('-', '')}-paper")
-    orders = broker.submit_orders(broker.validate_orders(build_order_suggestions(portfolio, current_positions, load_order_config(execution_path))))
+    orders = broker.submit_orders(
+        broker.validate_orders(build_order_suggestions(execution_portfolio, current_positions, load_order_config(execution_path)))
+    )
     fills = broker.fetch_fills(orders)
     expected = broker.fetch_positions(current_positions, fills)
     reconcile_report = broker.reconcile(expected, expected.copy())
@@ -697,6 +722,24 @@ def _write_portfolio_gate_explanation(
             )
     output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return output
+
+
+def _write_pipeline_portfolio_outputs(
+    portfolio: pd.DataFrame,
+    run_dir: Path,
+    artifacts: dict[str, str],
+    *,
+    artifact_prefix: str,
+    summary_title: str,
+) -> None:
+    portfolio_path = write_target_portfolio(portfolio, run_dir / f"{artifact_prefix}_portfolio.csv")
+    summary_path = write_portfolio_summary(
+        portfolio,
+        run_dir / f"{artifact_prefix}_portfolio_summary.md",
+        title=summary_title,
+    )
+    artifacts[f"{artifact_prefix}_portfolio"] = str(portfolio_path)
+    artifacts[f"{artifact_prefix}_portfolio_summary"] = str(summary_path)
 
 
 def _portfolio_gate_decision(failed_rows: list[dict[str, Any]], expert_review_gate: dict[str, str]) -> str:

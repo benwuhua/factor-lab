@@ -220,6 +220,14 @@ make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv RUN_DATE
 
 Stock cards are JSONL evidence packets that combine target weights, factor drivers, event evidence, trading state, gate context, and audit fields.
 
+Daily pipeline bundles now separate research and execution semantics:
+
+- `research_portfolio.csv`: factor-driven research candidates.
+- `execution_portfolio.csv`: post-review, post-gate execution candidates.
+- `target_portfolio.csv`: legacy alias for the execution portfolio.
+
+See `docs/portfolio-construction-reading-spine.md` for the portfolio construction reference spine.
+
 The report reads `reports/approved_factors.yaml` when available so factor drivers such as `top_factor_1` and `top_factor_2` can be grouped by approved factor family. Outputs are written under `reports/exposure_attribution/`.
 
 The portfolio risk gate can also enforce exposure maturity checks from `configs/risk.yaml`:
