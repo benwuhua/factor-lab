@@ -21,8 +21,7 @@ portfolio:
   confirmation_exclude_families:
     - fundamental_quality
   confirmation_min_score: 0.05
-  required_min_scores:
-    quality_low_leverage_contribution: 0.0
+  required_min_scores: {}
 
 output:
   target_portfolio: reports/target_portfolio_{run_yyyymmdd}.csv

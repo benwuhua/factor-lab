@@ -8,12 +8,17 @@ import pandas as pd
 import yaml
 
 from qlib_factor_lab.data_quality import DataQualityConfig, check_signal_quality
-from qlib_factor_lab.portfolio import PortfolioConfig, build_target_portfolio
+from qlib_factor_lab.portfolio import PortfolioConfig, build_target_portfolio, load_portfolio_config
 from qlib_factor_lab.risk import RiskConfig, check_portfolio_risk
 from qlib_factor_lab.tradability import TradabilityConfig, apply_tradability_filter
 
 
 class StageCTests(unittest.TestCase):
+    def test_default_portfolio_config_does_not_gate_on_retired_factor_columns(self):
+        config = load_portfolio_config(Path(__file__).resolve().parents[1] / "configs/portfolio.yaml")
+
+        self.assertNotIn("quality_low_leverage_contribution", config.required_min_scores)
+
     def test_signal_quality_fails_closed_on_missing_required_column(self):
         signal = self._signal().drop(columns=["ensemble_score"])
 
