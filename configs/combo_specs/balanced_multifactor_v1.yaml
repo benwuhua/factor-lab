@@ -1,14 +1,15 @@
 name: balanced_multifactor_v1
-description: "Balanced A-share multi-factor candidate: quality, growth improvement, cashflow quality, low gap risk, quiet breakout, PIT value, and dividend yield."
+description: "Balanced A-share multi-factor candidate: growth improvement, cashflow quality, low gap risk, quiet breakout, PIT value, and dividend yield. quality_low_leverage is kept as a watch-only member until stability improves."
 fundamental_path: data/fundamental_quality.csv
 members:
   - name: quality_low_leverage
+    active: false
     source: fundamental_quality
     family: fundamental_quality
     logic_bucket: quality_low_leverage
     direction: 1
     weight: 0.00
-    approval_status: core
+    approval_status: watch
     regime_profile: all_weather
     components:
       - field: roe

@@ -186,6 +186,15 @@ class ComboSpecTests(unittest.TestCase):
             self.assertEqual(12.0, float(aaa["roe"]))
             self.assertEqual(20.0, float(aaa["debt_ratio"]))
 
+    def test_balanced_multifactor_disables_unstable_quality_member(self):
+        spec = load_combo_spec(Path(__file__).resolve().parents[1] / "configs/combo_specs/balanced_multifactor_v1.yaml")
+        by_name = {member.name: member for member in spec.members}
+        factors = signal_factors_from_combo_spec(spec)
+
+        self.assertIn("quality_low_leverage", by_name)
+        self.assertFalse(by_name["quality_low_leverage"].active)
+        self.assertNotIn("quality_low_leverage", [factor.name for factor in factors])
+
 
 if __name__ == "__main__":
     unittest.main()
