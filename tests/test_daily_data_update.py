@@ -25,10 +25,31 @@ class DailyDataUpdateTest(unittest.TestCase):
             names,
         )
         self.assertIn("--universe", steps[0].command)
+        self.assertIn("scripts/build_tushare_qlib_data.py", steps[0].command)
         self.assertIn("csi500", steps[0].command)
         self.assertIn("configs/provider_current.yaml", steps[0].command)
         self.assertIn("csi300", steps[1].command)
         self.assertIn("configs/provider_csi300_current.yaml", steps[1].command)
+
+    def test_plan_can_fallback_to_akshare_market_data_provider(self) -> None:
+        config = DailyDataUpdateConfig(project_root=Path("/repo"), as_of_date="2026-04-27", market_data_provider="akshare")
+
+        steps = build_daily_data_update_plan(config)
+
+        self.assertIn("scripts/build_akshare_qlib_data.py", steps[0].command)
+        self.assertIn("data/akshare/source_csi500", steps[0].command)
+
+    def test_plan_can_use_tushare_market_data_provider_for_both_universes(self) -> None:
+        config = DailyDataUpdateConfig(project_root=Path("/repo"), as_of_date="2026-04-27", market_data_provider="tushare")
+
+        steps = build_daily_data_update_plan(config)
+
+        self.assertEqual("market_data_csi500", steps[0].name)
+        self.assertIn("scripts/build_tushare_qlib_data.py", steps[0].command)
+        self.assertIn("data/tushare/source_csi500", steps[0].command)
+        self.assertEqual("market_data_csi300", steps[1].name)
+        self.assertIn("scripts/build_tushare_qlib_data.py", steps[1].command)
+        self.assertIn("data/tushare/source_csi300", steps[1].command)
 
     def test_plan_can_skip_market_data_for_fast_context_refresh(self) -> None:
         config = DailyDataUpdateConfig(project_root=Path("/repo"), as_of_date="2026-04-27", skip_market_data=True)
@@ -55,6 +76,34 @@ class DailyDataUpdateTest(unittest.TestCase):
         self.assertIn("50", research_step.command)
         self.assertIn("--offset", research_step.command)
         self.assertIn("100", research_step.command)
+
+    def test_plan_defaults_to_tushare_fundamental_provider(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-27",
+            fetch_fundamentals=True,
+        )
+
+        steps = build_daily_data_update_plan(config)
+        research_step = steps[-2]
+
+        self.assertEqual("research_data_domains", research_step.name)
+        self.assertIn("--fundamental-provider", research_step.command)
+        self.assertIn("tushare", research_step.command)
+
+    def test_plan_can_fallback_to_akshare_fundamental_provider(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-27",
+            fetch_fundamentals=True,
+            fundamental_provider="akshare",
+        )
+
+        steps = build_daily_data_update_plan(config)
+        research_step = steps[-2]
+
+        self.assertIn("--fundamental-provider", research_step.command)
+        self.assertIn("akshare", research_step.command)
 
     def test_write_update_manifest_records_step_statuses(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

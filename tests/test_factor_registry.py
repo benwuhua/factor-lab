@@ -111,6 +111,24 @@ class FactorRegistryTests(unittest.TestCase):
             promoted,
         )
 
+    def test_project_registry_contains_tushare_daily_basic_factor_fields(self):
+        root = Path(__file__).resolve().parents[1]
+        factors = load_factor_registry(root / "factors/registry.yaml")
+        by_name = {factor.name: factor for factor in factors}
+
+        expected = {
+            "tushare_ep_ttm": "$pe_ttm",
+            "tushare_bp": "$pb",
+            "tushare_dividend_yield": "$dividend_yield",
+            "tushare_amount_20": "$amount",
+            "tushare_free_float_turnover_20": "$turnover_rate_f",
+            "tushare_total_mv": "$total_mv",
+        }
+        for name, field in expected.items():
+            with self.subTest(name=name):
+                self.assertIn(name, by_name)
+                self.assertIn(field, by_name[name].expression)
+
 
 if __name__ == "__main__":
     unittest.main()

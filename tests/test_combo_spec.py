@@ -208,6 +208,17 @@ class ComboSpecTests(unittest.TestCase):
         self.assertLessEqual(by_family.get("dividend", 0.0), 0.05)
         self.assertIn("growth_improvement", [member.name for member in active])
 
+    def test_tushare_market_enriched_spec_uses_daily_basic_value_dividend_liquidity_fields(self):
+        spec = load_combo_spec(Path(__file__).resolve().parents[1] / "configs/combo_specs/tushare_market_enriched_v1.yaml")
+        by_name = {member.name: member for member in spec.members}
+
+        self.assertIn("$pe_ttm", by_name["tushare_ep_ttm"].expression)
+        self.assertIn("$pb", by_name["tushare_bp"].expression)
+        self.assertIn("$dividend_yield", by_name["tushare_dividend_yield"].expression)
+        self.assertIn("$turnover_rate_f", by_name["tushare_free_float_turnover_20"].expression)
+        self.assertIn("$total_mv", by_name["tushare_total_mv"].expression)
+        self.assertEqual("qlib_expression", by_name["tushare_amount_20"].source)
+
 
 if __name__ == "__main__":
     unittest.main()

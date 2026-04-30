@@ -18,9 +18,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Incrementally refresh market data, research data domains, and governance reports.")
     parser.add_argument("--project-root", default=str(default_root))
     parser.add_argument("--as-of-date", default=today_for_daily_data())
+    parser.add_argument("--market-data-provider", default="tushare", choices=["akshare", "tushare"])
     parser.add_argument("--skip-market-data", action="store_true")
     parser.add_argument("--skip-research-context", action="store_true")
     parser.add_argument("--fetch-fundamentals", action="store_true")
+    parser.add_argument("--fundamental-provider", default="tushare", choices=["akshare", "tushare"])
     parser.add_argument("--derive-valuation-fields", action="store_true")
     parser.add_argument("--fetch-cninfo-dividends", action="store_true")
     parser.add_argument("--fundamental-source", default=None)
@@ -35,9 +37,11 @@ def main() -> int:
     config = DailyDataUpdateConfig(
         project_root=root,
         as_of_date=args.as_of_date,
+        market_data_provider=args.market_data_provider,
         skip_market_data=args.skip_market_data,
         skip_research_context=args.skip_research_context,
         fetch_fundamentals=args.fetch_fundamentals,
+        fundamental_provider=args.fundamental_provider,
         derive_valuation_fields=args.derive_valuation_fields,
         fetch_cninfo_dividends=args.fetch_cninfo_dividends,
         fundamental_source=Path(args.fundamental_source) if args.fundamental_source else None,

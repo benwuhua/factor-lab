@@ -329,6 +329,43 @@ class ResearchDataDomainsTest(unittest.TestCase):
             self.assertEqual({"SH600000", "SZ000001"}, set(fundamentals["instrument"]))
             self.assertEqual({"SH600000", "SZ000001"}, set(dividends["instrument"]))
 
+    def test_write_research_data_domains_can_fetch_fundamentals_from_tushare(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame([{"instrument": "SZ000001", "name": "平安银行"}]).to_csv(
+                root / "data/security_master.csv",
+                index=False,
+            )
+
+            fetched = pd.DataFrame(
+                [
+                    {
+                        "instrument": "SZ000001",
+                        "report_period": "2026-03-31",
+                        "announce_date": "2026-04-20",
+                        "available_at": "2026-04-20",
+                        "roe": 8.5,
+                        "gross_margin": 31.2,
+                        "debt_ratio": 42.1,
+                        "source": "tushare_fina_indicator_vip",
+                    }
+                ]
+            )
+
+            with patch("qlib_factor_lab.research_data_domains.fetch_fundamental_quality_from_tushare", return_value=fetched) as mocked:
+                write_research_data_domains(
+                    root,
+                    as_of_date="2026-04-30",
+                    fetch_fundamentals=True,
+                    fundamental_provider="tushare",
+                )
+
+            mocked.assert_called_once()
+            result = pd.read_csv(root / "data/fundamental_quality.csv")
+            self.assertEqual(["SZ000001"], result["instrument"].tolist())
+            self.assertEqual(["tushare_fina_indicator_vip"], result["source"].tolist())
+
     def test_write_research_data_domains_passes_offset_to_live_fetchers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

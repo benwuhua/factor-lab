@@ -10,9 +10,11 @@ from pathlib import Path
 class DailyDataUpdateConfig:
     project_root: Path
     as_of_date: str
+    market_data_provider: str = "tushare"
     skip_market_data: bool = False
     skip_research_context: bool = False
     fetch_fundamentals: bool = False
+    fundamental_provider: str = "tushare"
     derive_valuation_fields: bool = False
     fetch_cninfo_dividends: bool = False
     fundamental_source: Path | None = None
@@ -34,19 +36,24 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
     steps: list[DataUpdateStep] = []
 
     if not config.skip_market_data:
+        market_provider = str(config.market_data_provider or "akshare").strip().lower()
+        if market_provider not in {"akshare", "tushare"}:
+            raise ValueError(f"unsupported market_data_provider: {config.market_data_provider}")
+        market_script = "scripts/build_tushare_qlib_data.py" if market_provider == "tushare" else "scripts/build_akshare_qlib_data.py"
+        market_source_root = "data/tushare" if market_provider == "tushare" else "data/akshare"
         steps.extend(
             [
                 DataUpdateStep(
                     "market_data_csi500",
                     (
                         python_bin,
-                        "scripts/build_akshare_qlib_data.py",
+                        market_script,
                         "--universe",
                         "csi500",
                         "--end",
                         yyyymmdd,
                         "--source-dir",
-                        "data/akshare/source_csi500",
+                        f"{market_source_root}/source_csi500",
                         "--qlib-dir",
                         "data/qlib/cn_data_current",
                         "--provider-config",
@@ -59,13 +66,13 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
                     "market_data_csi300",
                     (
                         python_bin,
-                        "scripts/build_akshare_qlib_data.py",
+                        market_script,
                         "--universe",
                         "csi300",
                         "--end",
                         yyyymmdd,
                         "--source-dir",
-                        "data/akshare/source_csi300",
+                        f"{market_source_root}/source_csi300",
                         "--qlib-dir",
                         "data/qlib/cn_data_csi300_current",
                         "--provider-config",
@@ -106,7 +113,13 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
         config.as_of_date,
     )
     if config.fetch_fundamentals:
-        research_domain_command += ("--fetch-fundamentals", "--delay", str(config.delay))
+        research_domain_command += (
+            "--fetch-fundamentals",
+            "--fundamental-provider",
+            str(config.fundamental_provider),
+            "--delay",
+            str(config.delay),
+        )
         research_domain_command += _limit_args(config.limit)
     if config.derive_valuation_fields:
         research_domain_command += ("--derive-valuation-fields",)

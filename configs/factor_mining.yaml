@@ -107,6 +107,36 @@ templates:
     direction: 1
     category: candidate_liquidity
     description: "{window} day average traded amount as a liquidity proxy."
+  - name: tushare_ep_ttm
+    expression: "1 / ($pe_ttm + 0.000001)"
+    direction: 1
+    category: candidate_value
+    description: "Tushare daily_basic PE TTM inverted into an earnings-yield value proxy."
+  - name: tushare_bp
+    expression: "1 / ($pb + 0.000001)"
+    direction: 1
+    category: candidate_value
+    description: "Tushare daily_basic PB inverted into a book-to-price value proxy."
+  - name: tushare_dividend_yield
+    expression: "$dividend_yield"
+    direction: 1
+    category: candidate_dividend
+    description: "Tushare daily_basic dividend yield candidate."
+  - name: tushare_amount_20
+    expression: "Mean($amount, 20)"
+    direction: 1
+    category: candidate_liquidity
+    description: "20 day average traded amount from the Tushare-backed market data."
+  - name: tushare_free_float_turnover_20
+    expression: "Mean($turnover_rate_f, 20)"
+    direction: 1
+    category: candidate_liquidity
+    description: "20 day average free-float turnover from Tushare daily_basic."
+  - name: tushare_total_mv
+    expression: "$total_mv"
+    direction: 1
+    category: candidate_size_capacity
+    description: "Tushare daily_basic total market value for capacity and size exposure diagnostics."
   - name: amihud_illiq_{window}
     expression: "Mean(Abs($close / Ref($close, 1) - 1) / ($amount + 1), {window})"
     windows: [10, 20, 60]

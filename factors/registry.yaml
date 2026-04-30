@@ -34,6 +34,36 @@ factors:
     direction: 1
     category: volume
     description: "Recent volume activity relative to the medium-term baseline."
+  - name: tushare_ep_ttm
+    expression: "1 / ($pe_ttm + 0.000001)"
+    direction: 1
+    category: value
+    description: "Tushare daily_basic earnings yield proxy from PE TTM; higher is cheaper, negative PE naturally ranks poorly."
+  - name: tushare_bp
+    expression: "1 / ($pb + 0.000001)"
+    direction: 1
+    category: value
+    description: "Tushare daily_basic book-to-price proxy from PB; higher is cheaper."
+  - name: tushare_dividend_yield
+    expression: "$dividend_yield"
+    direction: 1
+    category: dividend
+    description: "Tushare daily_basic dividend yield field."
+  - name: tushare_amount_20
+    expression: "Mean($amount, 20)"
+    direction: 1
+    category: liquidity
+    description: "20 day average traded amount from the Tushare-backed Qlib market data."
+  - name: tushare_free_float_turnover_20
+    expression: "Mean($turnover_rate_f, 20)"
+    direction: 1
+    category: liquidity
+    description: "20 day average free-float turnover from Tushare daily_basic."
+  - name: tushare_total_mv
+    expression: "$total_mv"
+    direction: 1
+    category: size_capacity
+    description: "Tushare daily_basic total market value, mainly for capacity and exposure diagnostics."
   - name: price_position_20
     expression: "($close - Min($low, 20)) / (Max($high, 20) - Min($low, 20) + 1e-12)"
     direction: 1

@@ -82,10 +82,14 @@ RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
 DAILY_DATA_AS_OF ?= $(shell PYTHONPATH=src $(PYTHON) -c "from qlib_factor_lab.akshare_data import today_for_daily_data; print(today_for_daily_data().replace('-', ''))")
+DAILY_DATA_MARKET_PROVIDER ?= tushare
+DAILY_DATA_MARKET_PROVIDER_ARG = $(if $(DAILY_DATA_MARKET_PROVIDER),--market-data-provider $(DAILY_DATA_MARKET_PROVIDER),)
 DAILY_DATA_SKIP_MARKET ?= 0
 DAILY_DATA_SKIP_MARKET_ARG = $(if $(filter 1 true yes TRUE YES,$(DAILY_DATA_SKIP_MARKET)),--skip-market-data,)
 DAILY_DATA_FETCH_FUNDAMENTALS ?= 0
 DAILY_DATA_FETCH_FUNDAMENTALS_ARG = $(if $(filter 1 true yes TRUE YES,$(DAILY_DATA_FETCH_FUNDAMENTALS)),--fetch-fundamentals,)
+DAILY_DATA_FUNDAMENTAL_PROVIDER ?= tushare
+DAILY_DATA_FUNDAMENTAL_PROVIDER_ARG = $(if $(DAILY_DATA_FUNDAMENTAL_PROVIDER),--fundamental-provider $(DAILY_DATA_FUNDAMENTAL_PROVIDER),)
 DAILY_DATA_DERIVE_VALUATION_FIELDS ?= 0
 DAILY_DATA_DERIVE_VALUATION_FIELDS_ARG = $(if $(filter 1 true yes TRUE YES,$(DAILY_DATA_DERIVE_VALUATION_FIELDS)),--derive-valuation-fields,)
 DAILY_DATA_FETCH_CNINFO_DIVIDENDS ?= 0
@@ -174,6 +178,8 @@ help:
 	@printf "  make research-context RUN_DATE=20260420\n"
 	@printf "  make research-data-domains RUN_DATE=20260420\n"
 	@printf "  make daily-data-update DAILY_DATA_AS_OF=20260420 DAILY_DATA_DRY_RUN=1\n"
+	@printf "  make daily-data-update DAILY_DATA_MARKET_PROVIDER=tushare DAILY_DATA_LIMIT=5\n"
+	@printf "  make daily-data-update DAILY_DATA_FETCH_FUNDAMENTALS=1 DAILY_DATA_FUNDAMENTAL_PROVIDER=tushare\n"
 	@printf "  make data-governance RUN_DATE=20260420\n"
 	@printf "  make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv\n"
 	@printf "  make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv\n"
@@ -221,6 +227,7 @@ research-data-domains:
 	$(PYTHON) scripts/build_research_data_domains.py \
 		--as-of-date $(RESEARCH_CONTEXT_AS_OF) \
 		$(DAILY_DATA_FETCH_FUNDAMENTALS_ARG) \
+		$(DAILY_DATA_FUNDAMENTAL_PROVIDER_ARG) \
 		$(DAILY_DATA_DERIVE_VALUATION_FIELDS_ARG) \
 		$(DAILY_DATA_FETCH_CNINFO_DIVIDENDS_ARG) \
 		$(DAILY_DATA_FUNDAMENTAL_SOURCE_ARG) \
@@ -231,8 +238,10 @@ daily-data-update:
 	$(PYTHON) scripts/update_daily_data.py \
 		--as-of-date $(DAILY_DATA_AS_OF) \
 		--manifest $(DAILY_DATA_MANIFEST) \
+		$(DAILY_DATA_MARKET_PROVIDER_ARG) \
 		$(DAILY_DATA_SKIP_MARKET_ARG) \
 		$(DAILY_DATA_FETCH_FUNDAMENTALS_ARG) \
+		$(DAILY_DATA_FUNDAMENTAL_PROVIDER_ARG) \
 		$(DAILY_DATA_DERIVE_VALUATION_FIELDS_ARG) \
 		$(DAILY_DATA_FETCH_CNINFO_DIVIDENDS_ARG) \
 		$(DAILY_DATA_FUNDAMENTAL_SOURCE_ARG) \

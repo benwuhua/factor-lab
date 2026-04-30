@@ -9,6 +9,7 @@ from typing import Any, Iterable
 import pandas as pd
 
 from .akshare_data import akshare_code_from_qlib, qlib_symbol_from_code
+from .tushare_data import fetch_fundamental_quality_from_tushare
 
 
 FUNDAMENTAL_QUALITY_COLUMNS = [
@@ -403,6 +404,7 @@ def write_research_data_domains(
     dividend_output: str | Path = "data/cninfo_dividends.csv",
     price_source_dirs: Iterable[str | Path] = ("data/akshare/source_csi300", "data/akshare/source_csi500"),
     fetch_fundamentals: bool = False,
+    fundamental_provider: str = "akshare",
     derive_valuation_fields: bool = False,
     fetch_cninfo_dividends: bool = False,
     limit: int | None = None,
@@ -417,13 +419,26 @@ def write_research_data_domains(
     if fundamental_source is not None:
         fundamentals = normalize_fundamental_quality(pd.read_csv(_resolve(root, fundamental_source)), as_of_date=as_of_date)
     elif fetch_fundamentals:
-        fetched_fundamentals = fetch_fundamental_quality_from_akshare(
-            security_master.get("instrument", pd.Series(dtype=str)).dropna().astype(str).tolist(),
-            as_of_date=as_of_date,
-            limit=limit,
-            offset=offset,
-            delay=delay,
-        )
+        instruments = security_master.get("instrument", pd.Series(dtype=str)).dropna().astype(str).tolist()
+        provider = str(fundamental_provider or "akshare").strip().lower()
+        if provider == "akshare":
+            fetched_fundamentals = fetch_fundamental_quality_from_akshare(
+                instruments,
+                as_of_date=as_of_date,
+                limit=limit,
+                offset=offset,
+                delay=delay,
+            )
+        elif provider == "tushare":
+            fetched_fundamentals = fetch_fundamental_quality_from_tushare(
+                instruments,
+                as_of_date=as_of_date,
+                limit=limit,
+                offset=offset,
+                delay=delay,
+            )
+        else:
+            raise ValueError(f"unsupported fundamental_provider: {fundamental_provider}")
         fundamentals = _merge_domain_rows(
             existing_fundamentals,
             fetched_fundamentals,

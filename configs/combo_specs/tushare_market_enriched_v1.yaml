@@ -1,0 +1,58 @@
+name: tushare_market_enriched_v1
+description: "Tushare-backed market enrichment combo: explicit daily_basic value, dividend, liquidity, and capacity fields for post-migration diagnostics before promotion into the production portfolio."
+fundamental_path: data/fundamental_quality.csv
+members:
+  - name: tushare_ep_ttm
+    source: qlib_expression
+    expression: "1 / ($pe_ttm + 0.000001)"
+    family: market_value
+    logic_bucket: fundamental_value
+    direction: 1
+    weight: 0.12
+    approval_status: challenger
+    regime_profile: all_weather
+  - name: tushare_bp
+    source: qlib_expression
+    expression: "1 / ($pb + 0.000001)"
+    family: market_value
+    logic_bucket: fundamental_value
+    direction: 1
+    weight: 0.12
+    approval_status: challenger
+    regime_profile: all_weather
+  - name: tushare_dividend_yield
+    source: qlib_expression
+    expression: "$dividend_yield"
+    family: market_dividend
+    logic_bucket: fundamental_dividend
+    direction: 1
+    weight: 0.08
+    approval_status: challenger
+    regime_profile: down_sideways
+  - name: tushare_amount_20
+    source: qlib_expression
+    expression: "Mean($amount, 20)"
+    family: liquidity_capacity
+    logic_bucket: liquidity_capacity
+    direction: 1
+    weight: 0.08
+    approval_status: challenger
+    regime_profile: all_weather
+  - name: tushare_free_float_turnover_20
+    source: qlib_expression
+    expression: "Mean($turnover_rate_f, 20)"
+    family: liquidity_attention
+    logic_bucket: liquidity_attention
+    direction: 1
+    weight: 0.06
+    approval_status: challenger
+    regime_profile: all_weather
+  - name: tushare_total_mv
+    source: qlib_expression
+    expression: "$total_mv"
+    family: size_capacity
+    logic_bucket: capacity_guardrail
+    direction: 1
+    weight: 0.04
+    approval_status: challenger
+    regime_profile: all_weather

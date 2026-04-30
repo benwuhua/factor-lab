@@ -1,4 +1,7 @@
 .venv/
+.env
+.env.*
+!.env.example
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -10,6 +13,7 @@ configs/qlib_lgb_workflow*.yaml
 data/qlib/
 data/source/
 data/akshare/
+data/tushare/
 reports/*.csv
 reports/*.parquet
 reports/*.png

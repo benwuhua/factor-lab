@@ -19,7 +19,8 @@ def main() -> int:
     parser.add_argument("--project-root", default=str(default_root))
     parser.add_argument("--as-of-date", default=today_for_daily_data())
     parser.add_argument("--fundamental-source", default=None, help="Optional offline raw fundamental CSV to normalize.")
-    parser.add_argument("--fetch-fundamentals", action="store_true", help="Fetch fundamental quality data from AkShare.")
+    parser.add_argument("--fetch-fundamentals", action="store_true", help="Fetch fundamental quality data from the configured provider.")
+    parser.add_argument("--fundamental-provider", default="tushare", choices=["akshare", "tushare"])
     parser.add_argument("--derive-valuation-fields", action="store_true", help="Derive EP/CFP/dividend yield from PIT close prices and dividend records.")
     parser.add_argument("--fetch-cninfo-dividends", action="store_true", help="Fetch dividend records from CNINFO via AkShare.")
     parser.add_argument("--limit", type=int, default=None, help="Limit instruments for smoke tests.")
@@ -32,6 +33,7 @@ def main() -> int:
         as_of_date=args.as_of_date,
         fundamental_source=args.fundamental_source,
         fetch_fundamentals=args.fetch_fundamentals,
+        fundamental_provider=args.fundamental_provider,
         derive_valuation_fields=args.derive_valuation_fields,
         fetch_cninfo_dividends=args.fetch_cninfo_dividends,
         limit=args.limit,
