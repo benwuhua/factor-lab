@@ -270,6 +270,32 @@ class WorkbenchTests(unittest.TestCase):
         self.assertAlmostEqual(float(event.loc["event_block", "weighted_return_pct"]), -1.5)
         self.assertEqual(attribution["contributors"].iloc[0]["instrument"], "CCC")
 
+    def test_execution_performance_attribution_prefers_formal_artifact_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "reports").mkdir()
+            pd.DataFrame(
+                {
+                    "instrument": ["OLD"],
+                    "target_weight": [1.0],
+                    "pct_today": [-9.0],
+                    "weighted_return_pct": [-9.0],
+                }
+            ).to_csv(root / "reports/portfolio_top20_intraday_20260430.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["NEW"],
+                    "target_weight": [1.0],
+                    "pct_today": [1.0],
+                    "weighted_return_pct": [1.0],
+                }
+            ).to_csv(root / "reports/portfolio_intraday_performance_20260430.csv", index=False)
+
+            attribution = build_execution_performance_attribution(root)
+
+        self.assertEqual(attribution["contributors"].iloc[0]["instrument"], "NEW")
+        self.assertIn("portfolio_intraday_performance", attribution["path"])
+
     def test_workbench_snapshot_counts_approved_factors_and_latest_target(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

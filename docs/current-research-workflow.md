@@ -150,6 +150,19 @@ make target-portfolio SIGNAL_CSV=reports/signals_20260420.csv
 make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv
 ```
 
+正式的当日涨跌归因入口：
+
+```bash
+make portfolio-intraday-performance RUN_DATE=20260430
+```
+
+这一步会读取 `runs/<date>/execution_portfolio.csv`，抓取或读取报价快照，写出：
+
+- `runs/<date>/portfolio_intraday_performance.csv`
+- `runs/<date>/portfolio_intraday_performance.md`
+- `reports/portfolio_intraday_performance_<date>.csv`
+- `reports/portfolio_intraday_performance_<date>.md`
+
 输出：
 
 - summary

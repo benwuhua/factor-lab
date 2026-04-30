@@ -51,6 +51,11 @@ EXECUTION_CONFIG ?= configs/execution.yaml
 CURRENT_POSITIONS ?= state/current_positions.csv
 RUN_DATE ?= 20260420
 TARGET_PORTFOLIO ?= reports/target_portfolio_$(RUN_DATE).csv
+PORTFOLIO_INTRADAY_PORTFOLIO ?= runs/$(RUN_DATE)/execution_portfolio.csv
+PORTFOLIO_INTRADAY_QUOTES ?=
+PORTFOLIO_INTRADAY_QUOTES_ARG = $(if $(PORTFOLIO_INTRADAY_QUOTES),--quote-csv $(PORTFOLIO_INTRADAY_QUOTES),)
+PORTFOLIO_INTRADAY_OUTPUT ?= runs/$(RUN_DATE)/portfolio_intraday_performance.csv
+PORTFOLIO_INTRADAY_REPORT ?= runs/$(RUN_DATE)/portfolio_intraday_performance.md
 STOCK_CARDS_OUTPUT ?= reports/stock_cards_$(RUN_DATE).jsonl
 THEME_CONFIG ?= configs/themes/deepseek_ascend_semiconductor.yaml
 THEME_SCAN_OUTPUT ?= reports/theme_scans/deepseek_ascend_semiconductor_$(RUN_DATE).csv
@@ -106,7 +111,7 @@ COMBO_DIAGNOSTICS_WINDOW_ARGS = $(if $(COMBO_DIAGNOSTICS_START_TIME),--start-tim
 EXPERT_REVIEWER ?= manual-reviewer
 EXPERT_CONFIRM_REASON ?= reviewed in workbench
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution portfolio-intraday-performance paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -142,6 +147,7 @@ help:
 	@printf "  make stock-cards      Build JSONL stock research cards from target portfolio\n"
 	@printf "  make theme-scan       Scan a hot theme universe with latest daily signal\n"
 	@printf "  make exposure-attribution  Explain factor-family, industry, and style exposures\n"
+	@printf "  make portfolio-intraday-performance  Build daily execution portfolio PnL attribution\n"
 	@printf "  make paper-orders    Generate paper orders/fills from target portfolio\n"
 	@printf "  make reconcile-account  Reconcile expected vs actual paper positions\n"
 	@printf "  make paper-batch     Run rolling paper batch over target portfolios\n"
@@ -415,6 +421,14 @@ exposure-attribution:
 		--input-csv $(EXPOSURE_INPUT) \
 		--approved-factors reports/approved_factors.yaml \
 		--output-dir $(EXPOSURE_OUTPUT_DIR)
+
+portfolio-intraday-performance:
+	$(PYTHON) scripts/build_portfolio_intraday_performance.py \
+		--portfolio $(PORTFOLIO_INTRADAY_PORTFOLIO) \
+		--run-date $(RUN_DATE) \
+		--output-csv $(PORTFOLIO_INTRADAY_OUTPUT) \
+		--output-md $(PORTFOLIO_INTRADAY_REPORT) \
+		$(PORTFOLIO_INTRADAY_QUOTES_ARG)
 
 paper-orders:
 	$(PYTHON) scripts/generate_orders.py \

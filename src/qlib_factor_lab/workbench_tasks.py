@@ -48,6 +48,12 @@ WORKBENCH_TASKS: dict[str, WorkbenchTask] = {
     "combo-manual-confirm": WorkbenchTask("combo-manual-confirm", "人工确认放行", ("make", "combo-manual-confirm"), "对 caution/manual 专家门禁记录人工确认并重跑组合流水线。"),
     "stock-cards": WorkbenchTask("stock-cards", "生成股票卡片", ("make", "stock-cards"), "把 target_portfolio 转换成可复核 JSONL 股票卡片。"),
     "exposure-attribution": WorkbenchTask("exposure-attribution", "暴露归因", ("make", "exposure-attribution"), "解释行业、因子族和风格暴露。"),
+    "portfolio-intraday-performance": WorkbenchTask(
+        "portfolio-intraday-performance",
+        "今日涨跌归因",
+        ("make", "portfolio-intraday-performance"),
+        "抓取/读取报价并生成正式组合当日涨跌归因产物。",
+    ),
     "paper-orders": WorkbenchTask("paper-orders", "生成纸面订单", ("make", "paper-orders"), "把目标组合转换为纸面订单和模拟成交。"),
     "reconcile-account": WorkbenchTask("reconcile-account", "账户对账", ("make", "reconcile-account"), "对 expected 和 actual positions 做对账。"),
     "paper-batch": WorkbenchTask("paper-batch", "滚动纸面批测", ("make", "paper-batch"), "对历史 target portfolio 做滚动纸面执行复盘。"),
@@ -68,6 +74,10 @@ ALLOWED_TASK_ENV_OVERRIDES = {
     "COMBO_DIAGNOSTICS_OUTPUT",
     "EXPERT_REVIEWER",
     "EXPERT_CONFIRM_REASON",
+    "PORTFOLIO_INTRADAY_PORTFOLIO",
+    "PORTFOLIO_INTRADAY_QUOTES",
+    "PORTFOLIO_INTRADAY_OUTPUT",
+    "PORTFOLIO_INTRADAY_REPORT",
 }
 
 

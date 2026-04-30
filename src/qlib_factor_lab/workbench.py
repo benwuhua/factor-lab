@@ -630,7 +630,9 @@ def build_execution_performance_attribution(
     ).fillna(0.0)
     frame["industry"] = _first_nonblank_column(frame, ["industry_sw", "industry", "industry_csrc"], default="unknown")
     frame["factor"] = _first_nonblank_column(frame, ["top_factor_1", "factor", "family"], default="unknown")
-    frame["event_bucket"] = frame.apply(_performance_event_bucket, axis=1)
+    existing_event_bucket = _first_nonblank_column(frame, ["event_bucket"], default="")
+    computed_event_bucket = frame.apply(_performance_event_bucket, axis=1)
+    frame["event_bucket"] = existing_event_bucket.where(existing_event_bucket.astype(str).str.strip().ne(""), computed_event_bucket)
     contributors = frame.sort_values("weighted_return_pct", ascending=True).reset_index(drop=True)
     keep = [
         column
@@ -1091,9 +1093,14 @@ def _portfolio_layer_action(row: pd.Series) -> str:
 
 
 def _latest_intraday_portfolio_path(root: Path) -> Path | None:
-    candidates = list((root / "reports").glob("portfolio_top*_intraday_*.csv"))
-    candidates.extend((root / "runs").glob("*/portfolio_top*_intraday_*.csv"))
-    return _latest_path(candidates)
+    formal = list((root / "reports").glob("portfolio_intraday_performance_*.csv"))
+    formal.extend((root / "runs").glob("*/portfolio_intraday_performance.csv"))
+    latest_formal = _latest_path(formal)
+    if latest_formal is not None:
+        return latest_formal
+    legacy = list((root / "reports").glob("portfolio_top*_intraday_*.csv"))
+    legacy.extend((root / "runs").glob("*/portfolio_top*_intraday_*.csv"))
+    return _latest_path(legacy)
 
 
 def _empty_execution_performance_attribution(path: Path | None) -> dict[str, Any]:

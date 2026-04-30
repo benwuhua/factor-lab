@@ -1482,7 +1482,15 @@ def _portfolio_gate_rows() -> list[dict[str, object]]:
         {"step": "01 TARGET", "title": "生成目标组合", "command": "make target-portfolio", "status": "ready", "action": "Run", "task_id": "target-portfolio"},
         {"step": "02 ATTR", "title": "暴露归因", "command": "make exposure-attribution", "status": "ready", "action": "Review", "task_id": "exposure-attribution"},
         {
-            "step": "03 CONFIRM",
+            "step": "03 PNL",
+            "title": "今日涨跌归因",
+            "command": "make portfolio-intraday-performance",
+            "status": "quote linked",
+            "action": "Run",
+            "task_id": "portfolio-intraday-performance",
+        },
+        {
+            "step": "04 CONFIRM",
             "title": "人工确认放行",
             "command": "make combo-manual-confirm",
             "status": "manual gate",
@@ -1494,7 +1502,7 @@ def _portfolio_gate_rows() -> list[dict[str, object]]:
                 "EXPERT_CONFIRM_REASON": "confirmed from portfolio gate page",
             },
         },
-        {"step": "04 PAPER", "title": "生成纸面订单", "command": "make paper-orders", "status": "guarded", "action": "Stage", "task_id": "paper-orders"},
+        {"step": "05 PAPER", "title": "生成纸面订单", "command": "make paper-orders", "status": "guarded", "action": "Stage", "task_id": "paper-orders"},
     ]
 
 

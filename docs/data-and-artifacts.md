@@ -92,6 +92,21 @@ Daily portfolio outputs are intentionally split:
 - `research_portfolio.csv`: pre-review research candidates generated from signals.
 - `execution_portfolio.csv`: post-review, post-gate execution candidates used by risk checks and paper orders.
 - `target_portfolio.csv`: legacy alias for `execution_portfolio.csv` kept for older scripts.
+- `portfolio_intraday_performance.csv`: formal intraday performance attribution for the execution portfolio.
+
+Build the intraday attribution artifact for a completed run:
+
+```bash
+make portfolio-intraday-performance RUN_DATE=20260430
+```
+
+For offline or audited quote snapshots:
+
+```bash
+make portfolio-intraday-performance \
+  RUN_DATE=20260430 \
+  PORTFOLIO_INTRADAY_QUOTES=/path/to/quotes.csv
+```
 
 Execution outputs are generated through `BrokerAdapter` implementations:
 
