@@ -2,8 +2,10 @@ import tempfile
 import subprocess
 import sys
 import unittest
+import importlib.util
 from datetime import date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -363,6 +365,39 @@ class AkShareDataTests(unittest.TestCase):
             events = pd.read_csv(root / "data/company_events.csv")
             self.assertEqual(events.loc[0, "event_type"], "regulatory_inquiry")
             self.assertIn("wrote:", result.stdout)
+
+    def test_build_research_context_prefers_current_provider_universe_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data/qlib/cn_data_csi300_current/instruments").mkdir(parents=True)
+            (root / "data/qlib/cn_data_current/instruments").mkdir(parents=True)
+            (root / "data/qlib/cn_data_csi300_current/instruments/csi300_current.txt").write_text(
+                "SH600000\t2015-01-01\t2026-04-29\n",
+                encoding="utf-8",
+            )
+            (root / "data/qlib/cn_data_current/instruments/csi500_current.txt").write_text(
+                "SZ000001\t2015-01-01\t2026-04-29\n",
+                encoding="utf-8",
+            )
+            repo = Path(__file__).resolve().parents[1]
+            spec = importlib.util.spec_from_file_location(
+                "build_research_context_data_for_test",
+                repo / "scripts/build_research_context_data.py",
+            )
+            self.assertIsNotNone(spec)
+            module = importlib.util.module_from_spec(spec)
+            assert spec.loader is not None
+            sys.path.insert(0, str(repo / "scripts"))
+            try:
+                spec.loader.exec_module(module)
+            finally:
+                sys.path.pop(0)
+            args = SimpleNamespace(universes=["csi300", "csi500"], universe_symbols_csv=None)
+
+            with patch.object(module, "fetch_universe_symbols", side_effect=RuntimeError("network unavailable")):
+                result = module._load_universe_symbols(root, args)
+
+            self.assertEqual(result, {"csi300": ["SH600000"], "csi500": ["SZ000001"]})
 
 
 if __name__ == "__main__":

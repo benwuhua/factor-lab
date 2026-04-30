@@ -17,6 +17,7 @@ from qlib_factor_lab.akshare_data import (
     fetch_security_master_snapshot,
     fetch_universe_symbols,
     filter_frame_to_universes,
+    load_symbols_from_existing_qlib,
     load_universe_symbols_csv,
     normalize_akshare_notices,
     normalize_security_master_snapshot,
@@ -86,11 +87,29 @@ def _load_universe_symbols(root: Path, args: argparse.Namespace) -> dict[str, li
     if args.universe_symbols_csv:
         loaded = load_universe_symbols_csv(_resolve(root, args.universe_symbols_csv))
         return {universe: symbols for universe, symbols in loaded.items() if universe in set(args.universes)}
+    current_symbols = _load_current_provider_symbols(root, args.universes)
+    if current_symbols:
+        return current_symbols
     fallback_qlib_dir = root / "data/qlib/cn_data"
     return {
         universe: fetch_universe_symbols(universe, fallback_qlib_dir=fallback_qlib_dir).symbols
         for universe in args.universes
     }
+
+
+def _load_current_provider_symbols(root: Path, universes: list[str]) -> dict[str, list[str]]:
+    provider_specs = {
+        "csi300": (root / "data/qlib/cn_data_csi300_current", "csi300_current"),
+        "csi500": (root / "data/qlib/cn_data_current", "csi500_current"),
+    }
+    loaded: dict[str, list[str]] = {}
+    for universe in universes:
+        qlib_dir, market = provider_specs[universe]
+        symbols = load_symbols_from_existing_qlib(qlib_dir, market)
+        if not symbols:
+            return {}
+        loaded[universe] = symbols
+    return loaded
 
 
 def _resolve(root: Path, path: str | Path) -> Path:
