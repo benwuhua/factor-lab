@@ -2,7 +2,13 @@ import unittest
 
 import pandas as pd
 
-from qlib_factor_lab.event_backtest import EventBacktestConfig, build_event_trades, summarize_trades
+from qlib_factor_lab.event_backtest import (
+    EventBacktestConfig,
+    TwoStageEventBacktestConfig,
+    build_event_trades,
+    build_two_stage_event_trades,
+    summarize_trades,
+)
 
 
 class EventBacktestTests(unittest.TestCase):
@@ -118,6 +124,49 @@ class EventBacktestTests(unittest.TestCase):
 
         self.assertFalse(trades[trades["instrument"] == "A"].empty)
 
+    def test_build_two_stage_event_trades_requires_delayed_confirmation_before_entry(self):
+        frame = self._two_stage_frame()
+
+        trades = build_two_stage_event_trades(
+            frame,
+            setup_col="setup",
+            confirm_col="confirm",
+            config=TwoStageEventBacktestConfig(
+                horizons=(3,),
+                buckets=((0.50, 1.0),),
+                confirmation_delay=3,
+                confirmation_min_score=2.8,
+            ),
+        )
+
+        self.assertEqual(len(trades), 1)
+        trade = trades.iloc[0]
+        self.assertEqual(trade["instrument"], "A")
+        self.assertEqual(trade["signal_date"], pd.Timestamp("2026-01-01"))
+        self.assertEqual(trade["confirmation_date"], pd.Timestamp("2026-01-04"))
+        self.assertEqual(trade["entry_date"], pd.Timestamp("2026-01-05"))
+        self.assertEqual(trade["exit_date"], pd.Timestamp("2026-01-07"))
+        self.assertAlmostEqual(trade["confirmation_score"], 3.2)
+        self.assertAlmostEqual(trade["return"], 16 / 13 - 1)
+
+    def test_build_two_stage_event_trades_can_gate_by_confirmation_percentile(self):
+        frame = self._two_stage_frame()
+
+        trades = build_two_stage_event_trades(
+            frame,
+            setup_col="setup",
+            confirm_col="confirm",
+            config=TwoStageEventBacktestConfig(
+                horizons=(3,),
+                buckets=((0.75, 1.0),),
+                confirmation_delay=3,
+                confirmation_min_percentile=0.90,
+            ),
+        )
+
+        self.assertEqual(trades["instrument"].tolist(), ["A"])
+        self.assertAlmostEqual(trades.iloc[0]["confirmation_score_pct"], 1.0)
+
     def test_summarize_trades_reports_return_quality_metrics(self):
         trades = pd.DataFrame(
             {
@@ -225,6 +274,37 @@ class EventBacktestTests(unittest.TestCase):
             150, 100, 100,
             160, 100, 100,
         ]
+        return frame
+
+    def _two_stage_frame(self):
+        dates = pd.date_range("2026-01-01", periods=8, freq="D")
+        instruments = ["A", "B"]
+        index = pd.MultiIndex.from_product([dates, instruments], names=["datetime", "instrument"])
+        frame = pd.DataFrame(index=index)
+        frame["setup"] = [
+            5, 4,
+            1, 0,
+            1, 0,
+            1, 0,
+            1, 0,
+            1, 0,
+            1, 0,
+            1, 0,
+        ]
+        frame["confirm"] = [
+            0.1, 0.2,
+            0.1, 0.2,
+            0.1, 0.2,
+            3.2, 2.0,
+            0.1, 0.2,
+            0.1, 0.2,
+            0.1, 0.2,
+            0.1, 0.2,
+        ]
+        frame["open"] = [10, 20, 11, 20, 12, 20, 13, 20, 13, 20, 14, 20, 15, 20, 16, 20]
+        frame["close"] = [10, 20, 11, 20, 12, 20, 13, 20, 14, 20, 15, 20, 16, 20, 17, 20]
+        frame["high"] = [10, 20, 11, 20, 12, 20, 13, 20, 14, 20, 15, 20, 17, 20, 18, 20]
+        frame["low"] = [10, 20, 10, 20, 11, 20, 12, 20, 12, 20, 13, 20, 14, 20, 15, 20]
         return frame
 
 
