@@ -14,6 +14,7 @@ suppress_runtime_warnings()
 add_src_to_path()
 
 from qlib_factor_lab.config import load_project_config
+from qlib_factor_lab.combo_spec import load_combo_spec
 from qlib_factor_lab.historical_paper_batch import (
     BatchPaths,
     build_historical_targets,
@@ -41,6 +42,7 @@ def main() -> int:
     parser.add_argument("--signal-config", default="configs/signal.yaml")
     parser.add_argument("--trading-config", default="configs/trading.yaml")
     parser.add_argument("--portfolio-config", default="configs/portfolio.yaml")
+    parser.add_argument("--combo-spec", default=None, help="Optional governed combo spec to score instead of the approved factor list.")
     parser.add_argument("--risk-config", default="configs/risk.yaml")
     parser.add_argument("--execution-config", default="configs/execution.yaml")
     parser.add_argument("--current-positions", default="state/current_positions.csv")
@@ -75,6 +77,7 @@ def main() -> int:
         if signal_config.execution_calendar_path is not None:
             signal_config = replace(signal_config, execution_calendar_path=_resolve(root, signal_config.execution_calendar_path))
         factors = load_approved_signal_factors(_resolve(root, signal_config.approved_factors_path))
+        combo_spec = load_combo_spec(_resolve(root, args.combo_spec)) if args.combo_spec else None
         run_dates = recent_trading_dates(project_config, args.days, args.end_date)
         paths = build_historical_targets(
             project_config,
@@ -87,6 +90,8 @@ def main() -> int:
             _resolve(root, args.signal_dir),
             _resolve(root, args.target_dir),
             current_positions=current_positions,
+            combo_spec=combo_spec,
+            root=root,
         )
         target_paths = paths.target_paths
 

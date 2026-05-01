@@ -6,6 +6,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from .combo_spec import (
+    ComboSpec,
+    build_combo_exposures,
+    market_signal_factors_from_combo_spec,
+    signal_config_for_combo_spec,
+    signal_factors_from_combo_spec,
+)
 from .config import ProjectConfig
 from .data_quality import check_signal_quality
 from .orders import OrderConfig
@@ -52,15 +59,23 @@ def build_historical_targets(
     signal_dir: Path,
     target_dir: Path,
     current_positions: pd.DataFrame | None = None,
+    combo_spec: ComboSpec | None = None,
+    root: str | Path | None = None,
 ) -> BatchPaths:
     signal_paths: list[Path] = []
     target_paths: list[Path] = []
     signal_dir.mkdir(parents=True, exist_ok=True)
     target_dir.mkdir(parents=True, exist_ok=True)
+    root_path = Path(root).expanduser().resolve() if root is not None else signal_dir.resolve().parents[1]
+    base_factors = market_signal_factors_from_combo_spec(combo_spec, factors) if combo_spec is not None else factors
+    target_factors = signal_factors_from_combo_spec(combo_spec, factors) if combo_spec is not None else factors
+    effective_signal_config = signal_config_for_combo_spec(signal_config, combo_spec) if combo_spec is not None else signal_config
     for run_date in run_dates:
-        dated_signal_config = replace(signal_config, run_date=run_date)
-        exposures = fetch_daily_factor_exposures(project_config, factors, run_date, initialize=False)
-        signal = build_daily_signal(exposures, factors, dated_signal_config)
+        dated_signal_config = replace(effective_signal_config, run_date=run_date)
+        exposures = fetch_daily_factor_exposures(project_config, base_factors, run_date, initialize=False)
+        if combo_spec is not None:
+            exposures = build_combo_exposures(root_path, combo_spec, exposures, dated_signal_config)
+        signal = build_daily_signal(exposures, target_factors, dated_signal_config)
         signal_path = signal_dir / f"signals_{run_date.replace('-', '')}.csv"
         write_daily_signal(signal, signal_path)
         signal_paths.append(signal_path)

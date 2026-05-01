@@ -9,6 +9,7 @@ import pandas as pd
 import yaml
 
 from qlib_factor_lab.config import ProjectConfig
+from qlib_factor_lab.combo_spec import load_combo_spec
 from qlib_factor_lab.historical_paper_batch import BatchPaths, build_historical_targets, write_historical_batch_summary
 from qlib_factor_lab.portfolio import PortfolioConfig
 from qlib_factor_lab.risk import RiskConfig
@@ -160,6 +161,100 @@ class HistoricalPaperBatchTests(unittest.TestCase):
                 )
 
             self.assertEqual(calls, [("2026-04-01", False), ("2026-04-02", False)])
+
+    def test_build_historical_targets_can_use_combo_spec_members(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fundamental_path = root / "data/fundamental_quality.csv"
+            fundamental_path.parent.mkdir(parents=True)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB"],
+                    "available_at": ["2026-03-31", "2026-03-31"],
+                    "roe": [0.20, 0.05],
+                }
+            ).to_csv(fundamental_path, index=False)
+            combo_spec = load_combo_spec(
+                {
+                    "name": "test_offensive",
+                    "fundamental_path": str(fundamental_path.relative_to(root)),
+                    "members": [
+                        {
+                            "name": "momentum",
+                            "source": "qlib_expression",
+                            "expression": "$close",
+                            "family": "momentum",
+                            "logic_bucket": "trend",
+                            "direction": 1,
+                            "weight": 0.7,
+                        },
+                        {
+                            "name": "quality_guardrail",
+                            "source": "fundamental_quality",
+                            "family": "quality",
+                            "logic_bucket": "fundamental_quality",
+                            "direction": 1,
+                            "weight": 0.3,
+                            "components": [{"field": "roe", "direction": 1, "weight": 1.0}],
+                        },
+                    ],
+                }
+            )
+            project_config = ProjectConfig(
+                provider_uri=root / "data/qlib",
+                region="cn",
+                market="csi500",
+                benchmark="SH000905",
+                start_time="2026-04-01",
+                end_time="2026-04-01",
+                freq="day",
+            )
+            signal_config = SignalConfig(
+                approved_factors_path=Path("reports/approved_factors.yaml"),
+                provider_config=Path("configs/provider_current.yaml"),
+                run_date="2026-04-01",
+                active_regime="sideways",
+                status_weights={"core": 1.0, "data_gated": 1.0},
+                regime_weights={"all_weather": {"sideways": 1.0}},
+                rule_weight=1.0,
+                model_weight=0.0,
+                signals_output_path=Path("reports/signals.csv"),
+                summary_output_path=Path("reports/signals.md"),
+                execution_calendar_path=None,
+            )
+
+            def fake_fetch(_project_config, factors, run_date, *, initialize=True):
+                self.assertEqual([factor.name for factor in factors], ["momentum"])
+                return pd.DataFrame(
+                    {
+                        "date": [run_date, run_date],
+                        "instrument": ["AAA", "BBB"],
+                        "tradable": [True, True],
+                        "momentum": [1.0, 2.0],
+                        "amount_20d": [100_000_000, 100_000_000],
+                        "last_price": [10.0, 20.0],
+                    }
+                )
+
+            with patch("qlib_factor_lab.historical_paper_batch.fetch_daily_factor_exposures", side_effect=fake_fetch):
+                paths = build_historical_targets(
+                    project_config,
+                    [],
+                    signal_config,
+                    TradabilityConfig(min_amount_20d=10_000_000),
+                    PortfolioConfig(top_k=2, cash_buffer=0.0, max_single_weight=1.0),
+                    RiskConfig(max_single_weight=1.0, min_positions=1, min_signal_coverage=0.1),
+                    ["2026-04-01"],
+                    root / "signals",
+                    root / "targets",
+                    combo_spec=combo_spec,
+                    root=root,
+                )
+
+            target = pd.read_csv(paths.target_paths[0])
+            self.assertIn("family_quality_score", target.columns)
+            self.assertIn("logic_fundamental_quality_score", target.columns)
+            self.assertEqual(len(target), 2)
 
 
 if __name__ == "__main__":
