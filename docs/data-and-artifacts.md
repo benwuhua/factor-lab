@@ -122,8 +122,26 @@ The daily update does these steps in order:
 - Incrementally update CSI500 Qlib bars in `data/qlib/cn_data_current`.
 - Incrementally update CSI300 Qlib bars in `data/qlib/cn_data_csi300_current`.
 - Refresh `data/security_master.csv` and `data/company_events.csv`.
-- Build `data/fundamental_quality.csv`, `data/shareholder_capital.csv`, and `data/announcement_evidence.csv`.
+- Build `data/security_master_history.csv`, `data/fundamental_quality.csv`, `data/shareholder_capital.csv`, and `data/announcement_evidence.csv`.
 - Write `reports/data_governance_<date>.md` and `reports/daily_data_update_<date>.md`.
+
+`security_master_history.csv` is the point-in-time master-data layer used by governance and future portfolio attribution. When no licensed historical master feed is supplied, Factor Lab creates a conservative proxy from the current security master plus the first available local trade date and marks those rows as `current_snapshot_backfilled`.
+
+For a licensed vendor PIT file, use the stable template at `docs/templates/security_master_history_vendor.csv`:
+
+```bash
+python scripts/build_research_data_domains.py \
+  --as-of-date 2026-04-30 \
+  --security-master-history-source /path/to/security_master_history_vendor.csv
+```
+
+Required columns:
+
+```text
+instrument,name,exchange,board,industry_sw,industry_csrc,is_st,listing_date,delisting_date,valid_from,valid_to,research_universes,source,as_of_date
+```
+
+`valid_from` is mandatory and `valid_to` should be blank for the currently active row. If a vendor provides historical industry, ST, board, listing or universe changes, put each effective interval on its own row.
 
 `fundamental_quality.csv` has a stable PIT schema but is only populated when an offline source is supplied or AkShare fundamentals are explicitly enabled:
 

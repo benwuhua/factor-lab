@@ -1,0 +1,3 @@
+instrument,name,exchange,board,industry_sw,industry_csrc,is_st,listing_date,delisting_date,valid_from,valid_to,research_universes,source,as_of_date
+SH600000,浦发银行,SSE,main,银行,货币金融服务,false,1999-11-10,,2020-01-01,,csi300,vendor_pit,2026-04-30
+SH600000,浦发银行,SSE,main,银行II,货币金融服务,false,1999-11-10,,2024-01-01,,csi300,vendor_pit,2026-04-30

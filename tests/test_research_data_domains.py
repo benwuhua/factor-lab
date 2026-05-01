@@ -541,6 +541,30 @@ class ResearchDataDomainsTest(unittest.TestCase):
             self.assertEqual(["vendor_pit"], history["source"].tolist())
             self.assertEqual(["2020-01-01"], history["valid_from"].tolist())
 
+    def test_security_master_history_vendor_template_documents_required_fields(self) -> None:
+        template = Path(__file__).resolve().parents[1] / "docs/templates/security_master_history_vendor.csv"
+
+        frame = pd.read_csv(template)
+
+        required = {
+            "instrument",
+            "name",
+            "exchange",
+            "board",
+            "industry_sw",
+            "industry_csrc",
+            "is_st",
+            "listing_date",
+            "delisting_date",
+            "valid_from",
+            "valid_to",
+            "research_universes",
+            "source",
+            "as_of_date",
+        }
+        self.assertEqual(required <= set(frame.columns), True)
+        self.assertEqual("vendor_pit", frame.loc[0, "source"])
+
     def test_write_research_data_domains_merges_limited_live_refresh_with_existing_data(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

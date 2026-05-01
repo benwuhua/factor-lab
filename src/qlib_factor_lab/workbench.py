@@ -418,6 +418,67 @@ def summarize_stock_cards(cards: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def build_stock_card_announcement_evidence_summary(cards: list[dict[str, Any]]) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    card_count = 0
+    positive = 0
+    risk = 0
+    neutral = 0
+    chunks = 0
+    events = 0
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        rolling = ((card.get("announcement_evidence") or {}).get("rolling_evidence") or {})
+        if not isinstance(rolling, dict) or int(float(rolling.get("chunks") or 0)) <= 0:
+            continue
+        card_count += 1
+        chunks += int(float(rolling.get("chunks") or 0))
+        events += int(float(rolling.get("events") or 0))
+        polarity = rolling.get("polarity_counts") if isinstance(rolling.get("polarity_counts"), dict) else {}
+        positive += int(float(polarity.get("positive") or 0))
+        risk += int(float(polarity.get("risk") or 0))
+        neutral += int(float(polarity.get("neutral") or 0))
+        for item in rolling.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            rows.append(
+                {
+                    "instrument": card.get("instrument", ""),
+                    "name": card.get("name", ""),
+                    "available_at": item.get("available_at", ""),
+                    "event_type": item.get("event_type", ""),
+                    "severity": item.get("severity", ""),
+                    "title": item.get("title", ""),
+                    "source_url": item.get("source_url", ""),
+                }
+            )
+    detail = pd.DataFrame(
+        rows,
+        columns=["instrument", "name", "available_at", "event_type", "severity", "title", "source_url"],
+    )
+    if not detail.empty:
+        detail["_available_at_sort"] = pd.to_datetime(detail["available_at"], errors="coerce")
+        detail = (
+            detail.sort_values(["_available_at_sort", "severity"], ascending=[False, True])
+            .drop(columns=["_available_at_sort"])
+            .reset_index(drop=True)
+        )
+    return {
+        "cards": {
+            "positions_with_evidence": card_count,
+            "chunks": chunks,
+            "events": events,
+            "positive": positive,
+            "risk": risk,
+            "neutral": neutral,
+        },
+        "event_types": _value_counts_frame(detail, "event_type"),
+        "severity": _value_counts_frame(detail, "severity"),
+        "detail": detail,
+    }
+
+
 def find_latest_run_dir(root: str | Path = ".") -> Path | None:
     root_path = Path(root)
     candidates = [

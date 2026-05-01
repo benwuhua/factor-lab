@@ -89,6 +89,7 @@ def _run_workbench_checks(page, base_url: str, expect) -> None:
 
     _click_nav_button(page, "05 组合门禁", expect)
     expect(page.get_by_text("为什么被 caution / reject")).to_be_visible()
+    expect(page.get_by_text("公告证据复核")).to_be_visible()
     expect(page.get_by_text("组合门禁")).to_be_visible()
 
 

@@ -32,6 +32,7 @@ from qlib_factor_lab.workbench import (
     build_research_context_health,
     build_research_evidence_summary,
     build_research_pipeline_status,
+    build_stock_card_announcement_evidence_summary,
     classify_gate_decision,
     find_latest_multilane_report,
     find_latest_run_dir,
@@ -433,6 +434,8 @@ def render_portfolio_gate() -> None:
         factor_logic_map=load_factor_logic_map_safe(ROOT),
     )
     expert = _latest_expert_review()
+    stock_cards = load_stock_cards(ROOT)
+    rolling_announcement = build_stock_card_announcement_evidence_summary(stock_cards)
     pretrade = build_pretrade_review(portfolio)
     evidence = build_research_evidence_summary(portfolio)
     trend = build_portfolio_gate_trend(ROOT)
@@ -484,6 +487,13 @@ def render_portfolio_gate() -> None:
             st.caption(expert["risk_notes"])
         if expert["watchlist"]:
             st.dataframe(pd.DataFrame({"instrument": expert["watchlist"]}), width="stretch", hide_index=True)
+        st.markdown(_section_header_html("公告证据复核", "rolling evidence from stock cards"), unsafe_allow_html=True)
+        st.markdown(_announcement_evidence_review_cards_html(rolling_announcement["cards"]), unsafe_allow_html=True)
+        rolling_detail = rolling_announcement["detail"]
+        if rolling_detail.empty:
+            st.info("当前 stock cards 没有滚动公告证据摘要。")
+        else:
+            st.dataframe(rolling_detail, width="stretch", hide_index=True)
         structured_reasons = pd.DataFrame(expert.get("structured_reasons") or [])
         if not structured_reasons.empty:
             display_reasons = structured_reasons.copy()
@@ -828,6 +838,8 @@ def render_stock_cards() -> None:
     for card in cards:
         signal = card.get("current_signal", {})
         evidence = card.get("evidence", {})
+        rolling = (card.get("announcement_evidence", {}) or {}).get("rolling_evidence", {}) or {}
+        polarity = rolling.get("polarity_counts", {}) if isinstance(rolling.get("polarity_counts"), dict) else {}
         audit = card.get("audit", {})
         review = card.get("review_questions", {})
         identity = card.get("identity", {})
@@ -842,12 +854,18 @@ def render_stock_cards() -> None:
                 "ensemble_score": signal.get("ensemble_score"),
                 "top_factor_1": signal.get("top_factor_1", ""),
                 "event_count": evidence.get("event_count", 0),
+                "rolling_chunks": rolling.get("chunks", 0),
+                "evidence_positive": polarity.get("positive", 0),
+                "evidence_risk": polarity.get("risk", 0),
                 "max_event_severity": evidence.get("max_event_severity", ""),
                 "risk_flags": evidence.get("risk_flags", ""),
                 "gate_reason": review.get("gate_reason", ""),
             }
         )
     frame = pd.DataFrame(rows)
+    rolling_summary = build_stock_card_announcement_evidence_summary(cards)
+    st.markdown(_section_header_html("公告证据复核", "positive / risk / neutral from rolling evidence"), unsafe_allow_html=True)
+    st.markdown(_announcement_evidence_review_cards_html(rolling_summary["cards"]), unsafe_allow_html=True)
     st.dataframe(frame, width="stretch", hide_index=True)
 
     selected = st.selectbox("查看卡片详情", frame["instrument"].astype(str).tolist())
@@ -1399,6 +1417,23 @@ def _evidence_cards_html(cards: dict[str, object]) -> str:
         for label, value in items
     )
     return f'<section class="evidence-grid">{html}</section>'
+
+
+def _announcement_evidence_review_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("Positions", cards.get("positions_with_evidence", 0), "有公告证据的候选"),
+        ("Chunks", cards.get("chunks", 0), "滚动证据片段"),
+        ("Positive", cards.get("positive", 0), "回购/增持等正向线索"),
+        ("Risk", cards.get("risk", 0), "监管/减持/风险事件"),
+        ("Neutral", cards.get("neutral", 0), "中性公告证据"),
+    ]
+    html = "".join(
+        '<div class="evidence-card">'
+        f"<label>{_html(label)}</label><strong>{_html(value)}</strong><span>{_html(note)}</span>"
+        "</div>"
+        for label, value, note in items
+    )
+    return f'<section class="evidence-grid evidence-health-grid">{html}</section>'
 
 
 def _data_domain_health_cards_html(cards: dict[str, object]) -> str:

@@ -23,6 +23,7 @@ from qlib_factor_lab.workbench import (
     build_pretrade_review,
     build_research_evidence_summary,
     build_research_pipeline_status,
+    build_stock_card_announcement_evidence_summary,
     build_workbench_freshness,
     find_latest_stock_cards,
     find_latest_multilane_report,
@@ -606,6 +607,47 @@ class WorkbenchTests(unittest.TestCase):
 
         self.assertEqual(library["announcement_evidence"]["chunks"], 1)
         self.assertEqual(library["announcement_evidence_path"], str(root / "data/announcement_evidence.csv"))
+
+    def test_stock_card_announcement_evidence_summary_counts_polarity_and_samples(self):
+        cards = [
+            {
+                "instrument": "AAA",
+                "name": "Alpha A",
+                "announcement_evidence": {
+                    "rolling_evidence": {
+                        "chunks": 2,
+                        "events": 2,
+                        "event_types": ["buyback", "regulatory_inquiry"],
+                        "polarity_counts": {"positive": 1, "risk": 1, "neutral": 0},
+                        "severity_counts": {"watch": 1, "risk": 1},
+                        "items": [
+                            {
+                                "event_type": "buyback",
+                                "severity": "watch",
+                                "title": "回购股份方案公告",
+                                "available_at": "2026-04-21",
+                                "source_url": "https://example.test/a",
+                            },
+                            {
+                                "event_type": "regulatory_inquiry",
+                                "severity": "risk",
+                                "title": "收到监管函",
+                                "available_at": "2026-04-22",
+                                "source_url": "https://example.test/b",
+                            },
+                        ],
+                    }
+                },
+            }
+        ]
+
+        summary = build_stock_card_announcement_evidence_summary(cards)
+
+        self.assertEqual(summary["cards"]["positions_with_evidence"], 1)
+        self.assertEqual(summary["cards"]["positive"], 1)
+        self.assertEqual(summary["cards"]["risk"], 1)
+        self.assertEqual(summary["event_types"].set_index("event_type").loc["buyback", "count"], 1)
+        self.assertEqual(list(summary["detail"]["title"]), ["收到监管函", "回购股份方案公告"])
 
     def test_research_context_health_reports_master_event_and_source_coverage(self):
         with tempfile.TemporaryDirectory() as tmp:
