@@ -64,18 +64,18 @@ def parse_args() -> argparse.Namespace:
 def _run_workbench_checks(page, base_url: str, expect) -> None:
     _open_page(page, base_url, "04 自动挖掘")
     _expand_sidebar_if_collapsed(page)
-    expect(page.get_by_role("heading", name="自动挖掘")).to_be_visible()
+    expect(page.get_by_role("heading", name="自动挖掘", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Queue · 启动自动挖掘")).to_be_visible()
 
     _click_nav_button(page, "03 因子研究", expect)
     expect(page).to_have_url(f"{base_url}/?page={quote_plus('03 因子研究')}")
-    expect(page.get_by_role("heading", name="因子研究")).to_be_visible()
+    expect(page.get_by_role("heading", name="因子研究", exact=True)).to_be_visible()
     expect(page.get_by_role("button", name="Smoke · 短窗多车道 smoke")).to_be_visible()
     expect(page.get_by_role("button", name="Run · 生成 approved 因子")).to_be_visible()
 
     _click_nav_button(page, "08 证据库", expect)
     expect(page).to_have_url(f"{base_url}/?page={quote_plus('08 证据库')}")
-    expect(page.get_by_role("heading", name="证据库")).to_be_visible()
+    expect(page.get_by_role("heading", name="证据库", exact=True)).to_be_visible()
     refresh_evidence = page.get_by_role("button", name="Run · 刷新证据库")
     expect(refresh_evidence).to_be_visible()
 
@@ -90,7 +90,7 @@ def _run_workbench_checks(page, base_url: str, expect) -> None:
     _click_nav_button(page, "05 组合门禁", expect)
     expect(page.get_by_text("为什么被 caution / reject")).to_be_visible()
     expect(page.get_by_text("公告证据复核")).to_be_visible()
-    expect(page.get_by_text("组合门禁")).to_be_visible()
+    expect(page.get_by_role("heading", name="组合门禁", exact=True)).to_be_visible()
 
 
 def _open_page(page, base_url: str, page_name: str) -> None:
