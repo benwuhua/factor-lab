@@ -91,6 +91,61 @@ class StockCardsTests(unittest.TestCase):
         self.assertEqual(cards[0]["financial_anomalies"], [])
         self.assertEqual(cards[0]["manual_review_actions"]["manual_chart_needed"], False)
 
+    def test_stock_cards_include_rolling_announcement_evidence_chunks(self):
+        portfolio = pd.DataFrame(
+            [
+                {
+                    "date": "2026-04-24",
+                    "instrument": "AAA",
+                    "name": "Alpha A",
+                    "event_count": 0,
+                }
+            ]
+        )
+        evidence = pd.DataFrame(
+            [
+                {
+                    "event_id": "e1",
+                    "instrument": "AAA",
+                    "event_type": "buyback",
+                    "event_date": "2026-04-20",
+                    "available_at": "2026-04-21",
+                    "severity": "watch",
+                    "title": "回购股份方案公告",
+                    "source_url": "https://example.test/e1",
+                    "chunk_id": "e1_000",
+                    "chunk_text": "公司公告回购股份方案，后续需核实资金来源。",
+                    "keywords": "回购,资金",
+                },
+                {
+                    "event_id": "future",
+                    "instrument": "AAA",
+                    "event_type": "announcement",
+                    "event_date": "2026-05-01",
+                    "available_at": "2026-05-01",
+                    "severity": "info",
+                    "title": "未来公告",
+                    "source_url": "https://example.test/future",
+                    "chunk_id": "future_000",
+                    "chunk_text": "未来不可见",
+                    "keywords": "",
+                },
+            ]
+        )
+
+        cards = build_stock_cards(
+            portfolio,
+            run_id="run-1",
+            as_of_date="2026-04-24",
+            announcement_evidence=evidence,
+        )
+
+        rolling = cards[0]["announcement_evidence"]["rolling_evidence"]
+        self.assertEqual(1, rolling["chunks"])
+        self.assertEqual(["buyback"], rolling["event_types"])
+        self.assertEqual(["https://example.test/e1"], rolling["source_urls"])
+        self.assertIn("回购股份方案公告", rolling["items"][0]["title"])
+
     def test_write_stock_card_report_renders_candidate_review_markdown(self):
         cards = build_stock_cards(
             pd.DataFrame(

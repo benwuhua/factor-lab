@@ -82,6 +82,40 @@ class ExpertReviewTests(unittest.TestCase):
         self.assertIn("buyback watch", packet)
         self.assertIn("max_industry_weight:fail", packet)
 
+    def test_build_expert_review_packet_includes_rolling_evidence_summary(self):
+        packet = build_expert_review_packet(
+            target_portfolio=self._target_portfolio(),
+            stock_cards=[
+                {
+                    "instrument": "AAA",
+                    "audit": {"review_decision": "caution"},
+                    "current_signal": {"top_factor_1": "alpha_a", "ensemble_score": 5.0},
+                    "evidence": {"event_count": 0, "max_event_severity": "", "event_risk_summary": ""},
+                    "announcement_evidence": {
+                        "rolling_evidence": {
+                            "chunks": 2,
+                            "events": 2,
+                            "event_types": ["buyback", "regulatory_inquiry"],
+                            "severity_counts": {"risk": 1, "watch": 1},
+                            "polarity_counts": {"positive": 1, "risk": 1, "neutral": 0},
+                            "items": [
+                                {"event_type": "buyback", "title": "回购股份方案公告", "severity": "watch"},
+                                {"event_type": "regulatory_inquiry", "title": "收到监管函", "severity": "risk"},
+                            ],
+                        }
+                    },
+                    "review_questions": {"gate_reason": ""},
+                }
+            ],
+            run_date="2026-04-23",
+        )
+
+        self.assertIn("rolling_evidence", packet)
+        self.assertIn("positive=1", packet)
+        self.assertIn("risk=1", packet)
+        self.assertIn("回购股份方案公告", packet)
+        self.assertIn("收到监管函", packet)
+
     def test_apply_expert_review_portfolio_gate_scales_caution_weights(self):
         portfolio = self._target_portfolio()
 

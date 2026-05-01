@@ -16,15 +16,22 @@ def build_stock_cards(
     gate_decision: str = "",
     gate_checks: pd.DataFrame | None = None,
     factor_version: str = "",
+    announcement_evidence: pd.DataFrame | None = None,
 ) -> list[dict[str, Any]]:
     cards = []
     checks = _gate_reason(gate_checks)
+    evidence_frame = _normalize_announcement_evidence(announcement_evidence)
     for _, row in portfolio.iterrows():
         event_count = int(_number(row.get("event_count")) or 0)
         source_urls = _split_semicolon(row.get("event_source_urls"))
         risk_flags = _text(row.get("risk_flags"))
         factor_contributions = _factor_contributions(row)
         financial_anomalies = _split_list(row.get("financial_anomaly_flags") or row.get("anomaly_flags"))
+        rolling_evidence = _rolling_evidence_for_instrument(
+            evidence_frame,
+            instrument=_text(row.get("instrument")),
+            as_of_date=as_of_date,
+        )
         cards.append(
             {
                 "instrument": _text(row.get("instrument")),
@@ -106,7 +113,8 @@ def build_stock_cards(
                     "positive_event_summary": _text(row.get("positive_event_summary")),
                     "risk_event_types": _text(row.get("risk_event_types")),
                     "risk_event_summary": _text(row.get("risk_event_summary")),
-                    "source_urls": source_urls,
+                    "source_urls": sorted(set(source_urls + rolling_evidence["source_urls"])),
+                    "rolling_evidence": rolling_evidence,
                 },
                 "financial_anomalies": financial_anomalies,
                 "manual_review_actions": {
@@ -187,6 +195,118 @@ def _factor_contributions(row: pd.Series) -> list[dict[str, Any]]:
     return contributions
 
 
+def _normalize_announcement_evidence(evidence: pd.DataFrame | None) -> pd.DataFrame:
+    columns = [
+        "event_id",
+        "instrument",
+        "event_type",
+        "event_date",
+        "available_at",
+        "severity",
+        "title",
+        "source_url",
+        "chunk_id",
+        "chunk_text",
+        "keywords",
+    ]
+    if evidence is None or evidence.empty:
+        return pd.DataFrame(columns=columns)
+    frame = evidence.copy()
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = ""
+    return frame.loc[:, columns]
+
+
+def _rolling_evidence_for_instrument(
+    evidence: pd.DataFrame,
+    *,
+    instrument: str,
+    as_of_date: str,
+    limit: int = 5,
+) -> dict[str, Any]:
+    if evidence.empty or not instrument:
+        return _empty_rolling_evidence()
+    frame = evidence.loc[evidence["instrument"].fillna("").astype(str) == instrument].copy()
+    if frame.empty:
+        return _empty_rolling_evidence()
+    available = pd.to_datetime(frame["available_at"], errors="coerce")
+    cutoff = pd.to_datetime(as_of_date, errors="coerce")
+    if not pd.isna(cutoff):
+        frame = frame.loc[available.notna() & (available <= cutoff)].copy()
+    if frame.empty:
+        return _empty_rolling_evidence()
+    frame["_available_at"] = pd.to_datetime(frame["available_at"], errors="coerce")
+    frame = frame.sort_values(["_available_at", "event_date", "chunk_id"], ascending=[False, False, True])
+    items = []
+    for _, row in frame.head(limit).iterrows():
+        items.append(
+            {
+                "event_id": _text(row.get("event_id")),
+                "event_type": _text(row.get("event_type")),
+                "event_date": _text(row.get("event_date")),
+                "available_at": _text(row.get("available_at")),
+                "severity": _text(row.get("severity")),
+                "title": _text(row.get("title")),
+                "chunk_text": _text(row.get("chunk_text")),
+                "source_url": _text(row.get("source_url")),
+            }
+        )
+    return {
+        "chunks": int(len(frame)),
+        "events": int(frame["event_id"].dropna().astype(str).nunique()),
+        "event_types": sorted(set(_nonblank_values(frame["event_type"]))),
+        "severity_counts": _value_counts(frame["severity"]),
+        "polarity_counts": _polarity_counts(frame["event_type"], frame["severity"]),
+        "source_urls": sorted(set(_nonblank_values(frame["source_url"]))),
+        "items": items,
+    }
+
+
+def _empty_rolling_evidence() -> dict[str, Any]:
+    return {
+        "chunks": 0,
+        "events": 0,
+        "event_types": [],
+        "severity_counts": {},
+        "polarity_counts": {"positive": 0, "risk": 0, "neutral": 0},
+        "source_urls": [],
+        "items": [],
+    }
+
+
+def _value_counts(series: pd.Series) -> dict[str, int]:
+    values = _nonblank_values(series)
+    return {value: values.count(value) for value in sorted(set(values))}
+
+
+def _polarity_counts(event_types: pd.Series, severities: pd.Series) -> dict[str, int]:
+    counts = {"positive": 0, "risk": 0, "neutral": 0}
+    for event_type, severity in zip(event_types.fillna("").astype(str), severities.fillna("").astype(str)):
+        polarity = _event_polarity(event_type, severity)
+        counts[polarity] += 1
+    return counts
+
+
+def _event_polarity(event_type: str, severity: str) -> str:
+    event_type = event_type.strip()
+    severity = severity.strip()
+    if event_type in {"buyback", "shareholder_increase", "pledge_release"}:
+        return "positive"
+    if severity in {"block", "risk"} or event_type in {
+        "disciplinary_action",
+        "delisting_risk",
+        "regulatory_inquiry",
+        "shareholder_reduction",
+        "performance_warning_down",
+        "lawsuit",
+        "pledge_risk",
+        "st_status",
+    }:
+        return "risk"
+    return "neutral"
+
+
 def _factor_profile(row: pd.Series) -> dict[str, Any]:
     profile = {}
     for name in ["expression", "pattern", "emotion", "liquidity", "risk", "fundamental", "shareholder"]:
@@ -229,6 +349,10 @@ def _split_semicolon(value: Any) -> list[str]:
     if not text:
         return []
     return [part.strip() for part in text.split(";") if part.strip()]
+
+
+def _nonblank_values(series: pd.Series) -> list[str]:
+    return [value for value in series.fillna("").astype(str).str.strip().tolist() if value]
 
 
 def _manual_review_actions(

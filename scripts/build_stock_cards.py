@@ -23,6 +23,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build JSONL stock research cards from a target portfolio.")
     parser.add_argument("--target-portfolio", required=True)
     parser.add_argument("--gate-checks-csv", default=None)
+    parser.add_argument("--announcement-evidence-csv", default=None)
     parser.add_argument("--as-of-date", default="")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--card-version", default="v1")
@@ -38,6 +39,9 @@ def main() -> int:
     as_of_date = args.as_of_date or _infer_as_of_date(portfolio)
     run_id = args.run_id or f"stock_cards_{as_of_date.replace('-', '')}"
     gate_checks = pd.read_csv(_resolve(root, args.gate_checks_csv)) if args.gate_checks_csv else None
+    announcement_evidence = (
+        pd.read_csv(_resolve(root, args.announcement_evidence_csv)) if args.announcement_evidence_csv else None
+    )
     cards = build_stock_cards(
         portfolio,
         run_id=run_id,
@@ -46,6 +50,7 @@ def main() -> int:
         gate_decision=args.gate_decision,
         gate_checks=gate_checks,
         factor_version=args.factor_version,
+        announcement_evidence=announcement_evidence,
     )
     output = write_stock_cards(cards, _resolve(root, _materialize(args.output, as_of_date)))
     print(f"cards: {len(cards)}")

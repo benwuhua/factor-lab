@@ -355,6 +355,12 @@ def classify_notice_event(title: str, category: str = "") -> tuple[str, str]:
         return "regulatory_inquiry", "risk"
     if "减持" in text:
         return "shareholder_reduction", "risk"
+    if any(word in text for word in ["增持", "持股计划增持"]):
+        return "shareholder_increase", "watch"
+    if any(word in text for word in ["回购", "股份回购"]):
+        return "buyback", "watch"
+    if any(word in text for word in ["股东户数", "股东人数", "股东总户数"]):
+        return "holder_count_change", "info"
     if any(word in text for word in ["解禁", "限售股上市流通", "限售股份上市流通"]):
         return "large_unlock", "watch"
     if any(word in text for word in ["业绩预告", "预亏", "业绩下修", "向下修正"]):
@@ -363,8 +369,12 @@ def classify_notice_event(title: str, category: str = "") -> tuple[str, str]:
         return "lawsuit", "risk"
     if "担保" in text:
         return "guarantee", "watch"
+    if any(word in text for word in ["解除质押", "质押解除"]):
+        return "pledge_release", "info"
     if "质押" in text:
         return "pledge_risk", "watch"
+    if any(word in text for word in ["权益变动", "股本变动", "股份变动"]):
+        return "capital_structure_change", "watch"
     if any(word in text for word in ["异动", "异常波动"]):
         return "abnormal_volatility", "watch"
     return "announcement", "info"

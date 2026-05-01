@@ -391,13 +391,14 @@ def build_expert_review_packet(
     else:
         lines.extend(
             [
-                "| instrument | decision | score | top_factor | event_count | severity | gate_reason | evidence |",
-                "|---|---|---:|---|---:|---|---|---|",
+                "| instrument | decision | score | top_factor | event_count | severity | gate_reason | evidence | rolling_evidence |",
+                "|---|---|---:|---|---:|---|---|---|---|",
             ]
         )
         for card in stock_cards[:max_positions]:
             signal = card.get("current_signal", {}) if isinstance(card, dict) else {}
             evidence = card.get("evidence", {}) if isinstance(card, dict) else {}
+            announcement_evidence = card.get("announcement_evidence", {}) if isinstance(card, dict) else {}
             audit = card.get("audit", {}) if isinstance(card, dict) else {}
             review = card.get("review_questions", {}) if isinstance(card, dict) else {}
             lines.append(
@@ -412,6 +413,7 @@ def build_expert_review_packet(
                         _text(evidence.get("max_event_severity", "")),
                         _text(review.get("gate_reason", "")),
                         _text(evidence.get("event_risk_summary", "")),
+                        _rolling_evidence_summary(announcement_evidence.get("rolling_evidence", {})),
                     ]
                 )
                 + " |"
@@ -431,6 +433,33 @@ def build_expert_review_packet(
         ]
     )
     return "\n".join(lines) + "\n"
+
+
+def _rolling_evidence_summary(rolling: Any) -> str:
+    if not isinstance(rolling, dict) or not rolling:
+        return ""
+    chunks = int(float(rolling.get("chunks") or 0))
+    events = int(float(rolling.get("events") or 0))
+    if chunks <= 0 and events <= 0:
+        return ""
+    polarity = rolling.get("polarity_counts", {}) if isinstance(rolling.get("polarity_counts"), dict) else {}
+    event_types = rolling.get("event_types", []) if isinstance(rolling.get("event_types"), list) else []
+    items = rolling.get("items", []) if isinstance(rolling.get("items"), list) else []
+    sample_titles = []
+    for item in items[:2]:
+        if isinstance(item, dict) and _text(item.get("title")):
+            sample_titles.append(_text(item.get("title")))
+    parts = [
+        f"rolling_evidence chunks={chunks} events={events}",
+        f"positive={int(float(polarity.get('positive') or 0))}",
+        f"risk={int(float(polarity.get('risk') or 0))}",
+        f"neutral={int(float(polarity.get('neutral') or 0))}",
+    ]
+    if event_types:
+        parts.append("types=" + ",".join(_text(item) for item in event_types if _text(item)))
+    if sample_titles:
+        parts.append("samples=" + "; ".join(sample_titles))
+    return "; ".join(parts)
 
 
 def load_stock_cards_jsonl(path: str | Path | None) -> list[dict[str, Any]]:

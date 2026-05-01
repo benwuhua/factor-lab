@@ -29,6 +29,7 @@ def search_announcement_evidence(
     severities: Iterable[str] | None = None,
     keyword: str | None = None,
     as_of_date: str | None = None,
+    lookback_days: int | None = None,
     limit: int = 200,
 ) -> pd.DataFrame:
     frame = _read_evidence(evidence_path)
@@ -43,6 +44,8 @@ def search_announcement_evidence(
         available = pd.to_datetime(filtered["available_at"], errors="coerce")
         cutoff = pd.Timestamp(as_of_date)
         filtered = filtered.loc[available.notna() & (available <= cutoff)]
+        if lookback_days is not None:
+            filtered = filtered.loc[available >= cutoff - pd.Timedelta(days=int(lookback_days))]
     if keyword and keyword.strip():
         needle = keyword.strip().lower()
         haystack = (

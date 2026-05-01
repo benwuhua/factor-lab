@@ -275,11 +275,13 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         if combo_spec is not None
         else _load_factor_diagnostics(root_path, run_date)
     )
+    announcement_evidence = _load_announcement_evidence(root_path)
     pre_review_stock_cards = build_stock_cards(
         research_portfolio,
         run_id=f"daily_{run_date.replace('-', '')}",
         as_of_date=run_date,
         gate_decision="pending",
+        announcement_evidence=announcement_evidence,
     )
     expert_review_path = run_dir / "expert_review_packet.md"
     expert_review_packet = build_expert_review_packet(
@@ -327,6 +329,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         run_id=f"daily_{run_date.replace('-', '')}",
         as_of_date=run_date,
         gate_decision=expert_review_gate["status"],
+        announcement_evidence=announcement_evidence,
     )
     stock_cards_path = write_stock_cards(stock_cards, run_dir / "stock_cards.jsonl")
     artifacts["stock_cards"] = str(stock_cards_path)
@@ -578,6 +581,13 @@ def _load_factor_diagnostics(root: Path, run_date: str, combo_name: str | None =
         if path.exists():
             return pd.read_csv(path)
     return None
+
+
+def _load_announcement_evidence(root: Path) -> pd.DataFrame | None:
+    path = root / "data" / "announcement_evidence.csv"
+    if not path.exists():
+        return None
+    return pd.read_csv(path)
 
 
 def _enrich_signal_with_event_risk(

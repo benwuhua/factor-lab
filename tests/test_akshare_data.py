@@ -344,17 +344,24 @@ class AkShareDataTests(unittest.TestCase):
     def test_normalize_akshare_notices_classifies_event_risk(self):
         raw = pd.DataFrame(
             {
-                "代码": ["600000", "000001", "300750"],
-                "公告标题": ["关于收到纪律处分决定书的公告", "股东减持计划公告", "年度报告"],
-                "公告日期": ["2026-04-20", "2026-04-21", "2026-04-22"],
-                "公告类型": ["监管", "股东", "定期报告"],
-                "网址": ["https://example.test/a", "https://example.test/b", ""],
+                "代码": ["600000", "000001", "300750", "601106", "002156", "688981"],
+                "公告标题": [
+                    "关于收到纪律处分决定书的公告",
+                    "股东减持计划公告",
+                    "年度报告",
+                    "关于以集中竞价方式回购股份方案的公告",
+                    "控股股东增持股份计划公告",
+                    "股东户数变化情况公告",
+                ],
+                "公告日期": ["2026-04-20", "2026-04-21", "2026-04-22", "2026-04-23", "2026-04-24", "2026-04-25"],
+                "公告类型": ["监管", "股东", "定期报告", "回购", "股东", "股东"],
+                "网址": ["https://example.test/a", "https://example.test/b", "", "", "", ""],
             }
         )
 
         result = normalize_akshare_notices(raw)
 
-        self.assertEqual(len(result), 3)
+        self.assertEqual(len(result), 6)
         disciplinary = result[result["instrument"] == "SH600000"].iloc[0]
         self.assertEqual(disciplinary["event_type"], "disciplinary_action")
         self.assertEqual(disciplinary["severity"], "block")
@@ -362,6 +369,9 @@ class AkShareDataTests(unittest.TestCase):
         self.assertEqual(reduction["event_type"], "shareholder_reduction")
         self.assertEqual(reduction["severity"], "risk")
         self.assertEqual(reduction["active_until"], "2026-06-20")
+        self.assertEqual(result[result["instrument"] == "SH601106"].iloc[0]["event_type"], "buyback")
+        self.assertEqual(result[result["instrument"] == "SZ002156"].iloc[0]["event_type"], "shareholder_increase")
+        self.assertEqual(result[result["instrument"] == "SH688981"].iloc[0]["event_type"], "holder_count_change")
 
     def test_fetch_company_notices_skips_upstream_schema_errors(self):
         class FakeAkshare:

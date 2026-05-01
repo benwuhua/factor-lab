@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from qlib_factor_lab.research_data_domains import (
+    build_security_master_history,
     build_announcement_evidence_index,
     build_shareholder_capital_from_events,
     derive_fundamental_quality_fields,
@@ -269,6 +270,7 @@ class ResearchDataDomainsTest(unittest.TestCase):
                     "instrument": "SZ000001",
                     "event_type": "shareholder_reduction",
                     "event_date": "2026-04-20",
+                    "announce_date": "2026-04-21",
                     "title": "股东减持计划公告",
                     "severity": "warning",
                     "source_url": "https://example.com/a",
@@ -291,8 +293,32 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertEqual(1, len(result))
         self.assertEqual("SZ000001", result.loc[0, "instrument"])
         self.assertEqual("shareholder_reduction", result.loc[0, "event_type"])
-        self.assertEqual("2026-04-20", result.loc[0, "announce_date"])
-        self.assertEqual("2026-04-27", result.loc[0, "available_at"])
+        self.assertEqual("2026-04-21", result.loc[0, "announce_date"])
+        self.assertEqual("2026-04-21", result.loc[0, "available_at"])
+
+    def test_shareholder_capital_keeps_expanded_capital_event_types(self) -> None:
+        events = pd.DataFrame(
+            [
+                {
+                    "instrument": "SZ000001",
+                    "event_type": "buyback",
+                    "event_date": "2026-04-20",
+                    "title": "回购股份方案公告",
+                    "severity": "watch",
+                },
+                {
+                    "instrument": "SZ000002",
+                    "event_type": "holder_count_change",
+                    "event_date": "2026-04-21",
+                    "title": "股东户数变化",
+                    "severity": "info",
+                },
+            ]
+        )
+
+        result = build_shareholder_capital_from_events(events, as_of_date="2026-04-27")
+
+        self.assertEqual({"buyback", "holder_count_change"}, set(result["event_type"]))
 
     def test_announcement_evidence_index_splits_searchable_event_text(self) -> None:
         events = pd.DataFrame(
@@ -315,7 +341,136 @@ class ResearchDataDomainsTest(unittest.TestCase):
 
         self.assertGreaterEqual(len(result), 2)
         self.assertEqual({"event_id", "instrument", "chunk_id", "chunk_text", "available_at"} <= set(result.columns), True)
+        self.assertEqual({"2026-04-20"}, set(result["available_at"]))
         self.assertTrue(result["chunk_text"].str.len().le(12).all())
+
+    def test_announcement_evidence_index_applies_lookback_and_no_future_events(self) -> None:
+        events = pd.DataFrame(
+            [
+                {
+                    "event_id": "old",
+                    "instrument": "SH600000",
+                    "event_type": "announcement",
+                    "event_date": "2026-01-01",
+                    "title": "旧公告",
+                    "summary": "超出窗口",
+                },
+                {
+                    "event_id": "recent",
+                    "instrument": "SH600001",
+                    "event_type": "buyback",
+                    "event_date": "2026-04-20",
+                    "announce_date": "2026-04-21",
+                    "title": "回购公告",
+                    "summary": "仍在窗口内",
+                },
+                {
+                    "event_id": "future",
+                    "instrument": "SH600002",
+                    "event_type": "announcement",
+                    "event_date": "2026-05-02",
+                    "title": "未来公告",
+                    "summary": "不能提前可见",
+                },
+            ]
+        )
+
+        result = build_announcement_evidence_index(
+            events,
+            as_of_date="2026-04-27",
+            chunk_size=50,
+            lookback_days=30,
+        )
+
+        self.assertEqual(["recent"], result["event_id"].drop_duplicates().tolist())
+        self.assertEqual(["2026-04-21"], result["available_at"].drop_duplicates().tolist())
+
+    def test_build_security_master_history_backfills_valid_from_from_first_trade_date(self) -> None:
+        master = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "name": "Alpha",
+                    "exchange": "SSE",
+                    "board": "main",
+                    "industry_sw": "bank",
+                    "industry_csrc": "finance",
+                    "is_st": False,
+                    "listing_date": "",
+                    "delisting_date": "",
+                    "valid_from": "2026-04-30",
+                    "valid_to": "",
+                    "research_universes": "csi300",
+                }
+            ]
+        )
+        prices = pd.DataFrame(
+            [
+                {"instrument": "SH600000", "trade_date": "2020-01-02", "close": 10.0},
+                {"instrument": "SH600000", "trade_date": "2026-04-30", "close": 11.0},
+            ]
+        )
+
+        result = build_security_master_history(master, prices=prices, as_of_date="2026-04-30")
+
+        self.assertEqual("2020-01-02", result.loc[0, "valid_from"])
+        self.assertEqual("current_snapshot_backfilled", result.loc[0, "source"])
+        self.assertEqual("2026-04-30", result.loc[0, "as_of_date"])
+
+    def test_build_security_master_history_prefers_external_pit_rows(self) -> None:
+        master = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "name": "Current Name",
+                    "exchange": "SSE",
+                    "board": "main",
+                    "valid_from": "2026-04-30",
+                },
+                {
+                    "instrument": "SZ000001",
+                    "name": "Only Current",
+                    "exchange": "SZSE",
+                    "board": "main",
+                    "valid_from": "2026-04-30",
+                },
+            ]
+        )
+        pit_source = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "name": "Old Name",
+                    "exchange": "SSE",
+                    "board": "main",
+                    "industry_sw": "old_bank",
+                    "is_st": False,
+                    "valid_from": "2020-01-01",
+                    "valid_to": "2024-12-31",
+                    "source": "vendor_pit",
+                },
+                {
+                    "instrument": "SH600000",
+                    "name": "New Name",
+                    "exchange": "SSE",
+                    "board": "main",
+                    "industry_sw": "new_bank",
+                    "is_st": False,
+                    "valid_from": "2025-01-01",
+                    "valid_to": "",
+                    "source": "vendor_pit",
+                },
+            ]
+        )
+
+        result = build_security_master_history(master, history_source=pit_source, as_of_date="2026-04-30")
+
+        self.assertEqual(3, len(result))
+        vendor_rows = result[result["instrument"] == "SH600000"]
+        self.assertEqual(["2020-01-01", "2025-01-01"], vendor_rows["valid_from"].tolist())
+        self.assertEqual({"vendor_pit"}, set(vendor_rows["source"]))
+        fallback = result[result["instrument"] == "SZ000001"].iloc[0]
+        self.assertEqual("security_master_snapshot", fallback["source"])
 
     def test_write_research_data_domains_writes_all_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -352,8 +507,39 @@ class ResearchDataDomainsTest(unittest.TestCase):
             )
 
             self.assertTrue(Path(manifest["fundamental_quality"]).exists())
+            self.assertTrue(Path(manifest["security_master_history"]).exists())
             self.assertTrue(Path(manifest["shareholder_capital"]).exists())
             self.assertTrue(Path(manifest["announcement_evidence"]).exists())
+
+    def test_write_research_data_domains_accepts_external_security_master_history_source(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame(
+                [{"instrument": "SH600000", "name": "Current", "valid_from": "2026-04-30"}]
+            ).to_csv(root / "data/security_master.csv", index=False)
+            pd.DataFrame(
+                [
+                    {
+                        "instrument": "SH600000",
+                        "name": "Vendor",
+                        "industry_sw": "bank",
+                        "valid_from": "2020-01-01",
+                        "valid_to": "",
+                        "source": "vendor_pit",
+                    }
+                ]
+            ).to_csv(root / "pit_history.csv", index=False)
+
+            manifest = write_research_data_domains(
+                root,
+                as_of_date="2026-04-30",
+                security_master_history_source=root / "pit_history.csv",
+            )
+
+            history = pd.read_csv(manifest["security_master_history"])
+            self.assertEqual(["vendor_pit"], history["source"].tolist())
+            self.assertEqual(["2020-01-01"], history["valid_from"].tolist())
 
     def test_write_research_data_domains_merges_limited_live_refresh_with_existing_data(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

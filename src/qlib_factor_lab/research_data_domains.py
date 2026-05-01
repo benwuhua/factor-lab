@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 import pandas as pd
 
-from .akshare_data import akshare_code_from_qlib, qlib_symbol_from_code
+from .akshare_data import akshare_code_from_qlib, classify_notice_event, qlib_symbol_from_code
 from .tushare_data import fetch_fundamental_quality_from_tushare
 
 
@@ -76,13 +76,32 @@ ANNOUNCEMENT_EVIDENCE_COLUMNS = [
     "keywords",
 ]
 
+SECURITY_MASTER_HISTORY_COLUMNS = [
+    "instrument",
+    "name",
+    "exchange",
+    "board",
+    "industry_sw",
+    "industry_csrc",
+    "is_st",
+    "listing_date",
+    "delisting_date",
+    "valid_from",
+    "valid_to",
+    "research_universes",
+    "source",
+    "as_of_date",
+]
+
 CAPITAL_EVENT_TYPES = {
     "shareholder_reduction",
     "shareholder_increase",
     "buyback",
     "large_unlock",
     "pledge_risk",
+    "pledge_release",
     "capital_structure_change",
+    "holder_count_change",
 }
 
 
@@ -91,6 +110,7 @@ class ResearchDataDomainPaths:
     fundamental_quality: Path
     shareholder_capital: Path
     announcement_evidence: Path
+    security_master_history: Path
 
 
 def normalize_fundamental_quality(raw: pd.DataFrame, *, as_of_date: str, source: str = "akshare_financial_indicator") -> pd.DataFrame:
@@ -282,12 +302,122 @@ def derive_fundamental_quality_fields(fundamentals: pd.DataFrame, dividends: pd.
     return frame.loc[:, FUNDAMENTAL_QUALITY_COLUMNS]
 
 
+def build_security_master_history(
+    security_master: pd.DataFrame,
+    *,
+    prices: pd.DataFrame | None = None,
+    history_source: pd.DataFrame | None = None,
+    as_of_date: str,
+) -> pd.DataFrame:
+    if (security_master is None or security_master.empty) and (history_source is None or history_source.empty):
+        return _empty(SECURITY_MASTER_HISTORY_COLUMNS)
+
+    source_history = _normalize_security_master_history_source(history_source, as_of_date=as_of_date)
+    source_instruments = set(source_history["instrument"].astype(str)) if not source_history.empty else set()
+
+    frame = security_master.copy() if security_master is not None else pd.DataFrame()
+    for column in SECURITY_MASTER_HISTORY_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = ""
+
+    first_trade_dates: dict[str, str] = {}
+    if prices is not None and not prices.empty and {"instrument", "trade_date"} <= set(prices.columns):
+        price_frame = prices.copy()
+        price_frame["_trade_date"] = pd.to_datetime(price_frame["trade_date"], errors="coerce")
+        first_trade_dates = (
+            price_frame.dropna(subset=["_trade_date"])
+            .sort_values(["instrument", "_trade_date"])
+            .groupby(price_frame["instrument"].astype(str))["_trade_date"]
+            .first()
+            .dt.strftime("%Y-%m-%d")
+            .to_dict()
+        )
+
+    rows: list[dict[str, Any]] = []
+    normalized_as_of = _normalize_date(as_of_date)
+    for _, item in frame.iterrows():
+        instrument = str(item.get("instrument", "")).strip().upper()
+        if not instrument or instrument in source_instruments:
+            continue
+        listing_date = _normalize_date(item.get("listing_date", ""))
+        first_trade = first_trade_dates.get(instrument, "")
+        existing_valid_from = _normalize_date(item.get("valid_from", ""))
+        valid_from = listing_date or first_trade or existing_valid_from or normalized_as_of
+        if first_trade and (not listing_date) and (not existing_valid_from or existing_valid_from >= normalized_as_of):
+            valid_from = first_trade
+        source = "security_master_snapshot"
+        if first_trade and valid_from == first_trade:
+            source = "current_snapshot_backfilled"
+        rows.append(
+            {
+                "instrument": instrument,
+                "name": str(item.get("name", "")),
+                "exchange": str(item.get("exchange", "")),
+                "board": str(item.get("board", "")),
+                "industry_sw": str(item.get("industry_sw", "")),
+                "industry_csrc": str(item.get("industry_csrc", "")),
+                "is_st": item.get("is_st", ""),
+                "listing_date": listing_date,
+                "delisting_date": _normalize_date(item.get("delisting_date", "")),
+                "valid_from": valid_from,
+                "valid_to": _normalize_date(item.get("valid_to", "")),
+                "research_universes": str(item.get("research_universes", "")),
+                "source": source,
+                "as_of_date": normalized_as_of,
+            }
+        )
+    if not rows:
+        fallback = _empty(SECURITY_MASTER_HISTORY_COLUMNS)
+    else:
+        fallback = pd.DataFrame(rows, columns=SECURITY_MASTER_HISTORY_COLUMNS)
+    return (
+        pd.concat([source_history, fallback], ignore_index=True)
+        .drop_duplicates(["instrument", "valid_from"], keep="last")
+        .sort_values(["instrument", "valid_from"])
+        .reset_index(drop=True)
+    )
+
+
+def _normalize_security_master_history_source(history_source: pd.DataFrame | None, *, as_of_date: str) -> pd.DataFrame:
+    if history_source is None or history_source.empty:
+        return _empty(SECURITY_MASTER_HISTORY_COLUMNS)
+    rows: list[dict[str, Any]] = []
+    normalized_as_of = _normalize_date(as_of_date)
+    for _, item in history_source.iterrows():
+        instrument = _instrument_from_row(item)
+        valid_from = _date_from_row(item, ["valid_from", "生效日期", "start_date", "from_date"])
+        if not instrument or not valid_from:
+            continue
+        rows.append(
+            {
+                "instrument": instrument,
+                "name": str(item.get("name", item.get("名称", ""))),
+                "exchange": str(item.get("exchange", "")),
+                "board": str(item.get("board", "")),
+                "industry_sw": str(item.get("industry_sw", item.get("申万行业", ""))),
+                "industry_csrc": str(item.get("industry_csrc", item.get("证监会行业", ""))),
+                "is_st": item.get("is_st", item.get("ST状态", "")),
+                "listing_date": _date_from_row(item, ["listing_date", "上市日期", "list_date"]),
+                "delisting_date": _date_from_row(item, ["delisting_date", "退市日期", "delist_date"]),
+                "valid_from": valid_from,
+                "valid_to": _date_from_row(item, ["valid_to", "失效日期", "end_date", "to_date"]),
+                "research_universes": str(item.get("research_universes", item.get("universe", ""))),
+                "source": str(item.get("source", "")).strip() or "external_pit_history",
+                "as_of_date": _date_from_row(item, ["as_of_date", "数据日期"]) or normalized_as_of,
+            }
+        )
+    if not rows:
+        return _empty(SECURITY_MASTER_HISTORY_COLUMNS)
+    return pd.DataFrame(rows, columns=SECURITY_MASTER_HISTORY_COLUMNS)
+
+
 def build_shareholder_capital_from_events(events: pd.DataFrame, *, as_of_date: str) -> pd.DataFrame:
     if events is None or events.empty:
         return _empty(SHAREHOLDER_CAPITAL_COLUMNS)
     frame = events.copy()
     if "event_type" not in frame.columns:
         return _empty(SHAREHOLDER_CAPITAL_COLUMNS)
+    frame = _with_inferred_event_types(frame)
     frame = frame[frame["event_type"].astype(str).isin(CAPITAL_EVENT_TYPES)].copy()
     if frame.empty:
         return _empty(SHAREHOLDER_CAPITAL_COLUMNS)
@@ -296,18 +426,35 @@ def build_shareholder_capital_from_events(events: pd.DataFrame, *, as_of_date: s
             frame[column] = ""
     frame["announce_date"] = frame["announce_date"] if "announce_date" in frame.columns else frame.get("event_date", "")
     frame.loc[frame["announce_date"].astype(str).str.strip() == "", "announce_date"] = frame.get("event_date", "")
-    frame["available_at"] = _normalize_date(as_of_date)
+    frame["available_at"] = [
+        _event_available_date(row, fallback_as_of_date=as_of_date)
+        for _, row in frame.iterrows()
+    ]
     frame["source"] = frame["source"].where(frame["source"].astype(str).str.strip() != "", "company_events")
     return frame.loc[:, SHAREHOLDER_CAPITAL_COLUMNS].sort_values(["instrument", "event_date", "event_type"])
 
 
-def build_announcement_evidence_index(events: pd.DataFrame, *, as_of_date: str, chunk_size: int = 220) -> pd.DataFrame:
+def build_announcement_evidence_index(
+    events: pd.DataFrame,
+    *,
+    as_of_date: str,
+    chunk_size: int = 220,
+    lookback_days: int | None = None,
+) -> pd.DataFrame:
     if events is None or events.empty:
         return _empty(ANNOUNCEMENT_EVIDENCE_COLUMNS)
 
     rows: list[dict[str, Any]] = []
-    available_at = _normalize_date(as_of_date)
+    events = _with_inferred_event_types(events)
+    as_of_ts = pd.Timestamp(_normalize_date(as_of_date))
+    window_start = as_of_ts - pd.Timedelta(days=int(lookback_days)) if lookback_days is not None else None
     for idx, item in events.iterrows():
+        available_at = _event_available_date(item, fallback_as_of_date=as_of_date)
+        available_ts = pd.to_datetime(available_at, errors="coerce")
+        if pd.isna(available_ts) or available_ts > as_of_ts:
+            continue
+        if window_start is not None and available_ts < window_start:
+            continue
         event_id = str(item.get("event_id", "") or f"event_{idx}")
         title = _clean_text(item.get("title", ""))
         text = " ".join(
@@ -342,6 +489,36 @@ def build_announcement_evidence_index(events: pd.DataFrame, *, as_of_date: str, 
     if not rows:
         return _empty(ANNOUNCEMENT_EVIDENCE_COLUMNS)
     return pd.DataFrame(rows, columns=ANNOUNCEMENT_EVIDENCE_COLUMNS)
+
+
+def _event_available_date(item: pd.Series, *, fallback_as_of_date: str) -> str:
+    for column in ["available_at", "announce_date", "event_date"]:
+        value = item.get(column, "")
+        normalized = _normalize_date(value)
+        if normalized:
+            return normalized
+    return _normalize_date(fallback_as_of_date)
+
+
+def _with_inferred_event_types(events: pd.DataFrame) -> pd.DataFrame:
+    if events is None or events.empty or "title" not in events.columns:
+        return events
+    frame = events.copy()
+    if "event_type" not in frame.columns:
+        frame["event_type"] = ""
+    if "severity" not in frame.columns:
+        frame["severity"] = ""
+    for index, row in frame.iterrows():
+        current_type = str(row.get("event_type", "")).strip()
+        inferred_type, inferred_severity = classify_notice_event(
+            str(row.get("title", "")),
+            str(row.get("category", "") or row.get("event_category", "")),
+        )
+        if current_type in {"", "announcement"} and inferred_type != "announcement":
+            frame.at[index, "event_type"] = inferred_type
+            if not str(row.get("severity", "")).strip() or str(row.get("severity", "")).strip() == "info":
+                frame.at[index, "severity"] = inferred_severity
+    return frame
 
 
 def fetch_fundamental_quality_from_akshare(
@@ -440,17 +617,22 @@ def write_research_data_domains(
     fundamental_source: str | Path | None = None,
     company_events_path: str | Path = "data/company_events.csv",
     security_master_path: str | Path = "data/security_master.csv",
+    security_master_history_source: str | Path | None = None,
     fundamental_output: str | Path = "data/fundamental_quality.csv",
+    security_master_history_output: str | Path = "data/security_master_history.csv",
     shareholder_output: str | Path = "data/shareholder_capital.csv",
     evidence_output: str | Path = "data/announcement_evidence.csv",
     evidence_jsonl_output: str | Path = "data/announcement_evidence.jsonl",
     dividend_output: str | Path = "data/cninfo_dividends.csv",
     price_source_dirs: Iterable[str | Path] = (
+        "data/tushare/source_csi300_full",
+        "data/tushare/source_csi500_full",
         "data/tushare/source_csi300",
         "data/tushare/source_csi500",
         "data/akshare/source_csi300",
         "data/akshare/source_csi500",
     ),
+    evidence_lookback_days: int | None = 180,
     fetch_fundamentals: bool = False,
     fundamental_provider: str = "akshare",
     derive_valuation_fields: bool = False,
@@ -462,6 +644,9 @@ def write_research_data_domains(
     root = Path(project_root).expanduser().resolve()
     events = _read_csv_if_exists(_resolve(root, company_events_path))
     security_master = _read_csv_if_exists(_resolve(root, security_master_path))
+    security_history_source_frame = (
+        pd.read_csv(_resolve(root, security_master_history_source)) if security_master_history_source is not None else None
+    )
 
     existing_fundamentals = _read_existing_or_empty(_resolve(root, fundamental_output), FUNDAMENTAL_QUALITY_COLUMNS)
     if fundamental_source is not None:
@@ -511,21 +696,29 @@ def write_research_data_domains(
             keys=["instrument", "available_at", "dividend_cash_per_10"],
             columns=CNINFO_DIVIDEND_COLUMNS,
         )
+    prices = read_close_prices_from_source_dirs(root, price_source_dirs)
     if derive_valuation_fields:
-        prices = read_close_prices_from_source_dirs(root, price_source_dirs)
         fundamentals = derive_fundamental_valuation_fields(fundamentals, prices=prices, dividends=dividends)
     fundamentals = derive_fundamental_quality_fields(fundamentals, dividends=dividends)
 
+    security_history = build_security_master_history(
+        security_master,
+        prices=prices,
+        history_source=security_history_source_frame,
+        as_of_date=as_of_date,
+    )
     shareholder = build_shareholder_capital_from_events(events, as_of_date=as_of_date)
-    evidence = build_announcement_evidence_index(events, as_of_date=as_of_date)
+    evidence = build_announcement_evidence_index(events, as_of_date=as_of_date, lookback_days=evidence_lookback_days)
 
     paths = ResearchDataDomainPaths(
         fundamental_quality=_resolve(root, fundamental_output),
         shareholder_capital=_resolve(root, shareholder_output),
         announcement_evidence=_resolve(root, evidence_output),
+        security_master_history=_resolve(root, security_master_history_output),
     )
     _write_csv(fundamentals, paths.fundamental_quality)
     _write_csv(dividends, dividends_path)
+    _write_csv(security_history, paths.security_master_history)
     _write_csv(shareholder, paths.shareholder_capital)
     _write_csv(evidence, paths.announcement_evidence)
     _write_jsonl(evidence, _resolve(root, evidence_jsonl_output))
@@ -533,6 +726,7 @@ def write_research_data_domains(
     return {
         "fundamental_quality": str(paths.fundamental_quality),
         "cninfo_dividends": str(dividends_path),
+        "security_master_history": str(paths.security_master_history),
         "shareholder_capital": str(paths.shareholder_capital),
         "announcement_evidence": str(paths.announcement_evidence),
         "announcement_evidence_jsonl": str(_resolve(root, evidence_jsonl_output)),
