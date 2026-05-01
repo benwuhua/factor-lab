@@ -29,16 +29,24 @@ data_governance:
       min_coverage_ratio: 0.01
       activation_lane: company_events
     liquidity_microstructure:
-      path: reports/execution_calendar_{run_yyyymmdd}.csv
+      path: data/liquidity_microstructure.csv
       required_fields:
         - instrument
+        - date
+        - available_at
         - tradable
         - suspended
         - limit_up
         - limit_down
         - buy_blocked
+        - sell_blocked
+        - amount
+        - amount_20d
       pit_fields:
         - date
+        - available_at
+      freshness_date_column: date
+      max_age_days: 7
       min_coverage_ratio: 0.90
       activation_lane: liquidity_microstructure
     emotion_atmosphere:
@@ -47,9 +55,14 @@ data_governance:
         - instrument
         - trade_date
         - available_at
+        - up_ratio
+        - limit_up_count
+        - emotion_score
       pit_fields:
         - trade_date
         - available_at
+      freshness_date_column: trade_date
+      max_age_days: 7
       min_coverage_ratio: 0.70
       activation_lane: emotion_atmosphere
     fundamental_quality:

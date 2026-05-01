@@ -75,6 +75,8 @@ ORDERS_CSV ?= runs/$(RUN_DATE)/orders.csv
 FILLS_CSV ?= runs/$(RUN_DATE)/fills.csv
 HISTORICAL_DAYS ?= 30
 EXECUTION_CALENDAR_OUTPUT ?= reports/execution_calendar_$(RUN_DATE).csv
+LIQUIDITY_MICROSTRUCTURE_OUTPUT ?= data/liquidity_microstructure.csv
+EMOTION_ATMOSPHERE_OUTPUT ?= data/emotion_atmosphere.csv
 REPLAY_RUN_DIR ?= runs/$(RUN_DATE)
 REPLAY_OUTPUT ?= $(REPLAY_RUN_DIR)/replay_report.md
 RESEARCH_CONTEXT_AS_OF ?= $(RUN_DATE)
@@ -117,7 +119,7 @@ COMBO_DIAGNOSTICS_WINDOW_ARGS = $(if $(COMBO_DIAGNOSTICS_START_TIME),--start-tim
 EXPERT_REVIEWER ?= manual-reviewer
 EXPERT_CONFIRM_REASON ?= reviewed in workbench
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution portfolio-intraday-performance paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar liquidity-microstructure emotion-atmosphere daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution portfolio-intraday-performance paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -147,6 +149,8 @@ help:
 	@printf "  make select-factors   Build approved factor governance artifacts\n"
 	@printf "  make combo-diagnostics  Evaluate recent IC/LS diagnostics for combo members\n"
 	@printf "  make execution-calendar  Build daily A-share execution status CSV\n"
+	@printf "  make liquidity-microstructure  Build persistent liquidity/tradability data domain\n"
+	@printf "  make emotion-atmosphere  Build market emotion data domain from liquidity data\n"
 	@printf "  make daily-signal     Build daily explainable signal from approved factors\n"
 	@printf "  make check-data-quality  Check a daily signal before portfolio construction\n"
 	@printf "  make target-portfolio Build TopK target portfolio from a daily signal\n"
@@ -223,7 +227,8 @@ research-context:
 		--as-of-date $(RESEARCH_CONTEXT_AS_OF) \
 		--notice-start $(RESEARCH_CONTEXT_NOTICE_START) \
 		--notice-end $(RESEARCH_CONTEXT_NOTICE_END) \
-		--universes $(RESEARCH_CONTEXT_UNIVERSES)
+		--universes $(RESEARCH_CONTEXT_UNIVERSES) \
+		--merge-existing-events
 
 research-data-domains:
 	$(PYTHON) scripts/build_research_data_domains.py \
@@ -386,6 +391,28 @@ execution-calendar:
 		--provider-config $(CSI500_PROVIDER) \
 		--run-date $(subst -,,$(RUN_DATE)) \
 		--output $(EXECUTION_CALENDAR_OUTPUT)
+
+liquidity-microstructure:
+	$(PYTHON) scripts/build_liquidity_microstructure.py \
+		--provider-config $(CSI500_PROVIDER) \
+		--start-date $(RUN_DATE) \
+		--end-date $(RUN_DATE) \
+		--output $(LIQUIDITY_MICROSTRUCTURE_OUTPUT) \
+		--merge-existing
+	$(PYTHON) scripts/build_liquidity_microstructure.py \
+		--provider-config $(CSI300_PROVIDER) \
+		--start-date $(RUN_DATE) \
+		--end-date $(RUN_DATE) \
+		--output $(LIQUIDITY_MICROSTRUCTURE_OUTPUT) \
+		--merge-existing
+
+emotion-atmosphere:
+	$(PYTHON) scripts/build_emotion_atmosphere.py \
+		--liquidity-csv $(LIQUIDITY_MICROSTRUCTURE_OUTPUT) \
+		--start-date $(RUN_DATE) \
+		--end-date $(RUN_DATE) \
+		--output $(EMOTION_ATMOSPHERE_OUTPUT) \
+		--merge-existing
 
 daily-signal:
 	$(PYTHON) scripts/build_daily_signal.py \

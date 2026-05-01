@@ -18,6 +18,9 @@ class DailyDataUpdateTest(unittest.TestCase):
             [
                 "market_data_csi500",
                 "market_data_csi300",
+                "liquidity_microstructure_csi500",
+                "liquidity_microstructure_csi300",
+                "emotion_atmosphere",
                 "research_context",
                 "research_data_domains",
                 "data_governance",
@@ -30,6 +33,16 @@ class DailyDataUpdateTest(unittest.TestCase):
         self.assertIn("configs/provider_current.yaml", steps[0].command)
         self.assertIn("csi300", steps[1].command)
         self.assertIn("configs/provider_csi300_current.yaml", steps[1].command)
+        self.assertEqual("liquidity_microstructure_csi500", steps[2].name)
+        self.assertIn("scripts/build_liquidity_microstructure.py", steps[2].command)
+        self.assertIn("configs/provider_current.yaml", steps[2].command)
+        self.assertIn("--merge-existing", steps[2].command)
+        self.assertEqual("liquidity_microstructure_csi300", steps[3].name)
+        self.assertIn("configs/provider_csi300_current.yaml", steps[3].command)
+        self.assertEqual("emotion_atmosphere", steps[4].name)
+        self.assertIn("scripts/build_emotion_atmosphere.py", steps[4].command)
+        self.assertIn("--merge-existing", steps[4].command)
+        self.assertIn("--merge-existing-events", steps[5].command)
 
     def test_plan_can_fallback_to_akshare_market_data_provider(self) -> None:
         config = DailyDataUpdateConfig(project_root=Path("/repo"), as_of_date="2026-04-27", market_data_provider="akshare")
@@ -70,7 +83,17 @@ class DailyDataUpdateTest(unittest.TestCase):
 
         steps = build_daily_data_update_plan(config)
 
-        self.assertEqual(["research_context", "research_data_domains", "data_governance"], [step.name for step in steps])
+        self.assertEqual(
+            [
+                "liquidity_microstructure_csi500",
+                "liquidity_microstructure_csi300",
+                "emotion_atmosphere",
+                "research_context",
+                "research_data_domains",
+                "data_governance",
+            ],
+            [step.name for step in steps],
+        )
 
     def test_plan_can_batch_research_data_domain_refresh_with_offset(self) -> None:
         config = DailyDataUpdateConfig(
@@ -129,7 +152,7 @@ class DailyDataUpdateTest(unittest.TestCase):
 
             text = path.read_text(encoding="utf-8")
             self.assertIn("# Daily Data Update", text)
-            self.assertIn("research_context", text)
+            self.assertIn(steps[0].name, text)
             self.assertIn("pass", text)
 
 

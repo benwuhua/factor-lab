@@ -1,3 +1,4 @@
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,21 @@ from qlib_factor_lab.company_events import (
     load_company_events,
     load_event_risk_config,
 )
+
+
+def _load_research_context_script():
+    repo_root = Path(__file__).resolve().parents[1]
+    scripts_dir = str(repo_root / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    spec = importlib.util.spec_from_file_location(
+        "build_research_context_data_for_company_event_tests",
+        repo_root / "scripts" / "build_research_context_data.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 class CompanyEventTests(unittest.TestCase):
@@ -417,6 +433,166 @@ class CompanyEventTests(unittest.TestCase):
             snapshot = pd.read_csv(output)
             self.assertEqual(len(snapshot), 1)
             self.assertTrue(bool(snapshot.loc[0, "event_blocked"]))
+
+    def test_build_research_context_data_cli_overwrites_events_by_default(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script = repo_root / "scripts" / "build_research_context_data.py"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project_root = Path(tmp)
+            (project_root / "raw").mkdir()
+            (project_root / "data").mkdir()
+            (project_root / "raw" / "universes.csv").write_text(
+                "universe,instrument\ncsi300,SH600000\n",
+                encoding="utf-8",
+            )
+            (project_root / "raw" / "notices.csv").write_text(
+                "代码,公告标题,公告日期,公告类型,网址\n600000,关于收到监管函的公告,2026-04-20,监管,https://example.test/new\n",
+                encoding="utf-8",
+            )
+            (project_root / "data" / "company_events.csv").write_text(
+                "\n".join(
+                    [
+                        "event_id,instrument,event_type,event_date,source,source_url,title,severity,summary,evidence,active_until",
+                        "old,SH600000,announcement,2026-04-01,manual,https://example.test/old,Old notice,info,Old notice,Old notice,",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--project-root",
+                    str(project_root),
+                    "--skip-security-master",
+                    "--notice-source-csv",
+                    "raw/notices.csv",
+                    "--company-events-output",
+                    "data/company_events.csv",
+                    "--universe-symbols-csv",
+                    "raw/universes.csv",
+                    "--as-of-date",
+                    "2026-04-24",
+                ],
+                check=False,
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            events = pd.read_csv(project_root / "data" / "company_events.csv")
+            self.assertEqual(len(events), 1)
+            self.assertNotIn("old", set(events["event_id"].astype(str)))
+
+    def test_merge_company_events_deduplicates_by_event_id_and_normalizes_values(self):
+        module = _load_research_context_script()
+        existing = pd.DataFrame(
+            {
+                "event_id": [" evt-1 "],
+                "instrument": [" sh600000 "],
+                "event_type": [" regulatory_inquiry "],
+                "event_date": ["2026/04/20"],
+                "source": ["manual"],
+                "source_url": [" https://example.test/old "],
+                "title": [" Old title "],
+                "severity": ["risk"],
+                "summary": ["Old summary"],
+                "evidence": ["Old evidence"],
+                "active_until": ["2026/06/19"],
+            }
+        )
+        fetched = pd.DataFrame(
+            {
+                "event_id": ["evt-1", "evt-2"],
+                "instrument": ["SH600000", "SZ000001"],
+                "event_type": ["regulatory_inquiry", "announcement"],
+                "event_date": ["2026-04-20 08:30:00", "2026-04-21"],
+                "source": ["akshare_notice", "akshare_notice"],
+                "source_url": ["https://example.test/new", "https://example.test/second"],
+                "title": ["New title", "Second title"],
+                "severity": ["risk", "info"],
+                "summary": ["New summary", "Second summary"],
+                "evidence": ["New evidence", "Second evidence"],
+                "active_until": ["2026-06-19 00:00:00", ""],
+            }
+        )
+
+        merged = module._merge_company_events(existing, fetched)
+
+        self.assertEqual(list(merged["event_id"]), ["evt-1", "evt-2"])
+        self.assertEqual(merged.loc[0, "instrument"], "SH600000")
+        self.assertEqual(merged.loc[0, "event_date"], "2026-04-20")
+        self.assertEqual(merged.loc[0, "title"], "New title")
+        self.assertEqual(merged.loc[0, "source_url"], "https://example.test/new")
+        self.assertEqual(merged.loc[0, "active_until"], "2026-06-19")
+
+    def test_merge_company_events_accepts_empty_existing_file(self):
+        module = _load_research_context_script()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            existing_path = Path(tmp) / "company_events.csv"
+            existing_path.write_text("", encoding="utf-8")
+            fetched = pd.DataFrame(
+                {
+                    "event_id": ["evt-1"],
+                    "instrument": ["SH600000"],
+                    "event_type": ["announcement"],
+                    "event_date": ["2026-04-20"],
+                    "source": ["akshare_notice"],
+                    "source_url": ["https://example.test/new"],
+                    "title": ["New title"],
+                    "severity": ["info"],
+                    "summary": ["New summary"],
+                    "evidence": ["New evidence"],
+                    "active_until": [""],
+                }
+            )
+
+            merged = module._merge_company_events(module._read_existing_events(existing_path), fetched)
+
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged.loc[0, "event_id"], "evt-1")
+
+    def test_merge_company_events_falls_back_to_content_key_when_event_id_blank(self):
+        module = _load_research_context_script()
+        existing = pd.DataFrame(
+            {
+                "event_id": [""],
+                "instrument": ["SH600000"],
+                "event_type": ["announcement"],
+                "event_date": ["2026/04/20"],
+                "source": ["manual"],
+                "source_url": ["https://example.test/same"],
+                "title": ["Same title"],
+                "severity": ["info"],
+                "summary": ["Old summary"],
+                "evidence": ["Old evidence"],
+                "active_until": [""],
+            }
+        )
+        fetched = pd.DataFrame(
+            {
+                "event_id": [""],
+                "instrument": [" SH600000 "],
+                "event_type": ["announcement"],
+                "event_date": ["2026-04-20 12:00:00"],
+                "source": ["akshare_notice"],
+                "source_url": ["https://example.test/same"],
+                "title": [" Same title "],
+                "severity": ["info"],
+                "summary": ["New summary"],
+                "evidence": ["New evidence"],
+                "active_until": [""],
+            }
+        )
+
+        merged = module._merge_company_events(existing, fetched)
+
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged.loc[0, "summary"], "New summary")
 
 
 if __name__ == "__main__":

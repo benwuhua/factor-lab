@@ -87,6 +87,59 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
             ]
         )
 
+    steps.extend(
+        [
+            DataUpdateStep(
+                "liquidity_microstructure_csi500",
+                (
+                    python_bin,
+                    "scripts/build_liquidity_microstructure.py",
+                    "--provider-config",
+                    "configs/provider_current.yaml",
+                    "--start-date",
+                    config.as_of_date,
+                    "--end-date",
+                    config.as_of_date,
+                    "--output",
+                    "data/liquidity_microstructure.csv",
+                    "--merge-existing",
+                ),
+            ),
+            DataUpdateStep(
+                "liquidity_microstructure_csi300",
+                (
+                    python_bin,
+                    "scripts/build_liquidity_microstructure.py",
+                    "--provider-config",
+                    "configs/provider_csi300_current.yaml",
+                    "--start-date",
+                    config.as_of_date,
+                    "--end-date",
+                    config.as_of_date,
+                    "--output",
+                    "data/liquidity_microstructure.csv",
+                    "--merge-existing",
+                ),
+            ),
+            DataUpdateStep(
+                "emotion_atmosphere",
+                (
+                    python_bin,
+                    "scripts/build_emotion_atmosphere.py",
+                    "--liquidity-csv",
+                    "data/liquidity_microstructure.csv",
+                    "--start-date",
+                    config.as_of_date,
+                    "--end-date",
+                    config.as_of_date,
+                    "--output",
+                    "data/emotion_atmosphere.csv",
+                    "--merge-existing",
+                ),
+            ),
+        ]
+    )
+
     if not config.skip_research_context:
         steps.append(
             DataUpdateStep(
@@ -103,6 +156,7 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
                     "--universes",
                     "csi300",
                     "csi500",
+                    "--merge-existing-events",
                 )
                 + _limit_args(config.limit)
                 + ("--delay", str(config.delay)),
