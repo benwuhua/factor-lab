@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 import pandas as pd
+from pandas.core.groupby.generic import DataFrameGroupBy
 
 from qlib_factor_lab.factor_eval import EvalConfig, evaluate_factor, prepare_factor_signal, with_directional_signal
 from qlib_factor_lab.factor_registry import FactorDef
@@ -49,6 +50,46 @@ class FactorEvalTests(unittest.TestCase):
         self.assertEqual([0, 0, 0, 0], result["observations"].tolist())
         self.assertTrue(result["ic_mean"].isna().all())
         self.assertTrue(result["long_short_mean_return"].isna().all())
+
+    def test_evaluate_factor_collapses_dataframe_ic_outputs_to_numeric_metrics(self):
+        index = pd.MultiIndex.from_product(
+            [
+                pd.to_datetime(["2020-01-01", "2020-01-02", "2020-01-03"]),
+                ["a", "b", "c"],
+            ],
+            names=["datetime", "instrument"],
+        )
+        frame = pd.DataFrame(
+            {
+                "alpha": [1.0, 2.0, 3.0, 1.5, 2.5, 3.5, 2.0, 3.0, 4.0],
+                "close": [10.0, 11.0, 12.0, 10.5, 11.5, 12.5, 11.0, 12.0, 13.0],
+            },
+            index=index,
+        )
+        factor = FactorDef(name="alpha", expression="$close", direction=1)
+
+        with (
+            patch("qlib_factor_lab.factor_eval.fetch_factor_frame", return_value=frame),
+            patch.object(
+                DataFrameGroupBy,
+                "apply",
+                side_effect=[
+                    pd.DataFrame({"corr": [0.10, 0.20]}),
+                    pd.DataFrame({"corr": [0.20, 0.40]}),
+                ],
+            ),
+        ):
+            result = evaluate_factor(
+                object(),
+                factor,
+                EvalConfig(horizons=(1,), quantiles=2),
+                initialize=False,
+            )
+
+        self.assertEqual([0.15], result["ic_mean"].round(6).tolist())
+        self.assertEqual([0.30], result["rank_ic_mean"].round(6).tolist())
+        self.assertTrue(pd.api.types.is_numeric_dtype(result["icir"]))
+        self.assertTrue(pd.api.types.is_numeric_dtype(result["rank_icir"]))
 
 
 if __name__ == "__main__":

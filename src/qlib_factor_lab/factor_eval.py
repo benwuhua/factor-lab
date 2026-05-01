@@ -86,6 +86,8 @@ def evaluate_factor(
         )
         turnover = _estimate_top_quantile_turnover(scored, signal_col, eval_config.quantiles)
         quantile_summary = compute_quantile_return_summary(scored, signal_col, "future_ret", eval_config.quantiles)
+        ic_mean, ic_std, icir = _summarize_numeric_series(daily_ic)
+        rank_ic_mean, rank_ic_std, rank_icir = _summarize_numeric_series(daily_rank_ic)
         neutralization = []
         if eval_config.purification_steps:
             neutralization.append(f"purify:{'+'.join(eval_config.purification_steps)}")
@@ -99,18 +101,45 @@ def evaluate_factor(
                 "direction": factor.direction,
                 "horizon": horizon,
                 "neutralization": "+".join(neutralization) if neutralization else "none",
-                "ic_mean": daily_ic.mean(),
-                "ic_std": daily_ic.std(),
-                "icir": daily_ic.mean() / daily_ic.std() if daily_ic.std() else float("nan"),
-                "rank_ic_mean": daily_rank_ic.mean(),
-                "rank_ic_std": daily_rank_ic.std(),
-                "rank_icir": daily_rank_ic.mean() / daily_rank_ic.std() if daily_rank_ic.std() else float("nan"),
+                "ic_mean": ic_mean,
+                "ic_std": ic_std,
+                "icir": icir,
+                "rank_ic_mean": rank_ic_mean,
+                "rank_ic_std": rank_ic_std,
+                "rank_icir": rank_icir,
                 "top_quantile_turnover": turnover,
                 "observations": int(len(scored)),
         }
         row.update(quantile_summary)
         results.append(row)
     return pd.DataFrame(results)
+
+
+def _summarize_numeric_series(values: pd.Series | pd.DataFrame | float) -> tuple[float, float, float]:
+    series = _coerce_numeric_series(values)
+    if series.empty:
+        return float("nan"), float("nan"), float("nan")
+    mean = _finite_float(series.mean())
+    std = _finite_float(series.std())
+    if np.isnan(mean) or np.isnan(std) or std == 0:
+        return mean, std, float("nan")
+    return mean, std, float(mean / std)
+
+
+def _coerce_numeric_series(values: pd.Series | pd.DataFrame | float) -> pd.Series:
+    if isinstance(values, pd.DataFrame):
+        values = pd.Series(values.to_numpy().reshape(-1))
+    elif not isinstance(values, pd.Series):
+        values = pd.Series([values])
+    return pd.to_numeric(values, errors="coerce").dropna()
+
+
+def _finite_float(value: object) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return float("nan")
+    return numeric if np.isfinite(numeric) else float("nan")
 
 
 def _empty_factor_eval_result(factor: FactorDef, eval_config: EvalConfig) -> pd.DataFrame:
