@@ -60,6 +60,28 @@ TUSHARE_FINA_INDICATOR_FIELDS = [
     "accrual_ratio",
 ]
 
+TUSHARE_INCOME_FIELDS = [
+    "ts_code",
+    "ann_date",
+    "end_date",
+    "n_income_attr_p",
+    "n_income",
+]
+
+TUSHARE_BALANCESHEET_FIELDS = [
+    "ts_code",
+    "ann_date",
+    "end_date",
+    "total_assets",
+]
+
+TUSHARE_CASHFLOW_FIELDS = [
+    "ts_code",
+    "ann_date",
+    "end_date",
+    "n_cashflow_act",
+]
+
 TUSHARE_DAILY_FIELDS = [
     "ts_code",
     "trade_date",
@@ -154,17 +176,17 @@ DEFAULT_PERMISSION_PROBES = [
     {
         "api_name": "income_vip",
         "params": {"period": "20260331"},
-        "fields": ["ts_code", "ann_date", "end_date", "total_revenue", "n_income_attr_p"],
+        "fields": TUSHARE_INCOME_FIELDS,
     },
     {
         "api_name": "balancesheet_vip",
         "params": {"period": "20260331"},
-        "fields": ["ts_code", "ann_date", "end_date", "total_assets", "total_liab"],
+        "fields": TUSHARE_BALANCESHEET_FIELDS,
     },
     {
         "api_name": "cashflow_vip",
         "params": {"period": "20260331"},
-        "fields": ["ts_code", "ann_date", "end_date", "n_cashflow_act"],
+        "fields": TUSHARE_CASHFLOW_FIELDS,
     },
     {
         "api_name": "dividend",
@@ -577,6 +599,7 @@ def fetch_fundamental_quality_from_tushare(
         return pd.DataFrame(columns=FUNDAMENTAL_QUALITY_COLUMNS)
 
     frames: list[pd.DataFrame] = []
+    accrual_frames: list[pd.DataFrame] = []
     period_values = list(periods or _quarter_periods(start_year=start_year, as_of_date=as_of_date))
     for period in period_values:
         try:
@@ -598,6 +621,14 @@ def fetch_fundamental_quality_from_tushare(
         if filtered.empty:
             continue
         frames.append(normalize_tushare_fina_indicator(filtered, as_of_date=as_of_date))
+        accruals = _fetch_statement_accruals_for_period(
+            period,
+            selected=selected,
+            token=token,
+            transport=transport,
+        )
+        if not accruals.empty:
+            accrual_frames.append(accruals)
         if delay > 0:
             time.sleep(delay)
     if not frames:
@@ -606,7 +637,125 @@ def fetch_fundamental_quality_from_tushare(
         ["instrument", "report_period"],
         keep="last",
     )
+    if accrual_frames:
+        combined = _fill_statement_accruals(combined, pd.concat(accrual_frames, ignore_index=True))
     return _derive_change_fields(combined)
+
+
+def _fetch_statement_accruals_for_period(
+    period: str,
+    *,
+    selected: set[str],
+    token: str | None = None,
+    transport: Transport | None = None,
+) -> pd.DataFrame:
+    params = {"period": _yyyymmdd(period)}
+    try:
+        income = call_tushare_api("income_vip", params=params, fields=TUSHARE_INCOME_FIELDS, token=token, transport=transport)
+        balance = call_tushare_api(
+            "balancesheet_vip",
+            params=params,
+            fields=TUSHARE_BALANCESHEET_FIELDS,
+            token=token,
+            transport=transport,
+        )
+        cashflow = call_tushare_api("cashflow_vip", params=params, fields=TUSHARE_CASHFLOW_FIELDS, token=token, transport=transport)
+    except Exception as exc:  # pragma: no cover - network/vendor dependent
+        print(f"skip tushare_statement_accrual period={period}: {exc}")
+        return pd.DataFrame(columns=["instrument", "report_period", "accrual_ratio", "operating_cashflow_to_net_profit"])
+    return _derive_statement_quality_metrics(income=income, balance=balance, cashflow=cashflow, selected=selected)
+
+
+def _derive_statement_quality_metrics(
+    *,
+    income: pd.DataFrame,
+    balance: pd.DataFrame,
+    cashflow: pd.DataFrame,
+    selected: set[str],
+) -> pd.DataFrame:
+    required = {"ts_code", "end_date"}
+    if income is None or balance is None or cashflow is None:
+        return pd.DataFrame(columns=["instrument", "report_period", "accrual_ratio", "operating_cashflow_to_net_profit"])
+    if not required <= set(income.columns) or not required <= set(balance.columns) or not required <= set(cashflow.columns):
+        return pd.DataFrame(columns=["instrument", "report_period", "accrual_ratio", "operating_cashflow_to_net_profit"])
+    if income.empty or balance.empty or cashflow.empty:
+        return pd.DataFrame(columns=["instrument", "report_period", "accrual_ratio", "operating_cashflow_to_net_profit"])
+
+    inc = income.copy()
+    bal = balance.copy()
+    cf = cashflow.copy()
+    merged = inc.merge(bal, on=["ts_code", "end_date"], how="inner", suffixes=("_income", "_balance"))
+    merged = merged.merge(cf, on=["ts_code", "end_date"], how="inner", suffixes=("", "_cashflow"))
+    if merged.empty:
+        return pd.DataFrame(columns=["instrument", "report_period", "accrual_ratio", "operating_cashflow_to_net_profit"])
+    rows: list[dict[str, object]] = []
+    for _, item in merged.iterrows():
+        instrument = _safe_qlib_symbol_from_tushare(item.get("ts_code"))
+        if not instrument or instrument not in selected:
+            continue
+        total_assets = _number_from_row(item, ["total_assets"])
+        operating_cashflow = _number_from_row(item, ["n_cashflow_act"])
+        net_income = _number_from_row(item, ["n_income_attr_p", "n_income"])
+        if total_assets in {None, 0} or operating_cashflow is None or net_income is None:
+            continue
+        report_period = _date_from_row(item, ["end_date"])
+        if not report_period:
+            continue
+        rows.append(
+            {
+                "instrument": instrument,
+                "report_period": report_period,
+                "accrual_ratio": (float(net_income) - float(operating_cashflow)) / float(total_assets) * 100.0,
+                "operating_cashflow_to_net_profit": (
+                    float(operating_cashflow) / float(net_income) * 100.0
+                    if float(net_income) != 0.0
+                    else None
+                ),
+                "source": "tushare_statement_accrual",
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=["instrument", "report_period", "accrual_ratio", "operating_cashflow_to_net_profit", "source"])
+    return pd.DataFrame(rows).drop_duplicates(["instrument", "report_period"], keep="last")
+
+
+def _fill_statement_accruals(fundamentals: pd.DataFrame, accruals: pd.DataFrame) -> pd.DataFrame:
+    if fundamentals.empty or accruals.empty:
+        return fundamentals
+    keep = [
+        column
+        for column in ["instrument", "report_period", "accrual_ratio", "operating_cashflow_to_net_profit", "source"]
+        if column in accruals.columns
+    ]
+    merged = fundamentals.merge(accruals.loc[:, keep], on=["instrument", "report_period"], how="left", suffixes=("", "_statement"))
+    filled = pd.Series(False, index=merged.index)
+    for column in ["accrual_ratio", "operating_cashflow_to_net_profit"]:
+        current = pd.to_numeric(merged.get(column), errors="coerce")
+        derived = pd.to_numeric(merged.get(f"{column}_statement"), errors="coerce")
+        column_filled = current.isna() & derived.notna()
+        filled = filled | column_filled
+        merged[column] = current.combine_first(derived)
+    merged["source"] = _append_source_flag(merged.get("source"), filled, "tushare_statement_accrual")
+    return merged.drop(
+        columns=[
+            "accrual_ratio_statement",
+            "operating_cashflow_to_net_profit_statement",
+            "source_statement",
+        ],
+        errors="ignore",
+    )
+
+
+def _append_source_flag(current: pd.Series | None, mask: pd.Series, source_name: str) -> pd.Series:
+    output = current.fillna("").astype(str).copy() if current is not None else pd.Series("", index=mask.index)
+    for index in output.index:
+        if not bool(mask.loc[index]):
+            continue
+        parts = [part for part in output.at[index].split(";") if part]
+        if source_name not in parts:
+            parts.append(source_name)
+        output.at[index] = ";".join(parts)
+    return output
 
 
 def _post_json(endpoint: str, payload: dict[str, object], timeout: float) -> dict[str, object]:

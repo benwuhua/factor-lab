@@ -9,9 +9,10 @@ from qlib_factor_lab.combo_spec import (
     build_combo_exposures,
     factor_diagnostics_from_combo_spec,
     load_combo_spec,
+    signal_config_for_combo_spec,
     signal_factors_from_combo_spec,
 )
-from qlib_factor_lab.signal import SignalConfig
+from qlib_factor_lab.signal import SignalConfig, factor_weight, load_signal_config
 
 
 class ComboSpecTests(unittest.TestCase):
@@ -199,14 +200,32 @@ class ComboSpecTests(unittest.TestCase):
         spec = load_combo_spec(Path(__file__).resolve().parents[1] / "configs/combo_specs/offensive_multifactor_v1.yaml")
         active = [member for member in spec.members if member.active]
         by_family = {}
+        effective_family_weights = {}
         for member in active:
             by_family[member.family] = by_family.get(member.family, 0.0) + member.weight
+            if member.family in effective_family_weights:
+                self.assertEqual(
+                    effective_family_weights[member.family],
+                    member.weight,
+                    f"duplicate active family {member.family} should use one clear family budget",
+                )
+            effective_family_weights[member.family] = member.weight
 
-        self.assertGreaterEqual(by_family.get("momentum", 0.0), 0.35)
+        self.assertAlmostEqual(1.0, sum(effective_family_weights.values()))
+        self.assertLessEqual(effective_family_weights.get("momentum", 0.0), 0.35)
         self.assertGreaterEqual(by_family.get("volume_confirm", 0.0) + by_family.get("quiet_breakout", 0.0), 0.25)
+        self.assertGreaterEqual(effective_family_weights.get("quality", 0.0), 0.10)
+        self.assertGreaterEqual(effective_family_weights.get("growth_improvement", 0.0), 0.20)
         self.assertLessEqual(by_family.get("value", 0.0), 0.05)
         self.assertLessEqual(by_family.get("dividend", 0.0), 0.05)
         self.assertIn("growth_improvement", [member.name for member in active])
+        active_fundamental_by_family = {}
+        for member in active:
+            if member.source != "fundamental_quality":
+                continue
+            active_fundamental_by_family[member.family] = active_fundamental_by_family.get(member.family, 0) + 1
+        self.assertLessEqual(active_fundamental_by_family.get("quality", 0), 1)
+        self.assertLessEqual(active_fundamental_by_family.get("growth_improvement", 0), 1)
 
     def test_p1_combo_specs_register_csv_backed_fundamental_factor_members(self):
         repo_root = Path(__file__).resolve().parents[1]
@@ -235,6 +254,17 @@ class ComboSpecTests(unittest.TestCase):
                 self.assertEqual("fundamental_quality", member.source, name)
                 self.assertEqual(family, member.family, name)
                 self.assertTrue(any(component.get("field") == field for component in member.components), name)
+
+    def test_signal_config_activates_data_gated_and_guardrail_combo_members(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        base_config = load_signal_config(repo_root / "configs/signal.yaml")
+        spec = load_combo_spec(repo_root / "configs/combo_specs/offensive_multifactor_v1.yaml")
+        config = signal_config_for_combo_spec(base_config, spec)
+        by_name = {factor.name: factor for factor in signal_factors_from_combo_spec(spec)}
+
+        self.assertGreater(factor_weight(by_name["quality_guardrail"], config), 0.0)
+        self.assertGreater(factor_weight(by_name["growth_improvement"], config), 0.0)
+        self.assertGreater(factor_weight(by_name["gap_risk_20"], config), 0.0)
 
     def test_tushare_market_enriched_spec_uses_daily_basic_value_dividend_liquidity_fields(self):
         spec = load_combo_spec(Path(__file__).resolve().parents[1] / "configs/combo_specs/tushare_market_enriched_v1.yaml")

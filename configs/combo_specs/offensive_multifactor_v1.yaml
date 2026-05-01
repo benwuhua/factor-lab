@@ -2,23 +2,35 @@ name: offensive_multifactor_v1
 description: "Risk-on A-share multi-factor candidate: medium-term momentum, volume confirmation, quiet breakout, and growth improvement, with gap risk kept as a guardrail instead of a return driver."
 fundamental_path: data/fundamental_quality.csv
 members:
+  - name: momentum_60_120_blend
+    source: qlib_expression
+    expression: "0.6 * (Ref($close, 5) / Ref($close, 60) - 1) + 0.4 * (Ref($close, 10) / Ref($close, 120) - 1)"
+    family: momentum
+    logic_bucket: trend_following
+    direction: 1
+    weight: 0.30
+    approval_status: challenger
+    regime_profile: all_weather
+    description: "One explicit momentum family budget; blends 60-day and 120-day trend to avoid duplicate family weighting."
   - name: momentum_60_skip5
+    active: false
     source: qlib_expression
     expression: "Ref($close, 5) / Ref($close, 60) - 1"
     family: momentum
     logic_bucket: trend_following
     direction: 1
-    weight: 0.25
-    approval_status: challenger
+    weight: 0.00
+    approval_status: watch
     regime_profile: all_weather
   - name: momentum_120_skip10
+    active: false
     source: qlib_expression
     expression: "Ref($close, 10) / Ref($close, 120) - 1"
     family: momentum
     logic_bucket: trend_following
     direction: 1
-    weight: 0.15
-    approval_status: challenger
+    weight: 0.00
+    approval_status: watch
     regime_profile: all_weather
   - name: volume_confirm_20
     source: qlib_expression
@@ -26,7 +38,7 @@ members:
     family: volume_confirm
     logic_bucket: liquidity_attention
     direction: 1
-    weight: 0.15
+    weight: 0.12
     approval_status: challenger
     regime_profile: all_weather
   - name: quiet_breakout_20
@@ -35,7 +47,7 @@ members:
     family: quiet_breakout
     logic_bucket: reversal_repair
     direction: 1
-    weight: 0.15
+    weight: 0.16
     approval_status: core
     regime_profile: all_weather
   - name: fundamental_ep
@@ -81,11 +93,12 @@ members:
         direction: 1
         weight: 1.00
   - name: fundamental_roe
+    active: false
     source: fundamental_quality
     family: quality
     logic_bucket: fundamental_quality
     direction: 1
-    weight: 0.04
+    weight: 0.00
     approval_status: data_gated
     regime_profile: all_weather
     description: "source_table=data/fundamental_quality.csv; source_field=roe; role=quality confirmation for risk-on names."
@@ -94,11 +107,12 @@ members:
         direction: 1
         weight: 1.00
   - name: fundamental_roic
+    active: false
     source: fundamental_quality
     family: quality
     logic_bucket: fundamental_quality
     direction: 1
-    weight: 0.04
+    weight: 0.00
     approval_status: data_gated
     regime_profile: all_weather
     description: "source_table=data/fundamental_quality.csv; source_field=roic; role=capital efficiency confirmation when covered."
@@ -107,11 +121,12 @@ members:
         direction: 1
         weight: 1.00
   - name: fundamental_cfo_to_ni
+    active: false
     source: fundamental_quality
     family: quality
     logic_bucket: fundamental_quality
     direction: 1
-    weight: 0.03
+    weight: 0.00
     approval_status: data_gated
     regime_profile: all_weather
     description: "source_table=data/fundamental_quality.csv; source_field=operating_cashflow_to_net_profit; role=earnings quality guardrail."
@@ -134,11 +149,12 @@ members:
         direction: -1
         weight: 1.00
   - name: fundamental_low_accrual
+    active: false
     source: fundamental_quality
     family: quality
     logic_bucket: fundamental_quality
     direction: 1
-    weight: 0.03
+    weight: 0.00
     approval_status: data_gated
     regime_profile: all_weather
     description: "source_table=data/fundamental_quality.csv; source_field=accrual_ratio; role=accounting quality guardrail."
@@ -146,12 +162,38 @@ members:
       - field: accrual_ratio
         direction: -1
         weight: 1.00
+  - name: quality_guardrail
+    source: fundamental_quality
+    family: quality
+    logic_bucket: fundamental_quality
+    direction: 1
+    weight: 0.14
+    approval_status: data_gated
+    regime_profile: all_weather
+    description: "Composite quality guardrail for risk-on names; avoids separately counting ROE, ROIC, cashflow quality, leverage, and accruals as independent alphas."
+    components:
+      - field: roe
+        direction: 1
+        weight: 0.30
+      - field: roic
+        direction: 1
+        weight: 0.25
+      - field: operating_cashflow_to_net_profit
+        direction: 1
+        weight: 0.25
+      - field: accrual_ratio
+        direction: -1
+        weight: 0.10
+      - field: debt_ratio
+        direction: -1
+        weight: 0.10
   - name: fundamental_revenue_growth_change
+    active: false
     source: fundamental_quality
     family: growth_improvement
     logic_bucket: fundamental_growth
     direction: 1
-    weight: 0.04
+    weight: 0.00
     approval_status: data_gated
     regime_profile: all_weather
     description: "source_table=data/fundamental_quality.csv; source_field=revenue_growth_change_yoy; role=growth acceleration confirmation."
@@ -160,11 +202,12 @@ members:
         direction: 1
         weight: 1.00
   - name: fundamental_profit_growth_change
+    active: false
     source: fundamental_quality
     family: growth_improvement
     logic_bucket: fundamental_growth
     direction: 1
-    weight: 0.04
+    weight: 0.00
     approval_status: data_gated
     regime_profile: all_weather
     description: "source_table=data/fundamental_quality.csv; source_field=net_profit_growth_change_yoy; role=profit acceleration confirmation."
@@ -173,11 +216,12 @@ members:
         direction: 1
         weight: 1.00
   - name: fundamental_margin_change
+    active: false
     source: fundamental_quality
     family: growth_improvement
     logic_bucket: fundamental_growth
     direction: 1
-    weight: 0.03
+    weight: 0.00
     approval_status: data_gated
     regime_profile: all_weather
     description: "source_table=data/fundamental_quality.csv; source_field=gross_margin_change_yoy; role=margin acceleration confirmation."
@@ -218,17 +262,18 @@ members:
     family: growth_improvement
     logic_bucket: fundamental_growth
     direction: 1
-    weight: 0.20
+    weight: 0.22
     approval_status: data_gated
     regime_profile: all_weather
+    description: "Composite growth improvement budget using change fields, so static growth levels are not double-counted with acceleration members."
     components:
-      - field: revenue_growth_yoy
+      - field: revenue_growth_change_yoy
         direction: 1
-        weight: 0.40
-      - field: net_profit_growth_yoy
+        weight: 0.35
+      - field: net_profit_growth_change_yoy
         direction: 1
-        weight: 0.40
-      - field: gross_margin
+        weight: 0.45
+      - field: gross_margin_change_yoy
         direction: 1
         weight: 0.20
   - name: gap_risk_20
@@ -237,6 +282,6 @@ members:
     family: gap_risk
     logic_bucket: risk_structure
     direction: -1
-    weight: 0.10
+    weight: 0.06
     approval_status: guardrail
     regime_profile: all_weather

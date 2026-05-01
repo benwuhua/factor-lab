@@ -331,10 +331,53 @@ class TushareDataTest(unittest.TestCase):
             transport=fake_transport,
         )
 
-        self.assertEqual(["fina_indicator_vip"], [str(call["api_name"]) for call in calls])
+        self.assertEqual(
+            ["fina_indicator_vip", "income_vip", "balancesheet_vip", "cashflow_vip"],
+            [str(call["api_name"]) for call in calls],
+        )
         self.assertEqual({"period": "20260331"}, calls[0]["params"])
         self.assertEqual(["SZ000001"], result["instrument"].tolist())
         self.assertEqual(["2026-03-31"], result["report_period"].tolist())
+
+    def test_fetch_fundamental_quality_from_tushare_derives_accrual_ratio_from_statement_vips(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
+            calls.append(payload)
+            api_name = str(payload["api_name"])
+            fields_by_api = {
+                "fina_indicator_vip": ["ts_code", "end_date", "ann_date", "roe"],
+                "income_vip": ["ts_code", "end_date", "ann_date", "n_income_attr_p"],
+                "balancesheet_vip": ["ts_code", "end_date", "ann_date", "total_assets"],
+                "cashflow_vip": ["ts_code", "end_date", "ann_date", "n_cashflow_act"],
+            }
+            rows_by_api = {
+                "fina_indicator_vip": [["000001.SZ", "20260331", "20260420", 8.5]],
+                "income_vip": [["000001.SZ", "20260331", "20260420", 100.0]],
+                "balancesheet_vip": [["000001.SZ", "20260331", "20260420", 1000.0]],
+                "cashflow_vip": [["000001.SZ", "20260331", "20260420", 50.0]],
+            }
+            return {
+                "code": 0,
+                "msg": "",
+                "data": {"fields": fields_by_api[api_name], "items": rows_by_api[api_name]},
+            }
+
+        result = fetch_fundamental_quality_from_tushare(
+            ["SZ000001"],
+            as_of_date="2026-04-30",
+            periods=["20260331"],
+            token="token",
+            transport=fake_transport,
+        )
+
+        self.assertEqual(
+            ["fina_indicator_vip", "income_vip", "balancesheet_vip", "cashflow_vip"],
+            [str(call["api_name"]) for call in calls],
+        )
+        self.assertAlmostEqual(5.0, float(result.loc[0, "accrual_ratio"]))
+        self.assertAlmostEqual(50.0, float(result.loc[0, "operating_cashflow_to_net_profit"]))
+        self.assertIn("tushare_statement_accrual", result.loc[0, "source"])
 
     def test_fetch_fundamental_quality_from_tushare_derives_cross_period_changes(self) -> None:
         def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
