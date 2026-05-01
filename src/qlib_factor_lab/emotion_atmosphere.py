@@ -27,6 +27,8 @@ OUTPUT_COLUMNS = [
     "hot_turnover_ratio",
     "panic_down_ratio",
     "emotion_score",
+    "instrument_emotion_score",
+    "crowding_cooling_score",
 ]
 
 
@@ -50,6 +52,8 @@ def build_emotion_atmosphere(
     result = data.merge(market, on="trade_date", how="left")
     result["available_at"] = result["trade_date"]
     result["emotion_score"] = _score_emotion(result)
+    result["instrument_emotion_score"] = _instrument_emotion_score(result)
+    result["crowding_cooling_score"] = (100.0 - result["instrument_emotion_score"]).clip(0.0, 100.0).round(4)
     result = result[OUTPUT_COLUMNS].copy()
     return result.sort_values(["trade_date", "instrument"]).reset_index(drop=True)
 
@@ -170,6 +174,34 @@ def _score_emotion(frame: pd.DataFrame) -> pd.Series:
         - 10.0 * limit_down_penalty
     )
     return score.fillna(50.0).clip(0.0, 100.0).round(4)
+
+
+def _instrument_emotion_score(frame: pd.DataFrame) -> pd.Series:
+    pieces = []
+    for _, daily in frame.groupby("trade_date", sort=False):
+        pct_rank = _daily_rank(daily["pct_change"], neutral=0.5)
+        turnover_rank = _daily_rank(daily["turnover_20d"].fillna(daily["amount_20d"]), neutral=0.5)
+        limit_bonus = daily["limit_up"].astype(float)
+        limit_down_penalty = daily["limit_down"].astype(float)
+        suspended_penalty = daily["suspended"].astype(float)
+        raw = (
+            100.0 * (0.55 * pct_rank + 0.25 * turnover_rank + 0.20 * limit_bonus)
+            - 35.0 * limit_down_penalty
+            - 50.0 * suspended_penalty
+        )
+        pieces.append(raw.clip(0.0, 100.0))
+    if not pieces:
+        return pd.Series(dtype="float64")
+    return pd.concat(pieces).sort_index().round(4)
+
+
+def _daily_rank(values: pd.Series, *, neutral: float) -> pd.Series:
+    numeric = pd.to_numeric(values, errors="coerce")
+    valid = numeric.notna()
+    if int(valid.sum()) <= 1:
+        return pd.Series(neutral, index=values.index, dtype="float64")
+    ranked = numeric.rank(method="average", pct=True)
+    return ranked.fillna(neutral).astype(float)
 
 
 def _hot_turnover_ratio(values: pd.Series) -> float:

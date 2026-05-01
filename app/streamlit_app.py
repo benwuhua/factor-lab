@@ -19,6 +19,7 @@ import streamlit as st
 from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
     build_combo_profile_summary,
+    build_data_domain_health,
     build_event_evidence_library,
     build_execution_performance_attribution,
     build_factor_data_gap_summary,
@@ -177,6 +178,7 @@ def render_data_governance() -> None:
     snapshot = load_workbench_snapshot(ROOT)
     freshness = pd.DataFrame(snapshot.freshness)
     factor_gaps = build_factor_data_gap_summary(ROOT)
+    domain_health = build_data_domain_health(ROOT)
     provider_rows = _provider_rows()
     quality_rows = _quality_rows(snapshot)
 
@@ -194,6 +196,7 @@ def render_data_governance() -> None:
             ("Fresh Artifacts", _fresh_count(freshness, "ready")),
             ("Stale Artifacts", _fresh_count(freshness, "stale")),
             ("Missing Artifacts", _fresh_count(freshness, "missing")),
+            ("Active Domains", domain_health["cards"].get("active", 0)),
             ("Latest Run", snapshot.latest_run_dir.name if snapshot.latest_run_dir else "n/a"),
         ]
     )
@@ -214,6 +217,13 @@ def render_data_governance() -> None:
                 width="stretch",
                 hide_index=True,
             )
+
+        st.markdown(_section_header_html("数据域健康", "PIT data domains for research lanes"), unsafe_allow_html=True)
+        st.markdown(_data_domain_health_cards_html(domain_health["cards"]), unsafe_allow_html=True)
+        if domain_health["rows"].empty:
+            st.info("暂无 data_governance CSV。先运行 make data-governance 或 make daily-data-update。")
+        else:
+            st.dataframe(domain_health["rows"], width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("质量检查动作", "quality gate"), unsafe_allow_html=True)
         st.markdown(_workflow_card_grid_html(quality_rows), unsafe_allow_html=True)
@@ -239,6 +249,15 @@ def render_data_governance() -> None:
                     ("missing", _fresh_count(freshness, "missing")),
                 ],
                 note="超过 freshness SLA 的产物会在后续组合环节被视为待复核输入。",
+            )
+            + _detail_card_html(
+                "Lane Domains",
+                [
+                    ("liquidity", domain_health["cards"].get("liquidity_rows", 0)),
+                    ("emotion", domain_health["cards"].get("emotion_rows", 0)),
+                    ("shadow", domain_health["cards"].get("shadow", 0)),
+                ],
+                note="liquidity / emotion 数据域会决定对应 autoresearch lane 能否 active。",
             )
             + _detail_card_html(
                 "Factor Data Gaps",
@@ -1365,6 +1384,21 @@ def _evidence_cards_html(cards: dict[str, object]) -> str:
         for label, value in items
     )
     return f'<section class="evidence-grid">{html}</section>'
+
+
+def _data_domain_health_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("domains", cards.get("domains", 0)),
+        ("active", cards.get("active", 0)),
+        ("shadow", cards.get("shadow", 0)),
+        ("liquidity rows", cards.get("liquidity_rows", 0)),
+        ("emotion rows", cards.get("emotion_rows", 0)),
+    ]
+    html = "".join(
+        f'<div class="evidence-card"><label>{_html(label)}</label><strong>{_html(value)}</strong></div>'
+        for label, value in items
+    )
+    return f'<section class="evidence-grid data-domain-health-grid">{html}</section>'
 
 
 def _evidence_health_cards_html(cards: dict[str, object]) -> str:

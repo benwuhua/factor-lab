@@ -38,6 +38,16 @@ class EmotionAtmosphereTests(unittest.TestCase):
         self.assertTrue(day.loc[day["instrument"] == "AAA", "limit_up"].iloc[0])
         self.assertTrue(day.loc[day["instrument"] == "CCC", "suspended"].iloc[0])
         self.assertEqual(day["available_at"].tolist(), ["2026-04-20", "2026-04-20", "2026-04-20"])
+        self.assertIn("instrument_emotion_score", day.columns)
+        self.assertGreater(
+            float(day.loc[day["instrument"] == "AAA", "instrument_emotion_score"].iloc[0]),
+            float(day.loc[day["instrument"] == "BBB", "instrument_emotion_score"].iloc[0]),
+        )
+        self.assertAlmostEqual(
+            100.0,
+            float(day.loc[day["instrument"] == "AAA", "instrument_emotion_score"].iloc[0])
+            + float(day.loc[day["instrument"] == "AAA", "crowding_cooling_score"].iloc[0]),
+        )
 
     def test_emotion_score_is_higher_for_stronger_breadth_and_heat(self):
         liquidity = pd.DataFrame(

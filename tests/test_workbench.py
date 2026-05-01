@@ -10,6 +10,7 @@ import yaml
 from qlib_factor_lab.workbench import (
     build_autoresearch_progress,
     build_combo_profile_summary,
+    build_data_domain_health,
     build_execution_gate_card,
     build_event_evidence_library,
     build_execution_performance_attribution,
@@ -122,6 +123,69 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(progress["latest_candidate"], "alpha_new")
         self.assertEqual(progress["recent_candidates"][0]["candidate_name"], "alpha_new")
         self.assertTrue(progress["is_active"])
+
+    def test_data_domain_health_surfaces_governed_liquidity_and_emotion_domains(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reports = root / "reports"
+            data = root / "data"
+            reports.mkdir()
+            data.mkdir()
+            pd.DataFrame(
+                [
+                    {
+                        "domain": "liquidity_microstructure",
+                        "activation_lane": "liquidity_microstructure",
+                        "status": "pass",
+                        "activation_status": "active",
+                        "coverage_ratio": 0.99875,
+                        "pit_field_completeness": 1.0,
+                        "freshness_status": "pass",
+                        "rows": 799,
+                        "detail": "",
+                    },
+                    {
+                        "domain": "emotion_atmosphere",
+                        "activation_lane": "emotion_atmosphere",
+                        "status": "pass",
+                        "activation_status": "active",
+                        "coverage_ratio": 0.99875,
+                        "pit_field_completeness": 1.0,
+                        "freshness_status": "pass",
+                        "rows": 799,
+                        "detail": "",
+                    },
+                ]
+            ).to_csv(reports / "data_governance_20260430.csv", index=False)
+            pd.DataFrame(
+                {
+                    "date": ["2026-04-30", "2026-04-30"],
+                    "instrument": ["AAA", "BBB"],
+                    "tradable": [True, False],
+                    "buy_blocked": [False, True],
+                    "amount_20d": [100_000_000, 50_000_000],
+                }
+            ).to_csv(data / "liquidity_microstructure.csv", index=False)
+            pd.DataFrame(
+                {
+                    "trade_date": ["2026-04-30", "2026-04-30"],
+                    "instrument": ["AAA", "BBB"],
+                    "emotion_score": [72.0, 71.0],
+                    "instrument_emotion_score": [88.0, 25.0],
+                    "limit_up_count": [3, 3],
+                    "up_ratio": [0.61, 0.61],
+                }
+            ).to_csv(data / "emotion_atmosphere.csv", index=False)
+
+            health = build_data_domain_health(root)
+
+        self.assertEqual(health["cards"]["domains"], 2)
+        self.assertEqual(health["cards"]["active"], 2)
+        rows = health["rows"].set_index("domain")
+        self.assertAlmostEqual(float(rows.loc["liquidity_microstructure", "coverage_pct"]), 99.875)
+        self.assertEqual(rows.loc["emotion_atmosphere", "latest_date"], "2026-04-30")
+        self.assertEqual(health["liquidity"]["buy_blocked"], 1)
+        self.assertAlmostEqual(health["emotion"]["mean_instrument_emotion_score"], 56.5)
 
     def test_portfolio_gate_explanation_marks_exposure_failures_as_caution(self):
         portfolio = pd.DataFrame(

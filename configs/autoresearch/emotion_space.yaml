@@ -1,40 +1,32 @@
 lane: emotion_atmosphere
-description: "A-share atmosphere factors built from PIT market OHLCV proxies until richer sentiment data is ready."
+description: "A-share atmosphere factors built from the persistent data/emotion_atmosphere.csv domain."
 logic_buckets:
   - emotion_atmosphere
   - crowding_cooling
   - breadth_mood
 editable_fields:
-  - heat_window
-  - baseline_window
-  - limit_like_threshold
-  - turnover_heat_formula
-  - breadth_split
+  - source_column
+  - signal_direction
+  - score_blend
+  - cooling_transform
 guards:
   min_trade_count: 120
   max_top_quantile_turnover: 0.35
   require_breadth_regime_split: true
   max_logic_bucket_concentration: 0.45
 templates:
-  - name: arbr_sentiment_26
+  - name: instrument_emotion_score
     logic_bucket: emotion_atmosphere
-    family: volatility_mood
-    expression_template: "(Sum($high - $open, 26) / (Sum($open - $low, 26) + 0.000001)) - (Sum(Greater($high - Ref($close, 1), 0), 26) / (Sum(Greater(Ref($close, 1) - $low, 0), 26) + 0.000001))"
-    direction: -1
-  - name: limit_pressure_cooling
-    logic_bucket: crowding_cooling
-    family: limit_pressure
-    windows: [3, 5, 10]
-    params:
-      limit_like_threshold: [0.07, 0.095]
-    direction: -1
-  - name: single_name_breadth_balance
-    logic_bucket: breadth_mood
-    family: breadth_mood
-    windows: [10, 20, 60]
+    family: data_domain_emotion
+    source_column: instrument_emotion_score
     direction: 1
-  - name: turnover_heat_cooling
+  - name: crowding_cooling_score
     logic_bucket: crowding_cooling
-    family: turnover_heat
-    windows: [5, 10, 20]
-    direction: -1
+    family: data_domain_emotion
+    source_column: crowding_cooling_score
+    direction: 1
+  - name: emotion_pct_change
+    logic_bucket: breadth_mood
+    family: data_domain_emotion
+    source_column: pct_change
+    direction: 1

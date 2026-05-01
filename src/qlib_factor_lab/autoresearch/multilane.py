@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 
 from qlib_factor_lab.autoresearch.cross_sectional_oracle import run_cross_sectional_lane_oracle
+from qlib_factor_lab.autoresearch.emotion_data_oracle import load_emotion_data_factor_specs, run_emotion_data_lane_oracle
 from qlib_factor_lab.autoresearch.event_oracle import run_event_lane_oracle
 from qlib_factor_lab.autoresearch.fundamental_oracle import run_fundamental_lane_oracle
 from qlib_factor_lab.autoresearch.oracle import run_expression_oracle
@@ -74,7 +75,7 @@ def run_multilane_autoresearch(
             if activation == "disabled":
                 rows.append(_row(lane_name, activation, "disabled_skipped", "", float("nan"), "", "lane is disabled"))
                 continue
-            if lane_name in {"pattern_event", "emotion_atmosphere"}:
+            if lane_name == "pattern_event":
                 future = executor.submit(
                     _run_qlib_oracle,
                     run_event_lane_oracle,
@@ -83,6 +84,22 @@ def run_multilane_autoresearch(
                         "factor_specs": _event_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
                         "provider_config": provider_config_path,
                         "project_root": root,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    },
+                )
+                futures[future] = (lane_name, activation)
+                continue
+            if lane_name == "emotion_atmosphere":
+                future = executor.submit(
+                    _run_qlib_oracle,
+                    run_emotion_data_lane_oracle,
+                    {
+                        "lane_name": lane_name,
+                        "factor_specs": _event_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides),
+                        "provider_config": provider_config_path,
+                        "project_root": root,
+                        "data_path": "data/emotion_atmosphere.csv",
                         "start_time": start_time,
                         "end_time": end_time,
                     },
@@ -279,6 +296,9 @@ def _event_factor_specs(
     lane_name: str,
     lane_factor_name_overrides: dict[str, list[str]] | None = None,
 ) -> list[dict[str, Any]]:
+    if lane_name == "emotion_atmosphere":
+        names = _lane_factor_names(lane_name, lane_factor_name_overrides)
+        return load_emotion_data_factor_specs(names)
     return _lane_factor_specs(root, mining_config_path, lane_name, lane_factor_name_overrides)
 
 
@@ -317,15 +337,9 @@ def _lane_factor_names(lane_name: str, lane_factor_name_overrides: dict[str, lis
         return {"wangji-ignition-setup", "wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"}
     if lane_name == "emotion_atmosphere":
         return {
-            "arbr_26",
-            "breadth_proxy_20",
-            "davol_5",
-            "davol_10",
-            "davol_20",
-            "heat_cooling_5_20",
-            "limit_pressure_5",
-            "turnover_mean_5",
-            "turnover_mean_20",
+            "instrument_emotion_score",
+            "crowding_cooling_score",
+            "emotion_pct_change",
         }
     if lane_name == "liquidity_microstructure":
         return {

@@ -7,6 +7,7 @@ from app.streamlit_app import (
     _autoresearch_progress_cards_html,
     _autoresearch_smoke_env_overrides,
     _detail_card_html,
+    _data_domain_health_cards_html,
     _evidence_cards_html,
     _evidence_health_cards_html,
     _evidence_library_rows,
@@ -57,6 +58,22 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertIn("<h3>队列状态</h3>", html)
         self.assertIn("<span>Review</span><b>3</b>", html)
         self.assertIn("Nightly 研究队列", html)
+
+    def test_data_domain_health_cards_html_shows_active_new_domains(self):
+        html = _data_domain_health_cards_html(
+            {
+                "domains": 7,
+                "active": 7,
+                "shadow": 0,
+                "liquidity_rows": 799,
+                "emotion_rows": 799,
+            }
+        )
+
+        self.assertIn("data-domain-health-grid", html)
+        self.assertIn("<label>active</label><strong>7</strong>", html)
+        self.assertIn("<label>liquidity rows</label><strong>799</strong>", html)
+        self.assertIn("<label>emotion rows</label><strong>799</strong>", html)
 
     def test_short_text_truncates_long_candidate_names_for_rail_cards(self):
         text = _short_text("volume_confirmed_high_mean60_discount_reversal", 20)

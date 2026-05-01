@@ -74,7 +74,7 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertTrue((root / "reports/autoresearch/multilane_summary.md").exists())
             self.assertTrue((root / "reports/autoresearch/multilane_summary.json").exists())
 
-    def test_runner_dispatches_pattern_and_emotion_event_oracles(self):
+    def test_runner_dispatches_pattern_event_and_emotion_data_oracles(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             lane_space = root / "configs/autoresearch/lane_space.yaml"
@@ -103,11 +103,17 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle:
-                event_oracle.side_effect = [
-                    ({"candidate": "wangji-factor1", "status": "review", "primary_metric": 0.02, "artifact_dir": "a"}, ""),
-                    ({"candidate": "arbr_26", "status": "review", "primary_metric": 0.01, "artifact_dir": "b"}, ""),
-                ]
+            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle, patch(
+                "qlib_factor_lab.autoresearch.multilane.run_emotion_data_lane_oracle"
+            ) as emotion_oracle:
+                event_oracle.return_value = (
+                    {"candidate": "wangji-factor1", "status": "review", "primary_metric": 0.02, "artifact_dir": "a"},
+                    "",
+                )
+                emotion_oracle.return_value = (
+                    {"candidate": "instrument_emotion_score", "status": "review", "primary_metric": 0.01, "artifact_dir": "b"},
+                    "",
+                )
 
                 report = run_multilane_autoresearch(
                     lane_space_path=lane_space,
@@ -117,10 +123,13 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                     end_time="2026-04-20",
                 )
 
-            self.assertEqual(event_oracle.call_count, 2)
-            for call in event_oracle.call_args_list:
-                self.assertEqual(call.kwargs["start_time"], "2026-01-01")
-                self.assertEqual(call.kwargs["end_time"], "2026-04-20")
+            event_oracle.assert_called_once()
+            emotion_oracle.assert_called_once()
+            self.assertEqual(event_oracle.call_args.kwargs["start_time"], "2026-01-01")
+            self.assertEqual(event_oracle.call_args.kwargs["end_time"], "2026-04-20")
+            self.assertEqual(emotion_oracle.call_args.kwargs["data_path"], "data/emotion_atmosphere.csv")
+            self.assertEqual(emotion_oracle.call_args.kwargs["start_time"], "2026-01-01")
+            self.assertEqual(emotion_oracle.call_args.kwargs["end_time"], "2026-04-20")
             frame = report.to_frame().set_index("lane")
             self.assertEqual(frame.loc["pattern_event", "run_status"], "completed")
             self.assertEqual(frame.loc["emotion_atmosphere", "run_status"], "completed")
@@ -414,7 +423,7 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle:
+            with patch("qlib_factor_lab.autoresearch.multilane.run_emotion_data_lane_oracle") as event_oracle:
                 report = run_multilane_autoresearch(
                     lane_space_path=lane_space,
                     project_root=root,
@@ -442,21 +451,14 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                 "emotion_atmosphere,emotion_atmosphere,shadow\n",
                 encoding="utf-8",
             )
-            mining_config = root / "configs/factor_mining.yaml"
-            mining_config.write_text(
-                yaml.safe_dump({"templates": [{"name": "arbr_26", "expression": "$close", "direction": -1}]}),
-                encoding="utf-8",
-            )
-
-            with patch("qlib_factor_lab.autoresearch.multilane.run_event_lane_oracle") as event_oracle:
+            with patch("qlib_factor_lab.autoresearch.multilane.run_emotion_data_lane_oracle") as event_oracle:
                 event_oracle.return_value = (
-                    {"candidate": "arbr_26", "status": "review", "primary_metric": 0.01, "artifact_dir": "b"},
+                    {"candidate": "instrument_emotion_score", "status": "review", "primary_metric": 0.01, "artifact_dir": "b"},
                     "",
                 )
                 report = run_multilane_autoresearch(
                     lane_space_path=lane_space,
                     project_root=root,
-                    mining_config_path=mining_config,
                     data_governance_report_path=governance,
                     include_shadow=True,
                 )
@@ -547,14 +549,13 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertEqual(oracle.call_args.kwargs["start_time"], "2026-01-01")
             self.assertEqual(oracle.call_args.kwargs["end_time"], "2026-04-20")
 
-    def test_emotion_lane_includes_heat_limit_and_breadth_proxy_factors(self):
+    def test_emotion_lane_uses_data_domain_factor_specs(self):
         repo_root = Path(__file__).resolve().parents[1]
 
         names = {spec["name"] for spec in _event_factor_specs(repo_root, "configs/factor_mining.yaml", "emotion_atmosphere")}
 
-        self.assertIn("limit_pressure_5", names)
-        self.assertIn("heat_cooling_5_20", names)
-        self.assertIn("breadth_proxy_20", names)
+        self.assertIn("instrument_emotion_score", names)
+        self.assertIn("crowding_cooling_score", names)
 
     def test_liquidity_lane_excludes_amount_guardrails_and_includes_microstructure_factors(self):
         repo_root = Path(__file__).resolve().parents[1]

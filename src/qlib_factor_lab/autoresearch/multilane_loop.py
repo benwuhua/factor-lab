@@ -34,15 +34,9 @@ DEFAULT_ROTATION_FACTOR_NAMES: dict[str, list[str]] = {
         "quiet_breakout_60",
     ],
     "emotion_atmosphere": [
-        "arbr_26",
-        "breadth_proxy_20",
-        "davol_5",
-        "davol_10",
-        "davol_20",
-        "heat_cooling_5_20",
-        "limit_pressure_5",
-        "turnover_mean_5",
-        "turnover_mean_20",
+        "instrument_emotion_score",
+        "crowding_cooling_score",
+        "emotion_pct_change",
     ],
     "liquidity_microstructure": [
         "amihud_illiq_10",

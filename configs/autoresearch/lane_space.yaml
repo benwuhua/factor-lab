@@ -119,7 +119,8 @@ lanes:
     factor_type: market_state_event_like
     activation_status: active
     required_data_domains:
-      - market_ohlcv
+      - emotion_atmosphere
+      - liquidity_microstructure
     families:
       - turnover_heat
       - limit_pressure

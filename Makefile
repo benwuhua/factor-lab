@@ -83,6 +83,9 @@ RESEARCH_CONTEXT_AS_OF ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_START ?= $(RUN_DATE)
 RESEARCH_CONTEXT_NOTICE_END ?= $(RUN_DATE)
 RESEARCH_CONTEXT_UNIVERSES ?= csi300 csi500
+EVENT_BACKFILL_AS_OF ?= $(RUN_DATE)
+EVENT_BACKFILL_DAYS ?= 90
+EVENT_BACKFILL_UNIVERSES ?= csi300 csi500
 DAILY_DATA_AS_OF ?= $(shell PYTHONPATH=src $(PYTHON) -c "from qlib_factor_lab.akshare_data import today_for_daily_data; print(today_for_daily_data().replace('-', ''))")
 DAILY_DATA_MARKET_PROVIDER ?= tushare
 DAILY_DATA_MARKET_PROVIDER_ARG = $(if $(DAILY_DATA_MARKET_PROVIDER),--market-data-provider $(DAILY_DATA_MARKET_PROVIDER),)
@@ -119,7 +122,7 @@ COMBO_DIAGNOSTICS_WINDOW_ARGS = $(if $(COMBO_DIAGNOSTICS_START_TIME),--start-tim
 EXPERT_REVIEWER ?= manual-reviewer
 EXPERT_CONFIRM_REASON ?= reviewed in workbench
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar liquidity-microstructure emotion-atmosphere daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution portfolio-intraday-performance paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context event-backfill research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar liquidity-microstructure emotion-atmosphere daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution portfolio-intraday-performance paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -131,6 +134,7 @@ help:
 	@printf "  make check-env        Check local Qlib provider environment\n"
 	@printf "  make industry-overrides  Refresh CSI300/CSI500 industry override table\n"
 	@printf "  make research-context Refresh security master and company event evidence\n"
+	@printf "  make event-backfill   Backfill historical company events with merge dedupe\n"
 	@printf "  make research-data-domains Build fundamental/shareholder/evidence data domains\n"
 	@printf "  make daily-data-update Incrementally refresh market data and research data domains\n"
 	@printf "  make data-governance Check PIT data-domain coverage and lane readiness\n"
@@ -229,6 +233,12 @@ research-context:
 		--notice-end $(RESEARCH_CONTEXT_NOTICE_END) \
 		--universes $(RESEARCH_CONTEXT_UNIVERSES) \
 		--merge-existing-events
+
+event-backfill:
+	$(PYTHON) scripts/backfill_company_events.py \
+		--as-of-date $(EVENT_BACKFILL_AS_OF) \
+		--days $(EVENT_BACKFILL_DAYS) \
+		--universes $(EVENT_BACKFILL_UNIVERSES)
 
 research-data-domains:
 	$(PYTHON) scripts/build_research_data_domains.py \

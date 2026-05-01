@@ -24,6 +24,9 @@ EVENT_RISK_CONFIG = Path("configs/event_risk.yaml")
 AUTORESEARCH_REVIEW_ANALYSIS = Path("reports/autoresearch")
 COMBO_SPEC_DIR = Path("configs/combo_specs")
 FUNDAMENTAL_QUALITY = Path("data/fundamental_quality.csv")
+DATA_GOVERNANCE_REPORT_GLOB = "data_governance_*.csv"
+LIQUIDITY_MICROSTRUCTURE = Path("data/liquidity_microstructure.csv")
+EMOTION_ATMOSPHERE = Path("data/emotion_atmosphere.csv")
 
 OFFENSIVE_FACTOR_FAMILIES = {"momentum", "volume_confirm", "quiet_breakout", "growth_improvement", "event_catalyst", "theme"}
 DEFENSIVE_FACTOR_FAMILIES = {"value", "dividend", "gap_risk", "cashflow_quality", "fundamental_quality", "low_vol"}
@@ -895,6 +898,124 @@ def build_factor_data_gap_summary(
             }
         )
     return pd.DataFrame(rows)
+
+
+def build_data_domain_health(
+    root: str | Path = ".",
+    *,
+    governance_report_path: str | Path | None = None,
+    liquidity_path: str | Path = LIQUIDITY_MICROSTRUCTURE,
+    emotion_path: str | Path = EMOTION_ATMOSPHERE,
+) -> dict[str, Any]:
+    root_path = Path(root)
+    governance_path = _resolve(root_path, governance_report_path) if governance_report_path is not None else _latest_path(
+        list((root_path / "reports").glob(DATA_GOVERNANCE_REPORT_GLOB))
+    )
+    governance = _read_csv_or_empty(governance_path) if governance_path is not None else pd.DataFrame()
+    rows = _data_domain_rows(governance, root_path, liquidity_path, emotion_path)
+    liquidity = _read_csv_or_empty(_resolve(root_path, liquidity_path))
+    emotion = _read_csv_or_empty(_resolve(root_path, emotion_path))
+    activation = rows.get("activation_status", pd.Series(dtype=str)).fillna("").astype(str) if not rows.empty else pd.Series(dtype=str)
+    return {
+        "cards": {
+            "domains": int(len(rows)),
+            "active": int((activation == "active").sum()),
+            "shadow": int((activation == "shadow").sum()),
+            "failed": int((rows.get("status", pd.Series(dtype=str)).fillna("").astype(str) == "fail").sum()) if not rows.empty else 0,
+            "liquidity_rows": int(len(liquidity)),
+            "emotion_rows": int(len(emotion)),
+        },
+        "rows": rows,
+        "liquidity": _liquidity_domain_metrics(liquidity),
+        "emotion": _emotion_domain_metrics(emotion),
+        "governance_path": str(governance_path) if governance_path is not None else "",
+    }
+
+
+def _data_domain_rows(
+    governance: pd.DataFrame,
+    root: Path,
+    liquidity_path: str | Path,
+    emotion_path: str | Path,
+) -> pd.DataFrame:
+    columns = [
+        "domain",
+        "activation_lane",
+        "status",
+        "activation_status",
+        "coverage_pct",
+        "pit_pct",
+        "freshness_status",
+        "rows",
+        "latest_date",
+        "detail",
+    ]
+    if governance.empty:
+        return pd.DataFrame(columns=columns)
+    frame = governance.copy()
+    for column in ["coverage_ratio", "pit_field_completeness"]:
+        frame[column] = pd.to_numeric(frame.get(column, pd.Series(dtype=float)), errors="coerce")
+    frame["coverage_pct"] = (frame["coverage_ratio"] * 100).round(3)
+    frame["pit_pct"] = (frame["pit_field_completeness"] * 100).round(3)
+    latest_dates = {
+        "liquidity_microstructure": _latest_date_from_csv(_resolve(root, liquidity_path), "date"),
+        "emotion_atmosphere": _latest_date_from_csv(_resolve(root, emotion_path), "trade_date"),
+    }
+    frame["latest_date"] = frame["domain"].map(latest_dates).fillna("")
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = pd.NA
+    return frame.loc[:, columns].reset_index(drop=True)
+
+
+def _liquidity_domain_metrics(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame.empty:
+        return {"rows": 0, "buy_blocked": 0, "suspended": 0, "median_amount_20d": float("nan")}
+    return {
+        "rows": int(len(frame)),
+        "buy_blocked": int(_truthy_series(frame.get("buy_blocked", pd.Series(dtype=object))).sum()),
+        "suspended": int(_truthy_series(frame.get("suspended", pd.Series(dtype=object))).sum()),
+        "median_amount_20d": _number(pd.to_numeric(frame.get("amount_20d", pd.Series(dtype=float)), errors="coerce").median()),
+    }
+
+
+def _emotion_domain_metrics(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame.empty:
+        return {
+            "rows": 0,
+            "mean_emotion_score": float("nan"),
+            "mean_instrument_emotion_score": float("nan"),
+            "latest_limit_up_count": 0,
+            "latest_up_ratio": float("nan"),
+        }
+    latest = ""
+    if "trade_date" in frame.columns:
+        dates = pd.to_datetime(frame["trade_date"], errors="coerce")
+        if dates.notna().any():
+            latest = dates.max().strftime("%Y-%m-%d")
+    latest_frame = frame[frame["trade_date"].astype(str) == latest] if latest and "trade_date" in frame.columns else frame
+    limit_up_count = pd.to_numeric(latest_frame.get("limit_up_count", pd.Series(dtype=float)), errors="coerce").max()
+    return {
+        "rows": int(len(frame)),
+        "mean_emotion_score": _number(pd.to_numeric(latest_frame.get("emotion_score", pd.Series(dtype=float)), errors="coerce").mean()),
+        "mean_instrument_emotion_score": _number(
+            pd.to_numeric(latest_frame.get("instrument_emotion_score", pd.Series(dtype=float)), errors="coerce").mean()
+        ),
+        "latest_limit_up_count": int(limit_up_count) if pd.notna(limit_up_count) else 0,
+        "latest_up_ratio": _number(pd.to_numeric(latest_frame.get("up_ratio", pd.Series(dtype=float)), errors="coerce").mean()),
+    }
+
+
+def _latest_date_from_csv(path: Path, column: str) -> str:
+    frame = _read_csv_or_empty(path)
+    if frame.empty or column not in frame.columns:
+        return ""
+    dates = pd.to_datetime(frame[column], errors="coerce").dropna()
+    return dates.max().strftime("%Y-%m-%d") if not dates.empty else ""
+
+
+def _truthy_series(values: pd.Series) -> pd.Series:
+    return values.map(_truthy).fillna(False).astype(bool)
 
 
 def build_combo_profile_summary(
