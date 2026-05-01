@@ -145,6 +145,7 @@ def run_multilane_autoresearch(
                         "project_root": root,
                         "start_time": start_time,
                         "end_time": end_time,
+                        "artifact_mode": str((lane or {}).get("artifact_mode", "full")),
                     },
                 )
                 futures[future] = (lane_name, activation)

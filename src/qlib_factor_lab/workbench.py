@@ -1161,6 +1161,7 @@ def parse_expert_review_result(source: str | Path | None) -> dict[str, Any]:
     metadata = _expert_metadata(text)
     output = _section_after(text, "## Output")
     manual_items = parse_expert_review_manual_items(output)
+    structured_reasons = _expert_structured_reasons(output)
     return {
         "status": metadata.get("status", "missing" if not text.strip() else ""),
         "decision": _normalized_decision(metadata.get("decision", "")),
@@ -1171,6 +1172,8 @@ def parse_expert_review_result(source: str | Path | None) -> dict[str, Any]:
         "hard_manual_review": manual_items.get("hard_manual_review", []),
         "liquidity_review": manual_items.get("liquidity_review", []),
         "risk_notes": _expert_risk_notes(output),
+        "structured_reasons": structured_reasons,
+        "reject_reasons": structured_reasons,
         "raw_output": output.strip(),
     }
 
@@ -1859,8 +1862,68 @@ def _expert_risk_notes(output: str) -> str:
     return " ".join(notes).strip()
 
 
+def _expert_structured_reasons(output: str) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for line in output.splitlines():
+        cleaned = _clean_markdown(line)
+        if not cleaned:
+            continue
+        category = _expert_reason_category(cleaned)
+        severity = _expert_reason_severity(cleaned)
+        if category == "other" and severity == "review":
+            continue
+        key = (category, cleaned)
+        if key in seen:
+            continue
+        rows.append(
+            {
+                "severity": severity,
+                "category": category,
+                "instruments": _expert_watchlist(cleaned),
+                "detail": cleaned,
+            }
+        )
+        seen.add(key)
+    return rows
+
+
+def _expert_reason_category(text: str) -> str:
+    lowered = text.lower()
+    if any(keyword in text for keyword in ["事件", "公告", "问询", "监管", "处罚", "纪律", "减持", "诉讼", "解禁"]) or "block" in lowered:
+        return "event_risk"
+    if any(keyword in text for keyword in ["流动性", "成交额", "容量", "换手"]) or "liquidity" in lowered:
+        return "liquidity"
+    if any(keyword in text for keyword in ["因子", "family", "逻辑单一"]) or "factor" in lowered:
+        return "factor_concentration"
+    if any(keyword in text for keyword in ["行业", "板块", "主题暴露"]):
+        return "industry_concentration"
+    if any(keyword in text for keyword in ["涨跌停", "停牌", "休市", "交易日", "不可成交"]):
+        return "tradability"
+    if any(keyword in text for keyword in ["数据", "缺失", "覆盖", "诊断"]):
+        return "data_quality"
+    if any(keyword in text for keyword in ["人工", "复核", "看图"]) or "manual" in lowered:
+        return "manual_review"
+    return "other"
+
+
+def _expert_reason_severity(text: str) -> str:
+    lowered = text.lower()
+    if any(keyword in lowered for keyword in ["reject", "block"]) or any(
+        keyword in text for keyword in ["阻断", "硬拦截", "拦截", "不建议进入", "不建议直接"]
+    ):
+        return "reject"
+    if any(keyword in lowered for keyword in ["caution", "manual", "watch"]) or any(
+        keyword in text for keyword in ["复核", "降仓", "观察", "偏低", "过高", "过度", "集中"]
+    ):
+        return "caution"
+    return "review"
+
+
 def _clean_markdown(line: str) -> str:
     cleaned = line.strip().replace("`", "")
     cleaned = re.sub(r"^\s*[-*]\s+", "", cleaned)
+    cleaned = re.sub(r"^\s*\d+[.、]\s*", "", cleaned)
+    cleaned = re.sub(r"^#+\s*", "", cleaned)
     cleaned = cleaned.replace("**", "")
     return cleaned.strip()

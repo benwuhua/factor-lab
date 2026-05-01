@@ -685,6 +685,40 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(result["watchlist"], ["SH600580", "SZ002568"])
         self.assertIn("第一是因子拥挤", result["risk_notes"])
 
+    def test_parse_expert_review_result_structures_reject_reasons(self):
+        text = """# Expert Review Result
+
+- status: completed
+- decision: reject
+- error:
+
+## Output
+
+结论：`reject`，组合不建议进入纸面执行。
+
+**核心判断**
+1. **因子族过度集中：是。** 组合主要来自 quality_low_leverage。
+2. **行业集中：是。** 专用设备权重过高。
+
+**3. 下单前最值得拦截的风险**
+- **事件风险第一优先级。** `SH601162` 有硬阻断公告，建议 Block。
+- **流动性容量。** `SZ002568` 20 日成交额偏低，进入 manual review。
+"""
+
+        result = parse_expert_review_result(text)
+
+        reasons = result["structured_reasons"]
+        by_category = {row["category"]: row for row in reasons}
+        self.assertEqual("reject", result["decision"])
+        self.assertIn("factor_concentration", by_category)
+        self.assertIn("industry_concentration", by_category)
+        self.assertIn("event_risk", by_category)
+        self.assertIn("liquidity", by_category)
+        self.assertEqual("reject", by_category["event_risk"]["severity"])
+        self.assertEqual(["SH601162"], by_category["event_risk"]["instruments"])
+        self.assertEqual("caution", by_category["liquidity"]["severity"])
+        self.assertEqual(["SZ002568"], by_category["liquidity"]["instruments"])
+
     def test_research_pipeline_status_links_research_expert_gate_and_paper(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

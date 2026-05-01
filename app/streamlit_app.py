@@ -484,6 +484,21 @@ def render_portfolio_gate() -> None:
             st.caption(expert["risk_notes"])
         if expert["watchlist"]:
             st.dataframe(pd.DataFrame({"instrument": expert["watchlist"]}), width="stretch", hide_index=True)
+        structured_reasons = pd.DataFrame(expert.get("structured_reasons") or [])
+        if not structured_reasons.empty:
+            display_reasons = structured_reasons.copy()
+            if "instruments" in display_reasons.columns:
+                display_reasons["instruments"] = display_reasons["instruments"].map(
+                    lambda value: "; ".join(value) if isinstance(value, list) else str(value)
+                )
+            st.dataframe(
+                display_reasons.loc[
+                    :,
+                    [column for column in ["severity", "category", "instruments", "detail"] if column in display_reasons.columns],
+                ],
+                width="stretch",
+                hide_index=True,
+            )
         st.markdown(_section_header_html("专家硬复核名单", "manual block before paper execution"), unsafe_allow_html=True)
         hard_manual = expert.get("hard_manual_review", [])
         liquidity_manual = expert.get("liquidity_review", [])

@@ -68,10 +68,12 @@ def run_fundamental_lane_oracle(
     close_frame: pd.DataFrame | None = None,
     start_time: str | None = None,
     end_time: str | None = None,
+    artifact_mode: str = "full",
 ) -> tuple[dict[str, Any], str]:
     started = time.time()
     root = Path(project_root)
     contract = load_expression_contract(_resolve(root, contract_path))
+    artifact_mode = _normalize_artifact_mode(artifact_mode)
     run_id = _make_run_id(lane_name)
     artifact_dir = _resolve(root, contract.artifact_root) / f"{lane_name}_{run_id}"
     artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -99,7 +101,8 @@ def run_fundamental_lane_oracle(
             continue
         factor_dir = artifact_dir / name
         factor_dir.mkdir(parents=True, exist_ok=True)
-        write_eval_report(factor_frame.reset_index(), factor_dir / "factor_frame.csv")
+        if artifact_mode == "full":
+            write_eval_report(factor_frame.reset_index(), factor_dir / "factor_frame.csv")
         raw_eval = evaluate_fundamental_factor_frame(
             factor_frame,
             factor_name=name,
@@ -136,6 +139,7 @@ def run_fundamental_lane_oracle(
         minimum_observations=contract.minimum_observations,
         no_data=fundamentals.empty,
         factor_count=len(factor_specs),
+        artifact_mode=artifact_mode,
     )
     block = _render_summary_block(payload)
     (artifact_dir / "summary.txt").write_text(block, encoding="utf-8")
@@ -302,6 +306,7 @@ def _lane_payload(
     minimum_observations: int,
     no_data: bool,
     factor_count: int = len(DEFAULT_FUNDAMENTAL_FACTOR_SPECS),
+    artifact_mode: str = "full",
 ) -> dict[str, Any]:
     if no_data:
         status = "discard_candidate"
@@ -317,6 +322,7 @@ def _lane_payload(
         "run_id": run_id,
         "candidate": str(best.get("factor", "")) if best is not None else "",
         "factor_count": factor_count,
+        "artifact_mode": artifact_mode,
         "status": status,
         "decision_reason": reason,
         "primary_metric": _float(best.get("rank_ic_mean", float("nan"))) if best is not None else float("nan"),
@@ -332,6 +338,7 @@ def _render_summary_block(payload: dict[str, Any]) -> str:
         "run_id",
         "candidate",
         "factor_count",
+        "artifact_mode",
         "status",
         "decision_reason",
         "primary_metric",
@@ -343,6 +350,13 @@ def _render_summary_block(payload: dict[str, Any]) -> str:
     lines.extend(f"{key}: {payload.get(key, '')}" for key in ordered)
     lines.append("---")
     return "\n".join(lines) + "\n"
+
+
+def _normalize_artifact_mode(value: str) -> str:
+    mode = str(value or "full").strip().lower()
+    if mode not in {"full", "light"}:
+        raise ValueError(f"unsupported fundamental artifact_mode: {value}")
+    return mode
 
 
 def _fetch_close_frame(project_config: Any) -> pd.DataFrame:

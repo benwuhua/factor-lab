@@ -242,6 +242,7 @@ lanes:
     editable_space: configs/autoresearch/fundamental_space.yaml
     factor_type: cross_sectional
     activation_status: active
+    artifact_mode: light
     required_data_domains:
       - fundamental_quality
     families:

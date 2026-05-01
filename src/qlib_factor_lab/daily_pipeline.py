@@ -92,6 +92,39 @@ class DailyPipelineResult:
     artifacts: dict[str, str]
 
 
+_GENERATED_RUN_ARTIFACTS = {
+    "approved_factors.yaml",
+    "block_report.md",
+    "combo_factors.yaml",
+    "combo_spec.yaml",
+    "data_freshness.md",
+    "data_governance.csv",
+    "data_governance.md",
+    "data_quality.md",
+    "event_risk_snapshot.csv",
+    "execution_portfolio.csv",
+    "execution_portfolio_summary.md",
+    "expert_review_packet.md",
+    "expert_review_result.md",
+    "fills.csv",
+    "manifest.json",
+    "orders.csv",
+    "portfolio_gate_explanation.md",
+    "positions_expected.csv",
+    "reconciliation.md",
+    "research_portfolio.csv",
+    "research_portfolio_summary.md",
+    "risk_report.md",
+    "run_summary.md",
+    "signal_summary.md",
+    "signals.csv",
+    "stock_cards.jsonl",
+    "target_portfolio.csv",
+    "target_portfolio_summary.md",
+    "configs",
+}
+
+
 def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPipelineResult:
     root_path = Path(root).expanduser().resolve()
     signal_config = load_signal_config(_resolve(root_path, inputs.signal_config_path))
@@ -117,7 +150,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         )
         freshness_run_date = str(freshness_report.get("provider_end_time") or datetime.now().date())
         run_dir = _resolve(root_path, _run_dir(execution_config, freshness_run_date))
-        run_dir.mkdir(parents=True, exist_ok=True)
+        _prepare_run_dir(run_dir)
         freshness_path = write_provider_data_freshness_report(freshness_report, run_dir / "data_freshness.md")
         artifacts["data_freshness"] = str(freshness_path)
         if not freshness_report["passed"]:
@@ -136,7 +169,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
     preflight_run_date = _preflight_run_date(signal_config.run_date)
     if preflight_run_date is not None:
         run_dir = _resolve(root_path, _run_dir(execution_config, preflight_run_date))
-        run_dir.mkdir(parents=True, exist_ok=True)
+        _prepare_run_dir(run_dir)
         governance_report = _write_data_governance_artifacts(root_path, run_dir, preflight_run_date, inputs, artifacts)
         governance_checked = True
         if governance_report is not None and not governance_report.passed:
@@ -168,8 +201,11 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
 
     signal = build_daily_signal(exposures, factors, signal_config)
     run_date = str(signal["date"].max()) if not signal.empty else signal_config.run_date
-    run_dir = run_dir or _resolve(root_path, _run_dir(execution_config, run_date))
-    run_dir.mkdir(parents=True, exist_ok=True)
+    if run_dir is None:
+        run_dir = _resolve(root_path, _run_dir(execution_config, run_date))
+        _prepare_run_dir(run_dir)
+    else:
+        run_dir.mkdir(parents=True, exist_ok=True)
 
     if not governance_checked:
         governance_report = _write_data_governance_artifacts(root_path, run_dir, run_date, inputs, artifacts)
@@ -596,6 +632,16 @@ def _write_data_governance_artifacts(
     artifacts["data_governance"] = str(report_path)
     artifacts["data_governance_csv"] = str(report_path.with_suffix(".csv"))
     return report
+
+
+def _prepare_run_dir(run_dir: Path) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    for name in _GENERATED_RUN_ARTIFACTS:
+        path = run_dir / name
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.is_dir():
+            shutil.rmtree(path)
 
 
 def _copy_configs(root: Path, run_dir: Path, inputs: DailyPipelineInputs, artifacts: dict[str, str]) -> None:

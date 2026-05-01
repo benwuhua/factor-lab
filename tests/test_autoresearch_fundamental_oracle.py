@@ -156,6 +156,37 @@ class FundamentalOracleTest(unittest.TestCase):
             self.assertTrue((Path(payload["artifact_dir"]) / "roe/neutralized_eval.csv").exists())
             self.assertTrue((Path(payload["artifact_dir"]) / "quality_low_leverage/neutralized_eval.csv").exists())
 
+    def test_run_fundamental_lane_oracle_light_artifacts_skip_factor_frames(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_contract(root, size_proxy=True)
+            _write_fundamental_space(root)
+            _write_security_master(root)
+            (root / "data").mkdir(exist_ok=True)
+            pd.DataFrame(
+                [
+                    {"instrument": "SH600000", "available_at": "2026-04-01", "roe": 10.0, "debt_ratio": 20.0},
+                    {"instrument": "SH600001", "available_at": "2026-04-01", "roe": 5.0, "debt_ratio": 50.0},
+                ]
+            ).to_csv(root / "data/fundamental_quality.csv", index=False)
+
+            payload, block = run_fundamental_lane_oracle(
+                lane_name="fundamental_quality",
+                contract_path="configs/autoresearch/contracts/csi500_current_v1.yaml",
+                project_root=root,
+                close_frame=_close_frame(with_volume=True),
+                artifact_mode="light",
+            )
+
+            artifact_dir = Path(payload["artifact_dir"])
+            self.assertEqual("light", payload["artifact_mode"])
+            self.assertIn("artifact_mode: light", block)
+            self.assertTrue((artifact_dir / "roe/raw_eval.csv").exists())
+            self.assertTrue((artifact_dir / "roe/neutralized_eval.csv").exists())
+            self.assertTrue((artifact_dir / "factor_summaries.csv").exists())
+            self.assertFalse((artifact_dir / "roe/factor_frame.csv").exists())
+            self.assertFalse((artifact_dir / "quality_low_leverage/factor_frame.csv").exists())
+
     def test_load_fundamental_factor_specs_uses_active_candidates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
