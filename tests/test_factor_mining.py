@@ -93,6 +93,26 @@ class FactorMiningTests(unittest.TestCase):
         self.assertIn("2.2 * ((Ref($volume, 2) + Ref($volume, 1) + $volume)", factor.expression)
         self.assertNotIn("If(", factor.expression)
         self.assertNotIn("Ref(Max($high, 120), 30)", factor.expression)
+        self.assertIn("confirmed", factor.description)
+        self.assertIn("days 12-14", factor.description)
+
+    def test_default_mining_config_includes_wangji_ignition_setup(self):
+        root = Path(__file__).resolve().parents[1]
+
+        factors = generate_candidate_factors(load_mining_config(root / "configs/factor_mining.yaml"))
+        factor_by_name = {factor.name: factor for factor in factors}
+
+        factor = factor_by_name["wangji-ignition-setup"]
+        self.assertEqual(factor.category, "candidate_pattern")
+        self.assertIn("Max(Ref($close, 1), 20) / Min(Ref($close, 1), 20)", factor.expression)
+        self.assertIn("Ref(Max($close, 60), 1) / Ref($close, 1) - 1", factor.expression)
+        self.assertIn("Mean(Ref($close, 1), 5) / Mean(Ref($close, 1), 30)", factor.expression)
+        self.assertIn("Less($close / Ref($close, 1) - 1, 0.12) / 0.06", factor.expression)
+        self.assertIn("Less($close / $open - 1, 0.12) / 0.06", factor.expression)
+        self.assertIn("($close - $low) / ($high - $low + 0.000001)", factor.expression)
+        self.assertIn("Less($volume / (Mean(Ref($volume, 1), 20) + 1), 3.0) / 1.5", factor.expression)
+        self.assertIn("ignition day", factor.description)
+        self.assertIn("pre-confirmation", factor.description)
 
     def test_default_mining_config_includes_wangji_reversal20_combo_gate(self):
         root = Path(__file__).resolve().parents[1]

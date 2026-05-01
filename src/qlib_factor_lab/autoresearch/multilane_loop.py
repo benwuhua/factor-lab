@@ -26,7 +26,13 @@ REVERSAL_LOGIC_TOKENS = ("reversal", "repair", "washout", "discount", "divergenc
 NON_REVERSAL_PRIORITY_LANES = {"emotion_atmosphere", "liquidity_microstructure", "risk_structure"}
 
 DEFAULT_ROTATION_FACTOR_NAMES: dict[str, list[str]] = {
-    "pattern_event": ["wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"],
+    "pattern_event": [
+        "wangji-factor1",
+        "wangji-ignition-setup",
+        "wangji-reversal20-combo",
+        "quiet_breakout_20",
+        "quiet_breakout_60",
+    ],
     "emotion_atmosphere": [
         "arbr_26",
         "breadth_proxy_20",

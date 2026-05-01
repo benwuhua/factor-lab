@@ -180,6 +180,29 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             self.assertEqual([spec["name"] for spec in event_oracle.call_args.kwargs["factor_specs"]], ["quiet_breakout_60"])
             self.assertEqual([spec["name"] for spec in cross_oracle.call_args.kwargs["factor_specs"]], ["downside_vol_20"])
 
+    def test_default_pattern_event_lane_includes_wangji_ignition_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mining_config = root / "configs/factor_mining.yaml"
+            mining_config.parent.mkdir(parents=True)
+            mining_config.write_text(
+                yaml.safe_dump(
+                    {
+                        "templates": [
+                            {"name": "wangji-ignition-setup", "expression": "$close", "direction": 1},
+                            {"name": "wangji-factor1", "expression": "$close", "direction": 1},
+                            {"name": "wangji-reversal20-combo", "expression": "$close", "direction": 1},
+                            {"name": "quiet_breakout_{window}", "expression": "$close", "windows": [20, 60], "direction": 1},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            specs = _event_factor_specs(root, mining_config, "pattern_event")
+
+            self.assertIn("wangji-ignition-setup", [spec["name"] for spec in specs])
+
     def test_runner_serializes_qlib_oracle_execution(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -148,7 +148,7 @@ strategies:
       - "Needs volume/tradability confirmation to avoid false breakouts."
     candidate_lane: "pattern_event"
     implementation_status: "candidate"
-    related_factors: ["quiet_breakout_20", "wangji-factor1"]
+    related_factors: ["quiet_breakout_20", "wangji-ignition-setup", "wangji-factor1"]
 
   - strategy_id: etf_sector_momentum_rotation
     strategy_name: "Sector momentum rotation"
