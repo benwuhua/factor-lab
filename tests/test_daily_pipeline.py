@@ -327,6 +327,8 @@ class DailyPipelineTests(unittest.TestCase):
             (stale_run_dir / "orders.csv").write_text("instrument,qty\nAAA,100\n", encoding="utf-8")
             (stale_run_dir / "risk_report.md").write_text("# stale risk report\n", encoding="utf-8")
             (stale_run_dir / "portfolio_gate_explanation.md").write_text("# stale gate\n", encoding="utf-8")
+            (stale_run_dir / "research_stock_cards.md").write_text("# stale research cards\n", encoding="utf-8")
+            (stale_run_dir / "research_stock_cards.jsonl").write_text("{}\n", encoding="utf-8")
             repo = Path(__file__).resolve().parents[1]
 
             result = subprocess.run(
@@ -360,6 +362,8 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertFalse((run_dir / "orders.csv").exists())
             self.assertFalse((run_dir / "risk_report.md").exists())
             self.assertFalse((run_dir / "portfolio_gate_explanation.md").exists())
+            self.assertFalse((run_dir / "research_stock_cards.md").exists())
+            self.assertFalse((run_dir / "research_stock_cards.jsonl").exists())
             self.assertTrue((run_dir / "block_report.md").exists())
             self.assertTrue((run_dir / "run_summary.md").exists())
             self.assertIn("expert_review_blocked", (run_dir / "block_report.md").read_text(encoding="utf-8"))

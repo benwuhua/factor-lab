@@ -114,6 +114,8 @@ _GENERATED_RUN_ARTIFACTS = {
     "reconciliation.md",
     "research_portfolio.csv",
     "research_portfolio_summary.md",
+    "research_stock_cards.jsonl",
+    "research_stock_cards.md",
     "risk_report.md",
     "run_summary.md",
     "signal_summary.md",
