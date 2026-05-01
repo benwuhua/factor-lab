@@ -136,7 +136,7 @@ def build_daily_signal(
             active_logic_cols.setdefault(factor.logic_bucket or infer_logic_bucket(factor.family or factor.name), []).append(
                 contribution_col
             )
-        contribution = _zscore(frame[factor.name].astype(float) * factor.direction) * multiplier
+        contribution = _zscore(pd.to_numeric(frame[factor.name], errors="coerce") * factor.direction) * multiplier
         if config.factor_contribution_cap is not None:
             cap = abs(float(config.factor_contribution_cap))
             contribution = contribution.clip(lower=-cap, upper=cap)

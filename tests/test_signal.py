@@ -42,6 +42,20 @@ class SignalTests(unittest.TestCase):
             self.assertFalse(bool(signal.loc[0, "limit_up"]))
             self.assertFalse(bool(signal.loc[0, "suspended"]))
 
+    def test_build_daily_signal_treats_nullable_factor_values_as_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved_path, config_path = self._write_fixture(root)
+            config = load_signal_config(config_path)
+            factors = load_approved_signal_factors(approved_path)
+            exposures = self._exposures()
+            exposures["core_alpha"] = pd.Series([2.0, pd.NA, 1.0], dtype="object")
+
+            signal = build_daily_signal(exposures, factors, config)
+
+            self.assertEqual(len(signal), 3)
+            self.assertTrue(pd.notna(signal["rule_score"]).all())
+
     def test_build_daily_signal_applies_execution_calendar_overrides(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
