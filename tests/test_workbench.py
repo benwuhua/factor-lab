@@ -25,7 +25,9 @@ from qlib_factor_lab.workbench import (
     build_research_pipeline_status,
     build_stock_card_announcement_evidence_summary,
     build_tushare_data_coverage,
+    build_tushare_data_gate_checks,
     build_workbench_freshness,
+    classify_gate_decision,
     find_latest_stock_cards,
     find_latest_multilane_report,
     find_latest_run_dir,
@@ -220,6 +222,63 @@ class WorkbenchTests(unittest.TestCase):
         self.assertIn("max_factor_family_concentration", failed)
         self.assertEqual(list(result.industry["industry"]), ["tech"])
         self.assertEqual(list(result.family["family"]), ["momentum"])
+
+    def test_portfolio_gate_rejects_missing_mandatory_tushare_domains_and_cautions_optional_domains(self):
+        portfolio = pd.DataFrame(
+            {
+                "instrument": ["AAA", "BBB"],
+                "target_weight": [0.4, 0.4],
+                "industry": ["tech", "healthcare"],
+            }
+        )
+        coverage_rows = pd.DataFrame(
+            [
+                {"domain": "PIT 主数据", "source": "tushare_pit", "status": "missing", "instruments": 0, "rows": 0},
+                {
+                    "domain": "财报披露事件",
+                    "source": "tushare_disclosure_date",
+                    "status": "active",
+                    "instruments": 800,
+                    "rows": 30000,
+                },
+                {"domain": "分红派息", "source": "tushare_dividend", "status": "missing", "instruments": 0, "rows": 0},
+            ]
+        )
+
+        result = build_portfolio_gate_explanation(
+            portfolio,
+            risk_config={"max_single_weight": 0.5, "min_positions": 2, "min_signal_coverage": 0.2},
+            tushare_coverage={"rows": coverage_rows},
+            min_tushare_domain_instruments=800,
+        )
+
+        failed = result.checks.query("status == 'fail'").set_index("check")
+        caution = result.checks.query("status == 'caution'").set_index("check")
+        self.assertEqual("reject", result.decision)
+        self.assertIn("tushare_pit_coverage", failed.index)
+        self.assertIn("tushare_dividend_coverage", caution.index)
+        self.assertIn("mandatory", failed.loc["tushare_pit_coverage", "detail"])
+        self.assertIn("optional", caution.loc["tushare_dividend_coverage", "detail"])
+
+    def test_tushare_data_gate_checks_marks_optional_failures_as_caution_only(self):
+        coverage_rows = pd.DataFrame(
+            [
+                {"domain": "PIT 主数据", "source": "tushare_pit", "status": "active", "instruments": 800, "rows": 1406},
+                {
+                    "domain": "财报披露事件",
+                    "source": "tushare_disclosure_date",
+                    "status": "active",
+                    "instruments": 800,
+                    "rows": 31622,
+                },
+                {"domain": "分红派息", "source": "tushare_dividend", "status": "missing", "instruments": 0, "rows": 0},
+            ]
+        )
+
+        checks = build_tushare_data_gate_checks({"rows": coverage_rows}, min_instruments=800)
+
+        self.assertEqual("caution", classify_gate_decision(checks))
+        self.assertEqual("caution", checks.set_index("check").loc["tushare_dividend_coverage", "status"])
 
     def test_gate_review_items_translate_failures_to_actions(self):
         checks = pd.DataFrame(
@@ -914,6 +973,18 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual("tushare_pit", by_domain.loc["PIT 主数据", "source"])
         self.assertEqual("tushare_dividend", by_domain.loc["分红派息", "source"])
         self.assertEqual("tushare_disclosure_date", by_domain.loc["财报披露事件", "source"])
+
+    def test_read_csv_or_empty_uses_low_memory_false_for_large_vendor_tables(self):
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "company_events.csv"
+            path.write_text("instrument,event_type\nAAA,financial_report_disclosure\n", encoding="utf-8")
+
+            with patch("qlib_factor_lab.workbench.pd.read_csv", wraps=pd.read_csv) as read_csv:
+                build_tushare_data_coverage(Path(tmp), company_events_path=path)
+
+        read_csv.assert_any_call(path, low_memory=False)
 
     def test_combo_profile_summary_classifies_offensive_and_defensive_specs(self):
         with tempfile.TemporaryDirectory() as tmp:

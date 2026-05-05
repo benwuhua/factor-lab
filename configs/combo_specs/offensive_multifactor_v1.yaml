@@ -8,7 +8,7 @@ members:
     family: momentum
     logic_bucket: trend_following
     direction: 1
-    weight: 0.30
+    weight: 0.26
     approval_status: challenger
     regime_profile: all_weather
     description: "One explicit momentum family budget; blends 60-day and 120-day trend to avoid duplicate family weighting."
@@ -255,6 +255,19 @@ members:
     description: "source_table=data/fundamental_quality.csv; source_field=dividend_cashflow_coverage; role=defensive dividend sustainability context."
     components:
       - field: dividend_cashflow_coverage
+        direction: 1
+        weight: 1.00
+  - name: financial_disclosure_recency_30d
+    source: fundamental_quality
+    family: event_catalyst
+    logic_bucket: financial_disclosure
+    direction: 1
+    weight: 0.04
+    approval_status: data_gated
+    regime_profile: all_weather
+    description: "source_table=data/fundamental_quality.csv; source_field=financial_disclosure_recency_30d; role=recent financial disclosure confirmation for risk-on candidates."
+    components:
+      - field: financial_disclosure_recency_30d
         direction: 1
         weight: 1.00
   - name: growth_improvement

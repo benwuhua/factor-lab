@@ -38,6 +38,8 @@ FUNDAMENTAL_QUALITY_COLUMNS = [
     "cashflow_growth_change_yoy",
     "dividend_stability",
     "dividend_cashflow_coverage",
+    "financial_disclosure_recency_30d",
+    "financial_disclosure_days_since",
     "valuation_source",
     "source",
 ]
@@ -281,7 +283,11 @@ def derive_fundamental_valuation_fields(
     return output.loc[:, FUNDAMENTAL_QUALITY_COLUMNS]
 
 
-def derive_fundamental_quality_fields(fundamentals: pd.DataFrame, dividends: pd.DataFrame | None = None) -> pd.DataFrame:
+def derive_fundamental_quality_fields(
+    fundamentals: pd.DataFrame,
+    dividends: pd.DataFrame | None = None,
+    disclosures: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     if fundamentals is None or fundamentals.empty:
         return _empty(FUNDAMENTAL_QUALITY_COLUMNS)
     frame = fundamentals.copy()
@@ -304,6 +310,7 @@ def derive_fundamental_quality_fields(fundamentals: pd.DataFrame, dividends: pd.
         frame[output_column] = existing.combine_first(current - previous)
 
     frame = _derive_dividend_quality_fields(frame, dividends)
+    frame = _derive_financial_disclosure_fields(frame, disclosures)
     frame = frame.drop(columns=["_report_period_dt"], errors="ignore")
     return frame.loc[:, FUNDAMENTAL_QUALITY_COLUMNS]
 
@@ -756,7 +763,7 @@ def write_research_data_domains(
     prices = read_close_prices_from_source_dirs(root, price_source_dirs)
     if derive_valuation_fields:
         fundamentals = derive_fundamental_valuation_fields(fundamentals, prices=prices, dividends=dividends)
-    fundamentals = derive_fundamental_quality_fields(fundamentals, dividends=dividends)
+    fundamentals = derive_fundamental_quality_fields(fundamentals, dividends=dividends, disclosures=events)
 
     security_history = build_security_master_history(
         security_master,
@@ -811,13 +818,13 @@ def _write_jsonl(frame: pd.DataFrame, path: Path) -> None:
 def _read_csv_if_exists(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
-    return pd.read_csv(path)
+    return pd.read_csv(path, low_memory=False)
 
 
 def _read_existing_or_empty(path: Path, columns: list[str]) -> pd.DataFrame:
     if not path.exists():
         return _empty(columns)
-    frame = pd.read_csv(path)
+    frame = pd.read_csv(path, low_memory=False)
     if frame.empty:
         return _empty(columns)
     for column in columns:
@@ -1064,6 +1071,60 @@ def _derive_dividend_quality_fields(frame: pd.DataFrame, dividends: pd.DataFrame
         ],
         errors="ignore",
     )
+
+
+def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.DataFrame | None) -> pd.DataFrame:
+    output = frame.copy()
+    if disclosures is None or disclosures.empty:
+        return output
+    if "available_at" not in output.columns or "instrument" not in output.columns:
+        return output
+    required = {"instrument", "event_type", "event_date"}
+    if not required <= set(disclosures.columns):
+        return output
+    events = disclosures.copy()
+    events = events[events["event_type"].fillna("").astype(str) == "financial_report_disclosure"].copy()
+    if events.empty:
+        return output
+    events["event_date"] = pd.to_datetime(events["event_date"], errors="coerce")
+    events = events.dropna(subset=["instrument", "event_date"]).sort_values(["instrument", "event_date"])
+    if events.empty:
+        return output
+
+    work = output.reset_index(drop=True).copy()
+    work["_row_id"] = work.index
+    work["_available_at_dt"] = pd.to_datetime(work["available_at"], errors="coerce")
+    rows = []
+    for _, item in work.iterrows():
+        available_at = item.get("_available_at_dt")
+        if pd.isna(available_at):
+            rows.append({"_row_id": item["_row_id"], "financial_disclosure_days_since_derived": pd.NA})
+            continue
+        history = events[
+            (events["instrument"].astype(str) == str(item.get("instrument", "")))
+            & (events["event_date"] <= available_at)
+        ].sort_values("event_date")
+        if history.empty:
+            rows.append({"_row_id": item["_row_id"], "financial_disclosure_days_since_derived": pd.NA})
+            continue
+        latest_event_date = history.iloc[-1]["event_date"]
+        days_since = float((available_at - latest_event_date).days)
+        rows.append({"_row_id": item["_row_id"], "financial_disclosure_days_since_derived": max(days_since, 0.0)})
+    derived = pd.DataFrame(rows)
+    if derived.empty:
+        return output
+    merged = work.merge(derived, on="_row_id", how="left")
+    days = pd.to_numeric(merged["financial_disclosure_days_since_derived"], errors="coerce")
+    recency = (1.0 - days / 30.0).clip(lower=0.0, upper=1.0)
+    merged["financial_disclosure_days_since"] = _fill_missing_numeric(
+        merged.get("financial_disclosure_days_since"),
+        days,
+    )
+    merged["financial_disclosure_recency_30d"] = _fill_missing_numeric(
+        merged.get("financial_disclosure_recency_30d"),
+        recency,
+    )
+    return merged.drop(columns=["_row_id", "_available_at_dt", "financial_disclosure_days_since_derived"], errors="ignore")
 
 
 def _fill_missing_numeric(current: pd.Series | None, derived: pd.Series) -> pd.Series:

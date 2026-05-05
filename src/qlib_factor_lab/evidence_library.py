@@ -73,7 +73,7 @@ def _read_evidence(evidence_path: str | Path) -> pd.DataFrame:
     path = Path(evidence_path)
     if not path.exists():
         return pd.DataFrame(columns=ANNOUNCEMENT_EVIDENCE_COLUMNS)
-    return _normalize_columns(pd.read_csv(path))
+    return _normalize_columns(pd.read_csv(path, low_memory=False))
 
 
 def _normalize_columns(frame: pd.DataFrame) -> pd.DataFrame:

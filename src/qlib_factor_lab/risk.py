@@ -29,6 +29,8 @@ class RiskConfig:
     slippage_bps: float = 0.0
     stamp_tax_bps: float = 0.0
     max_risk_budget_per_position: float | None = None
+    enable_vendor_data_gate: bool = False
+    min_tushare_domain_instruments: int = 1
     factor_family_map_path: Path | None = None
     factor_logic_map_path: Path | None = None
     report_output_path: Path = Path("reports/portfolio_risk_{run_yyyymmdd}.md")
@@ -40,7 +42,7 @@ class RiskReport:
 
     @property
     def passed(self) -> bool:
-        return all(row["status"] == "pass" for row in self.rows)
+        return all(row["status"] in {"pass", "caution"} for row in self.rows)
 
     def to_frame(self) -> pd.DataFrame:
         return pd.DataFrame(self.rows, columns=["check", "status", "value", "threshold", "detail"])
@@ -61,6 +63,8 @@ def load_risk_config(path: str | Path) -> RiskConfig:
     max_position_amount_share = raw.get("max_position_amount_share")
     max_estimated_cost = raw.get("max_estimated_cost")
     max_risk_budget_per_position = raw.get("max_risk_budget_per_position")
+    enable_vendor_data_gate = bool(raw.get("enable_vendor_data_gate", False))
+    min_tushare_domain_instruments = int(raw.get("min_tushare_domain_instruments", 1))
     factor_family_map_path = raw.get("factor_family_map_path")
     factor_logic_map_path = raw.get("factor_logic_map_path", factor_family_map_path)
     return RiskConfig(
@@ -89,6 +93,8 @@ def load_risk_config(path: str | Path) -> RiskConfig:
         max_risk_budget_per_position=(
             float(max_risk_budget_per_position) if max_risk_budget_per_position is not None else None
         ),
+        enable_vendor_data_gate=enable_vendor_data_gate,
+        min_tushare_domain_instruments=min_tushare_domain_instruments,
         factor_family_map_path=Path(str(factor_family_map_path)) if factor_family_map_path else None,
         factor_logic_map_path=Path(str(factor_logic_map_path)) if factor_logic_map_path else None,
         report_output_path=Path(output.get("report", "reports/portfolio_risk_{run_yyyymmdd}.md")),

@@ -122,7 +122,18 @@ class ResearchDataDomainsTest(unittest.TestCase):
             ]
         )
 
-        result = derive_fundamental_quality_fields(fundamentals, dividends=dividends)
+        disclosures = pd.DataFrame(
+            [
+                {
+                    "instrument": "SH600000",
+                    "event_type": "financial_report_disclosure",
+                    "event_date": "2026-04-26",
+                    "source": "tushare_disclosure_date",
+                }
+            ]
+        )
+
+        result = derive_fundamental_quality_fields(fundamentals, dividends=dividends, disclosures=disclosures)
         current = result[result["report_period"] == "2026-03-31"].iloc[0]
 
         self.assertAlmostEqual(4.5, float(current["gross_margin_change_yoy"]))
@@ -131,6 +142,8 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertAlmostEqual(5.0, float(current["cashflow_growth_change_yoy"]))
         self.assertAlmostEqual(0.5, float(current["dividend_stability"]))
         self.assertAlmostEqual(5.0, float(current["dividend_cashflow_coverage"]))
+        self.assertAlmostEqual(1 - 2 / 30, float(current["financial_disclosure_recency_30d"]))
+        self.assertAlmostEqual(2.0, float(current["financial_disclosure_days_since"]))
 
     def test_normalize_fundamental_quality_derives_ratios_from_price_when_raw_ratios_missing(self) -> None:
         raw = pd.DataFrame(
@@ -819,6 +832,26 @@ class ResearchDataDomainsTest(unittest.TestCase):
             self.assertEqual(["SZ000001"], result["instrument"].tolist())
             self.assertEqual({"ep", "cfp", "dividend_yield"} <= set(result.columns), True)
             self.assertEqual(["existing"], result["source"].tolist())
+
+    def test_write_research_data_domains_reads_existing_vendor_csvs_with_low_memory_false(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data = root / "data"
+            data.mkdir()
+            pd.DataFrame({"instrument": ["AAA"]}).to_csv(data / "security_master.csv", index=False)
+            pd.DataFrame({"event_id": ["1"], "instrument": ["AAA"], "event_type": ["financial_report_disclosure"]}).to_csv(
+                data / "company_events.csv",
+                index=False,
+            )
+            pd.DataFrame({"instrument": ["AAA"], "report_period": ["2026-03-31"], "available_at": ["2026-04-28"]}).to_csv(
+                data / "fundamental_quality.csv",
+                index=False,
+            )
+
+            with patch("qlib_factor_lab.research_data_domains.pd.read_csv", wraps=pd.read_csv) as read_csv:
+                write_research_data_domains(root, as_of_date="2026-04-30")
+
+        self.assertTrue(any(call.kwargs.get("low_memory") is False for call in read_csv.call_args_list))
 
 
 if __name__ == "__main__":

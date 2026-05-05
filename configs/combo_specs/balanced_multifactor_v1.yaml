@@ -190,6 +190,19 @@ members:
       - field: dividend_cashflow_coverage
         direction: 1
         weight: 1.00
+  - name: financial_disclosure_recency_30d
+    source: fundamental_quality
+    family: event_catalyst
+    logic_bucket: financial_disclosure
+    direction: 1
+    weight: 0.02
+    approval_status: data_gated
+    regime_profile: all_weather
+    description: "source_table=data/fundamental_quality.csv; source_field=financial_disclosure_recency_30d; role=recent financial disclosure information catalyst."
+    components:
+      - field: financial_disclosure_recency_30d
+        direction: 1
+        weight: 1.00
   - name: growth_improvement
     source: fundamental_quality
     family: growth_improvement

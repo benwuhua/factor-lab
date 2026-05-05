@@ -16,6 +16,8 @@ risk:
   slippage_bps: 0.0
   stamp_tax_bps: 0.0
   max_risk_budget_per_position: null
+  enable_vendor_data_gate: true
+  min_tushare_domain_instruments: 800
   factor_family_map_path: reports/approved_factors.yaml
   factor_logic_map_path: reports/approved_factors.yaml
 

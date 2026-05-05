@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -10,6 +11,16 @@ from qlib_factor_lab.evidence_library import search_announcement_evidence, summa
 
 
 class EvidenceLibraryTest(unittest.TestCase):
+    def test_search_announcement_evidence_reads_vendor_csv_with_low_memory_false(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "announcement_evidence.csv"
+            path.write_text("event_id,instrument,event_type\n1,AAA,financial_report_disclosure\n", encoding="utf-8")
+
+            with patch("qlib_factor_lab.evidence_library.pd.read_csv", wraps=pd.read_csv) as read_csv:
+                search_announcement_evidence(path)
+
+        read_csv.assert_called_once_with(path, low_memory=False)
+
     def test_search_filters_by_instrument_type_severity_and_keyword(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "announcement_evidence.csv"

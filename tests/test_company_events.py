@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -34,6 +35,16 @@ def _load_research_context_script():
 
 
 class CompanyEventTests(unittest.TestCase):
+    def test_load_company_events_uses_low_memory_false_for_vendor_csvs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "events.csv"
+            path.write_text("event_id,instrument,event_type\n1,AAA,financial_report_disclosure\n", encoding="utf-8")
+
+            with patch("qlib_factor_lab.company_events.pd.read_csv", wraps=pd.read_csv) as read_csv:
+                load_company_events(path)
+
+        read_csv.assert_called_once_with(path, low_memory=False)
+
     def test_classify_event_type_maps_p2_taxonomy(self):
         expected = {
             "buyback": ("positive_catalyst", "info", "boost"),

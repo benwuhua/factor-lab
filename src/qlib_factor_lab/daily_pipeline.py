@@ -376,6 +376,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
         factor_family_map=load_configured_factor_family_map(risk_config, root=root_path),
         factor_logic_map=load_configured_factor_logic_map(risk_config, root=root_path),
     )
+    risk_report = _apply_vendor_data_gate(root_path, risk_report, risk_config)
     risk_path = write_risk_report(risk_report, run_dir / "risk_report.md")
     artifacts["risk_report"] = str(risk_path)
     portfolio_gate_path = _write_portfolio_gate_explanation(
@@ -963,6 +964,21 @@ def _write_manifest(
 def _git_commit(root: Path) -> str:
     result = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=root, capture_output=True, text=True, check=False)
     return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _apply_vendor_data_gate(root: Path, risk_report, risk_config):
+    if not getattr(risk_config, "enable_vendor_data_gate", False):
+        return risk_report
+    from .risk import RiskReport
+    from .workbench import build_tushare_data_coverage, build_tushare_data_gate_checks
+
+    checks = build_tushare_data_gate_checks(
+        build_tushare_data_coverage(root),
+        min_instruments=int(getattr(risk_config, "min_tushare_domain_instruments", 1)),
+    )
+    if checks.empty:
+        return risk_report
+    return RiskReport(tuple(list(risk_report.rows) + checks.to_dict("records")))
 
 
 def _run_dir(data: dict[str, Any], run_date: str) -> Path:

@@ -66,6 +66,7 @@ def main() -> int:
         factor_family_map=factor_family_map,
         factor_logic_map=factor_logic_map,
     )
+    risk_report = _apply_vendor_data_gate(root, risk_report, risk_config)
 
     target_path = write_target_portfolio(
         portfolio,
@@ -92,6 +93,21 @@ def _resolve(root: Path, path: str | Path) -> Path:
     if candidate.is_absolute():
         return candidate
     return root / candidate
+
+
+def _apply_vendor_data_gate(root: Path, risk_report, risk_config):
+    if not getattr(risk_config, "enable_vendor_data_gate", False):
+        return risk_report
+    from qlib_factor_lab.risk import RiskReport
+    from qlib_factor_lab.workbench import build_tushare_data_coverage, build_tushare_data_gate_checks
+
+    checks = build_tushare_data_gate_checks(
+        build_tushare_data_coverage(root),
+        min_instruments=int(getattr(risk_config, "min_tushare_domain_instruments", 1)),
+    )
+    if checks.empty:
+        return risk_report
+    return RiskReport(tuple(list(risk_report.rows) + checks.to_dict("records")))
 
 
 def _materialize(path: str | Path, run_date: str) -> Path:

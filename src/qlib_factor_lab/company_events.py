@@ -163,7 +163,7 @@ def load_company_events(path: str | Path | None) -> pd.DataFrame:
     if not events_path.exists():
         return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
 
-    return pd.read_csv(events_path)
+    return pd.read_csv(events_path, low_memory=False)
 
 
 def build_event_risk_snapshot(

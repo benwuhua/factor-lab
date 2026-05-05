@@ -44,6 +44,7 @@ FACTOR_DATA_FIELDS = [
     {"field": "revenue_growth_yoy", "lane": "growth", "use_case": "进攻/盈利改善", "required_for": "offensive"},
     {"field": "net_profit_growth_yoy", "lane": "growth", "use_case": "进攻/盈利改善", "required_for": "offensive"},
     {"field": "operating_cashflow_to_net_profit", "lane": "cashflow", "use_case": "质量/现金流确认", "required_for": "balanced"},
+    {"field": "financial_disclosure_recency_30d", "lane": "event", "use_case": "财报披露催化", "required_for": "balanced/offensive"},
 ]
 
 
@@ -514,6 +515,8 @@ def build_portfolio_gate_explanation(
     factor_family_map: dict[str, str] | None = None,
     factor_logic_map: dict[str, str] | None = None,
     signal: pd.DataFrame | None = None,
+    tushare_coverage: dict[str, Any] | None = None,
+    min_tushare_domain_instruments: int = 1,
 ) -> PortfolioGateExplanation:
     config = _risk_config(risk_config or {})
     signal_frame = signal if signal is not None else _signal_for_portfolio(portfolio)
@@ -530,6 +533,14 @@ def build_portfolio_gate_explanation(
         logic_map=factor_logic_map or {},
     )
     checks = risk_report.to_frame()
+    gate_min_instruments = (
+        int(min_tushare_domain_instruments)
+        if min_tushare_domain_instruments != 1
+        else int(getattr(config, "min_tushare_domain_instruments", 1))
+    )
+    data_checks = build_tushare_data_gate_checks(tushare_coverage, min_instruments=gate_min_instruments)
+    if not data_checks.empty:
+        checks = pd.concat([checks, data_checks], ignore_index=True)
     decision = classify_gate_decision(checks)
     return PortfolioGateExplanation(
         decision=decision,
@@ -551,6 +562,7 @@ def load_portfolio_gate_explanation(root: str | Path = ".") -> PortfolioGateExpl
         risk_config=risk_config,
         factor_family_map=load_factor_family_map_safe(root_path),
         factor_logic_map=load_factor_logic_map_safe(root_path),
+        tushare_coverage=build_tushare_data_coverage(root_path),
     )
 
 
@@ -566,7 +578,8 @@ def classify_gate_decision(checks: pd.DataFrame) -> str:
     if checks.empty or "status" not in checks.columns:
         return "pass"
     failed = set(checks.loc[checks["status"] == "fail", "check"].astype(str))
-    if not failed:
+    cautioned = set(checks.loc[checks["status"] == "caution", "check"].astype(str))
+    if not failed and not cautioned:
         return "pass"
     caution_checks = {
         "max_industry_weight",
@@ -574,7 +587,11 @@ def classify_gate_decision(checks: pd.DataFrame) -> str:
         "max_factor_family_concentration",
         "min_factor_logic_count",
         "max_factor_logic_concentration",
+        "tushare_dividend_coverage",
+        "tushare_disclosure_evidence_coverage",
     }
+    if not failed and cautioned:
+        return "caution"
     if failed and failed <= caution_checks:
         return "caution"
     return "reject"
@@ -584,7 +601,7 @@ def build_gate_review_items(checks: pd.DataFrame) -> pd.DataFrame:
     columns = ["check", "decision_level", "value", "limit", "review_focus"]
     if checks.empty or "status" not in checks.columns:
         return pd.DataFrame(columns=columns)
-    failed = checks.loc[checks["status"] == "fail"].copy()
+    failed = checks.loc[checks["status"].isin(["fail", "caution"])].copy()
     if failed.empty:
         return pd.DataFrame(columns=columns)
     failed["decision_level"] = failed.apply(lambda row: classify_gate_decision(pd.DataFrame([row])), axis=1)
@@ -1018,6 +1035,44 @@ def build_tushare_data_coverage(
     }
 
 
+def build_tushare_data_gate_checks(
+    coverage: dict[str, Any] | None,
+    *,
+    min_instruments: int = 1,
+) -> pd.DataFrame:
+    columns = ["check", "status", "value", "threshold", "detail"]
+    if not coverage:
+        return pd.DataFrame(columns=columns)
+    rows = coverage.get("rows")
+    if not isinstance(rows, pd.DataFrame) or rows.empty:
+        return pd.DataFrame(columns=columns)
+    by_domain = {str(row["domain"]): row for _, row in rows.iterrows() if "domain" in row}
+    specs = [
+        ("PIT 主数据", "tushare_pit_coverage", "mandatory"),
+        ("财报披露事件", "tushare_disclosure_event_coverage", "mandatory"),
+        ("分红派息", "tushare_dividend_coverage", "optional"),
+        ("公告证据", "tushare_disclosure_evidence_coverage", "optional"),
+    ]
+    output = []
+    for domain, check, level in specs:
+        row = by_domain.get(domain)
+        instruments_value = _number(row.get("instruments")) if row is not None else 0
+        instruments = int(instruments_value) if pd.notna(instruments_value) else 0
+        status = str(row.get("status", "")) if row is not None else "missing"
+        passed = status == "active" and instruments >= int(min_instruments)
+        output_status = "pass" if passed else ("fail" if level == "mandatory" else "caution")
+        output.append(
+            {
+                "check": check,
+                "status": output_status,
+                "value": instruments,
+                "threshold": int(min_instruments),
+                "detail": f"{level}; domain={domain}; source={row.get('source', '') if row is not None else ''}; status={status}",
+            }
+        )
+    return pd.DataFrame(output, columns=columns)
+
+
 def build_data_domain_health(
     root: str | Path = ".",
     *,
@@ -1425,6 +1480,8 @@ def _risk_config(raw: dict[str, Any] | RiskConfig) -> RiskConfig:
             if raw.get("max_factor_logic_concentration") is not None
             else None
         ),
+        enable_vendor_data_gate=bool(raw.get("enable_vendor_data_gate", False)),
+        min_tushare_domain_instruments=int(raw.get("min_tushare_domain_instruments", 1)),
     )
 
 
@@ -1796,7 +1853,7 @@ def _count_unique_split_values(values: pd.Series) -> int:
 def _read_csv_or_empty(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
-    return pd.read_csv(path)
+    return pd.read_csv(path, low_memory=False)
 
 
 def _nonblank_strings(values: pd.Series) -> list[str]:
