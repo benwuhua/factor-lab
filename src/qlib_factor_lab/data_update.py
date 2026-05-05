@@ -241,7 +241,6 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
             "--delay",
             str(config.delay),
         )
-        research_domain_command += _limit_args(config.limit)
     if config.derive_valuation_fields:
         research_domain_command += ("--derive-valuation-fields",)
     if config.fetch_cninfo_dividends:
@@ -251,6 +250,7 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
     if config.fetch_disclosure_events:
         research_domain_command += ("--fetch-disclosure-events",)
     if config.fetch_fundamentals or config.fetch_cninfo_dividends or config.fetch_dividends or config.fetch_disclosure_events:
+        research_domain_command += _limit_args(config.limit)
         research_domain_command += _offset_args(config.offset)
     if config.fundamental_source is not None:
         research_domain_command += ("--fundamental-source", str(config.fundamental_source))

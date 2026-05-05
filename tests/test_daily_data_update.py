@@ -119,6 +119,25 @@ class DailyDataUpdateTest(unittest.TestCase):
         self.assertIn("--offset", research_step.command)
         self.assertIn("100", research_step.command)
 
+    def test_plan_applies_limit_to_tushare_dividend_and_disclosure_refresh(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-30",
+            skip_market_data=True,
+            fetch_dividends=True,
+            fetch_disclosure_events=True,
+            limit=5,
+        )
+
+        steps = build_daily_data_update_plan(config)
+        research_step = steps[-2]
+
+        self.assertEqual("research_data_domains", research_step.name)
+        self.assertIn("--fetch-dividends", research_step.command)
+        self.assertIn("--fetch-disclosure-events", research_step.command)
+        self.assertIn("--limit", research_step.command)
+        self.assertIn("5", research_step.command)
+
     def test_plan_defaults_to_tushare_fundamental_provider(self) -> None:
         config = DailyDataUpdateConfig(
             project_root=Path("/repo"),
