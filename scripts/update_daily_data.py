@@ -39,6 +39,7 @@ def main() -> int:
     parser.add_argument("--rqdata-start-date", default=None, help="Start date for RQData PIT security master export.")
     parser.add_argument("--rqdata-output", default="data/vendor/security_master_history_rqdata.csv")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--research-context-limit", type=int, default=None)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--delay", type=float, default=0.2)
     parser.add_argument("--dry-run", action="store_true")
@@ -70,6 +71,7 @@ def main() -> int:
         rqdata_start_date=args.rqdata_start_date,
         rqdata_output=Path(args.rqdata_output),
         limit=args.limit,
+        research_context_limit=args.research_context_limit,
         offset=args.offset,
         delay=args.delay,
     )

@@ -32,6 +32,7 @@ class DailyDataUpdateConfig:
     rqdata_start_date: str | None = None
     rqdata_output: Path = Path("data/vendor/security_master_history_rqdata.csv")
     limit: int | None = None
+    research_context_limit: int | None = None
     offset: int = 0
     delay: float = 0.2
 
@@ -170,7 +171,7 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
                     "csi500",
                     "--merge-existing-events",
                 )
-                + _limit_args(config.limit)
+                + _limit_args(config.research_context_limit)
                 + ("--delay", str(config.delay)),
             )
         )

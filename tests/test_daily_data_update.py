@@ -119,6 +119,33 @@ class DailyDataUpdateTest(unittest.TestCase):
         self.assertIn("--offset", research_step.command)
         self.assertIn("100", research_step.command)
 
+    def test_plan_does_not_apply_domain_limit_to_research_context_by_default(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-30",
+            limit=5,
+        )
+
+        steps = build_daily_data_update_plan(config)
+        research_context = steps[5]
+
+        self.assertEqual("research_context", research_context.name)
+        self.assertNotIn("--limit", research_context.command)
+
+    def test_plan_can_limit_research_context_explicitly_for_smoke_runs(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-30",
+            research_context_limit=5,
+        )
+
+        steps = build_daily_data_update_plan(config)
+        research_context = steps[5]
+
+        self.assertEqual("research_context", research_context.name)
+        self.assertIn("--limit", research_context.command)
+        self.assertIn("5", research_context.command)
+
     def test_plan_applies_limit_to_tushare_dividend_and_disclosure_refresh(self) -> None:
         config = DailyDataUpdateConfig(
             project_root=Path("/repo"),
