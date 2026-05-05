@@ -8,9 +8,11 @@ from qlib_factor_lab.tushare_data import (
     TushareApiError,
     call_tushare_api,
     download_tushare_history_csvs,
+    fetch_security_master_history_from_tushare,
     fetch_fundamental_quality_from_tushare,
     format_permission_probe_rows,
     normalize_tushare_history,
+    normalize_tushare_security_master_history,
     normalize_tushare_fina_indicator,
     probe_tushare_permissions,
     qlib_symbol_from_tushare,
@@ -264,6 +266,87 @@ class TushareDataTest(unittest.TestCase):
         self.assertIn("income_vip", report)
         self.assertIn("[REDACTED]", report)
         self.assertNotIn("secret-token", report)
+
+    def test_normalize_tushare_security_master_history_uses_namechange_pit_intervals(self) -> None:
+        stock_basic = pd.DataFrame(
+            [
+                {
+                    "ts_code": "600000.SH",
+                    "name": "浦发银行",
+                    "industry": "银行",
+                    "market": "主板",
+                    "exchange": "SSE",
+                    "list_date": "19991110",
+                    "delist_date": None,
+                },
+                {
+                    "ts_code": "000004.SZ",
+                    "name": "*ST国华",
+                    "industry": "软件服务",
+                    "market": "主板",
+                    "exchange": "SZSE",
+                    "list_date": "19901201",
+                    "delist_date": None,
+                },
+            ]
+        )
+        namechange = pd.DataFrame(
+            [
+                {"ts_code": "600000.SH", "name": "G浦发", "start_date": "20060512", "end_date": "20061008"},
+                {"ts_code": "600000.SH", "name": "浦发银行", "start_date": "20061009", "end_date": None},
+            ]
+        )
+
+        result = normalize_tushare_security_master_history(stock_basic, namechange, as_of_date="20260505")
+        by_key = result.set_index(["instrument", "name"])
+
+        self.assertIn(("SH600000", "G浦发"), by_key.index)
+        self.assertEqual("2006-05-12", by_key.loc[("SH600000", "G浦发"), "valid_from"])
+        self.assertEqual("2006-10-08", by_key.loc[("SH600000", "G浦发"), "valid_to"])
+        self.assertEqual("tushare_pit", by_key.loc[("SH600000", "浦发银行"), "source"])
+        self.assertFalse(bool(by_key.loc[("SH600000", "浦发银行"), "is_st"]))
+        self.assertTrue(bool(by_key.loc[("SZ000004", "*ST国华"), "is_st"]))
+        self.assertEqual("2026-05-05", by_key.loc[("SZ000004", "*ST国华"), "as_of_date"])
+
+    def test_fetch_security_master_history_from_tushare_batches_namechange_by_instrument(self) -> None:
+        calls: list[tuple[str, dict[str, object]]] = []
+
+        def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
+            api_name = str(payload["api_name"])
+            params = dict(payload["params"])
+            calls.append((api_name, params))
+            if api_name == "stock_basic":
+                return {
+                    "code": 0,
+                    "msg": "",
+                    "data": {
+                        "fields": ["ts_code", "name", "industry", "market", "exchange", "list_date", "delist_date"],
+                        "items": [["600000.SH", "浦发银行", "银行", "主板", "SSE", "19991110", None]],
+                    },
+                }
+            if api_name == "namechange":
+                return {
+                    "code": 0,
+                    "msg": "",
+                    "data": {
+                        "fields": ["ts_code", "name", "start_date", "end_date", "ann_date", "change_reason"],
+                        "items": [["600000.SH", "浦发银行", "20061009", None, None, "摘G"]],
+                    },
+                }
+            raise AssertionError(payload)
+
+        result = fetch_security_master_history_from_tushare(
+            ["SH600000"],
+            as_of_date="20260505",
+            token="token",
+            transport=fake_transport,
+            delay=0,
+        )
+
+        self.assertEqual(["SH600000"], result["instrument"].tolist())
+        self.assertEqual(["tushare_pit"], result["source"].tolist())
+        self.assertIn(("stock_basic", {"list_status": "L"}), calls)
+        self.assertIn(("namechange", {"ts_code": "600000.SH"}), calls)
 
     def test_normalize_tushare_fina_indicator_maps_pit_fundamental_fields(self) -> None:
         raw = pd.DataFrame(

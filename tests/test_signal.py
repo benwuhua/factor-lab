@@ -279,6 +279,80 @@ class SignalTests(unittest.TestCase):
             output = pd.read_csv(root / "reports/signals_20260423.csv")
             self.assertTrue(bool(output.set_index("instrument").loc["AAA", "suspended"]))
 
+    def test_build_daily_signal_cli_can_score_combo_spec_with_fundamental_member(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            approved_path, config_path = self._write_fixture(root)
+            exposures_path = root / "exposures.csv"
+            self._exposures().to_csv(exposures_path, index=False)
+            (root / "data").mkdir(exist_ok=True)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB", "CCC"],
+                    "available_at": ["2026-04-01", "2026-04-01", "2026-04-01"],
+                    "roe": [20.0, 5.0, 1.0],
+                    "debt_ratio": [10.0, 80.0, 90.0],
+                }
+            ).to_csv(root / "data/fundamental_quality.csv", index=False)
+            combo_path = root / "configs/combo_specs/combo.yaml"
+            combo_path.parent.mkdir(parents=True)
+            combo_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "name": "combo",
+                        "fundamental_path": "data/fundamental_quality.csv",
+                        "members": [
+                            {
+                                "name": "quality_low_leverage",
+                                "source": "fundamental_quality",
+                                "family": "quality",
+                                "logic_bucket": "fundamental_quality",
+                                "weight": 0.5,
+                                "components": [
+                                    {"field": "roe", "direction": 1, "weight": 1.0},
+                                    {"field": "debt_ratio", "direction": -1, "weight": 0.5},
+                                ],
+                            },
+                            {
+                                "name": "core_alpha",
+                                "source": "approved_factor",
+                                "family": "momentum",
+                                "logic_bucket": "trend_following",
+                                "weight": 0.5,
+                            },
+                        ],
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+            repo = Path(__file__).resolve().parents[1]
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo / "scripts/build_daily_signal.py"),
+                    "--config",
+                    str(config_path.relative_to(root)),
+                    "--project-root",
+                    str(root),
+                    "--exposures-csv",
+                    str(exposures_path.relative_to(root)),
+                    "--combo-spec",
+                    str(combo_path.relative_to(root)),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            output = pd.read_csv(root / "reports/signals_20260423.csv")
+            self.assertIn("quality_low_leverage_contribution", output.columns)
+            self.assertIn("family_quality_score", output.columns)
+            self.assertIn("logic_fundamental_quality_score", output.columns)
+            self.assertIn("family_momentum_score", output.columns)
+
     def test_fetch_daily_factor_exposures_can_limit_to_explicit_instruments(self):
         class FakeD:
             requested_instruments = None

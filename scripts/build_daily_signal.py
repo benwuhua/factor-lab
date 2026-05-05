@@ -13,6 +13,13 @@ suppress_runtime_warnings()
 add_src_to_path()
 
 from qlib_factor_lab.config import load_project_config
+from qlib_factor_lab.combo_spec import (
+    build_combo_exposures,
+    load_combo_spec,
+    market_signal_factors_from_combo_spec,
+    signal_config_for_combo_spec,
+    signal_factors_from_combo_spec,
+)
 from qlib_factor_lab.signal import (
     build_daily_signal,
     fetch_daily_factor_exposures,
@@ -31,6 +38,7 @@ def main() -> int:
     parser.add_argument("--run-date", default=None, help="Override config run date. Use latest for provider end date.")
     parser.add_argument("--active-regime", default=None, help="Override config active market regime.")
     parser.add_argument("--provider-config", default=None, help="Override provider config used for Qlib exposure fetch.")
+    parser.add_argument("--combo-spec", default=None, help="Optional governed combo spec to include fundamental/event/market combo members.")
     parser.add_argument("--exposures-csv", default=None, help="Optional precomputed exposure CSV for tests or offline runs.")
     parser.add_argument("--model-scores-csv", default=None, help="Optional CSV with instrument,model_score columns.")
     parser.add_argument("--signals-output", default=None, help="Override signal CSV output path.")
@@ -46,13 +54,27 @@ def main() -> int:
     if args.active_regime is not None:
         config = replace(config, active_regime=args.active_regime)
 
-    factors = load_approved_signal_factors(_resolve_path(root, config.approved_factors_path))
-    if args.exposures_csv:
-        exposures = pd.read_csv(_resolve_path(root, args.exposures_csv))
+    approved_factors = load_approved_signal_factors(_resolve_path(root, config.approved_factors_path))
+    combo_spec = load_combo_spec(_resolve_path(root, args.combo_spec)) if args.combo_spec else None
+    if combo_spec is None:
+        factors = approved_factors
+        if args.exposures_csv:
+            exposures = pd.read_csv(_resolve_path(root, args.exposures_csv))
+        else:
+            provider_config = Path(args.provider_config) if args.provider_config is not None else config.provider_config
+            project_config = load_project_config(_resolve_path(root, provider_config))
+            exposures = fetch_daily_factor_exposures(project_config, factors, config.run_date)
     else:
-        provider_config = Path(args.provider_config) if args.provider_config is not None else config.provider_config
-        project_config = load_project_config(_resolve_path(root, provider_config))
-        exposures = fetch_daily_factor_exposures(project_config, factors, config.run_date)
+        market_factors = market_signal_factors_from_combo_spec(combo_spec, approved_factors)
+        if args.exposures_csv:
+            base_exposures = pd.read_csv(_resolve_path(root, args.exposures_csv))
+        else:
+            provider_config = Path(args.provider_config) if args.provider_config is not None else config.provider_config
+            project_config = load_project_config(_resolve_path(root, provider_config))
+            base_exposures = fetch_daily_factor_exposures(project_config, market_factors, config.run_date)
+        config = signal_config_for_combo_spec(config, combo_spec)
+        factors = signal_factors_from_combo_spec(combo_spec, approved_factors)
+        exposures = build_combo_exposures(root, combo_spec, base_exposures, config)
 
     if args.model_scores_csv:
         model_scores = pd.read_csv(_resolve_path(root, args.model_scores_csv))

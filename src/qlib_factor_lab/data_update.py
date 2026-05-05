@@ -22,6 +22,9 @@ class DailyDataUpdateConfig:
     fundamental_source: Path | None = None
     security_master_history_source: Path | None = None
     env_file: Path | None = None
+    tushare_security_master_history: bool = False
+    tushare_security_master_start_date: str | None = None
+    tushare_security_master_output: Path = Path("data/vendor/security_master_history_tushare.csv")
     rqdata_security_master_history: bool = False
     rqdata_start_date: str | None = None
     rqdata_output: Path = Path("data/vendor/security_master_history_rqdata.csv")
@@ -170,6 +173,31 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
         )
 
     security_master_history_source = config.security_master_history_source
+    if config.tushare_security_master_history:
+        security_master_history_source = config.tushare_security_master_output
+        steps.append(
+            DataUpdateStep(
+                "tushare_security_master_history",
+                (
+                    python_bin,
+                    "scripts/build_tushare_vendor_data.py",
+                    "--instruments",
+                )
+                + _security_master_instruments_args(root)
+                + (
+                    "--start-date",
+                    str(config.tushare_security_master_start_date or "2015-01-01"),
+                    "--end-date",
+                    config.as_of_date,
+                    "--as-of-date",
+                    config.as_of_date,
+                    "--env-file",
+                    str(config.env_file or ".env"),
+                    "--output",
+                    str(config.tushare_security_master_output),
+                ),
+            )
+        )
     if config.rqdata_security_master_history:
         security_master_history_source = config.rqdata_output
         steps.append(

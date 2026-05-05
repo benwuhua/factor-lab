@@ -379,8 +379,7 @@ make test
 ```bash
 python3 - <<'PY'
 from pathlib import Path
-needle_parts = ["08ba0a5599df5c2569478bac7bbad2d", "bd955ea3a06687939fb822eaf"]
-needle = "".join(needle_parts)
+needle = "replace_with_sensitive_token_to_scan"
 hits = []
 for path in Path(".").rglob("*"):
     if not path.is_file() or any(part in {".git", ".venv", "data", "reports"} for part in path.parts):

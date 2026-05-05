@@ -118,6 +118,45 @@ TUSHARE_DAILY_BASIC_FIELDS = [
 
 TUSHARE_ADJ_FACTOR_FIELDS = ["ts_code", "trade_date", "adj_factor"]
 
+TUSHARE_STOCK_BASIC_FIELDS = [
+    "ts_code",
+    "symbol",
+    "name",
+    "area",
+    "industry",
+    "market",
+    "exchange",
+    "list_date",
+    "delist_date",
+    "is_hs",
+]
+
+TUSHARE_NAMECHANGE_FIELDS = [
+    "ts_code",
+    "name",
+    "start_date",
+    "end_date",
+    "ann_date",
+    "change_reason",
+]
+
+SECURITY_MASTER_HISTORY_COLUMNS = [
+    "instrument",
+    "name",
+    "exchange",
+    "board",
+    "industry_sw",
+    "industry_csrc",
+    "is_st",
+    "listing_date",
+    "delisting_date",
+    "valid_from",
+    "valid_to",
+    "research_universes",
+    "source",
+    "as_of_date",
+]
+
 
 Transport = Callable[[str, dict[str, object], float], dict[str, object]]
 
@@ -337,6 +376,147 @@ def qlib_symbol_from_tushare(ts_code: str) -> str:
     if exchange not in {"SH", "SZ"} or len(code) != 6 or not code.isdigit():
         raise ValueError(f"invalid Tushare ts_code: {ts_code}")
     return f"{exchange}{code}"
+
+
+def normalize_tushare_security_master_history(
+    stock_basic: pd.DataFrame,
+    namechange: pd.DataFrame | None = None,
+    *,
+    as_of_date: str,
+    research_universe: str = "",
+) -> pd.DataFrame:
+    if stock_basic is None or stock_basic.empty:
+        return pd.DataFrame(columns=SECURITY_MASTER_HISTORY_COLUMNS)
+    normalized_as_of = _normalize_date(as_of_date)
+    name_frame = namechange.copy() if namechange is not None else pd.DataFrame()
+    rows: list[dict[str, object]] = []
+    for _, stock in stock_basic.iterrows():
+        ts_code = str(stock.get("ts_code", "")).strip().upper()
+        instrument = _safe_qlib_symbol_from_tushare(ts_code)
+        if not instrument:
+            continue
+        listing_date = _normalize_date(stock.get("list_date", ""))
+        delisting_date = _normalize_date(stock.get("delist_date", ""))
+        changes = _namechange_rows_for_code(name_frame, ts_code)
+        if changes.empty:
+            changes = pd.DataFrame(
+                [
+                    {
+                        "ts_code": ts_code,
+                        "name": stock.get("name", ""),
+                        "start_date": listing_date,
+                        "end_date": delisting_date,
+                    }
+                ]
+            )
+        for _, change in changes.iterrows():
+            name = str(change.get("name", "") or stock.get("name", "") or "").strip()
+            valid_from = _normalize_date(change.get("start_date", "")) or listing_date or normalized_as_of
+            valid_to = _normalize_date(change.get("end_date", "")) or delisting_date
+            rows.append(
+                {
+                    "instrument": instrument,
+                    "name": name,
+                    "exchange": _exchange_from_tushare(ts_code, stock.get("exchange", "")),
+                    "board": str(stock.get("market", "") or ""),
+                    "industry_sw": "",
+                    "industry_csrc": str(stock.get("industry", "") or ""),
+                    "is_st": _is_st_name(name),
+                    "listing_date": listing_date,
+                    "delisting_date": delisting_date,
+                    "valid_from": valid_from,
+                    "valid_to": valid_to,
+                    "research_universes": research_universe,
+                    "source": "tushare_pit",
+                    "as_of_date": normalized_as_of,
+                }
+            )
+    if not rows:
+        return pd.DataFrame(columns=SECURITY_MASTER_HISTORY_COLUMNS)
+    frame = pd.DataFrame(rows, columns=SECURITY_MASTER_HISTORY_COLUMNS)
+    return (
+        frame.sort_values(["instrument", "valid_from", "valid_to", "name"])
+        .drop_duplicates(["instrument", "valid_from", "valid_to", "name"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
+def fetch_security_master_history_from_tushare(
+    instruments: Iterable[str],
+    *,
+    as_of_date: str,
+    start_date: str | None = None,
+    research_universe: str = "",
+    token: str | None = None,
+    transport: Transport | None = None,
+    delay: float = 0.2,
+) -> pd.DataFrame:
+    symbols = [str(item).strip().upper() for item in instruments if str(item).strip()]
+    ts_codes = sorted({tushare_code_from_qlib(symbol) for symbol in symbols})
+    stock_basic = call_tushare_api(
+        "stock_basic",
+        params={"list_status": "L"},
+        fields=TUSHARE_STOCK_BASIC_FIELDS,
+        token=token,
+        transport=transport,
+    )
+    if ts_codes and not stock_basic.empty and "ts_code" in stock_basic.columns:
+        stock_basic = stock_basic[stock_basic["ts_code"].astype(str).str.upper().isin(ts_codes)].copy()
+    frames: list[pd.DataFrame] = []
+    for ts_code in ts_codes:
+        try:
+            frame = call_tushare_api(
+                "namechange",
+                params={"ts_code": ts_code},
+                fields=TUSHARE_NAMECHANGE_FIELDS,
+                token=token,
+                transport=transport,
+            )
+        except TushareApiError as exc:
+            print(f"skip tushare_namechange {ts_code}: {exc}")
+            continue
+        if not frame.empty:
+            frames.append(frame)
+        if delay > 0:
+            time.sleep(delay)
+    namechange = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=TUSHARE_NAMECHANGE_FIELDS)
+    result = normalize_tushare_security_master_history(
+        stock_basic,
+        namechange,
+        as_of_date=as_of_date,
+        research_universe=research_universe,
+    )
+    if start_date and not result.empty:
+        start = pd.Timestamp(_normalize_date(start_date))
+        valid_to = pd.to_datetime(result["valid_to"], errors="coerce").fillna(pd.Timestamp.max)
+        result = result[valid_to >= start].reset_index(drop=True)
+    return result.loc[:, SECURITY_MASTER_HISTORY_COLUMNS]
+
+
+def write_security_master_history_from_tushare(
+    output_path: str | Path,
+    *,
+    instruments: Iterable[str],
+    as_of_date: str,
+    start_date: str | None = None,
+    research_universe: str = "",
+    token: str | None = None,
+    transport: Transport | None = None,
+    delay: float = 0.2,
+) -> Path:
+    frame = fetch_security_master_history_from_tushare(
+        instruments,
+        as_of_date=as_of_date,
+        start_date=start_date,
+        research_universe=research_universe,
+        token=token,
+        transport=transport,
+        delay=delay,
+    )
+    output = Path(output_path).expanduser().resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(output, index=False)
+    return output
 
 
 def normalize_tushare_history(
@@ -875,6 +1055,37 @@ def _safe_qlib_symbol_from_tushare(ts_code: object) -> str:
         return qlib_symbol_from_tushare(str(ts_code))
     except ValueError:
         return ""
+
+
+def _namechange_rows_for_code(namechange: pd.DataFrame, ts_code: str) -> pd.DataFrame:
+    if namechange is None or namechange.empty or "ts_code" not in namechange.columns:
+        return pd.DataFrame(columns=TUSHARE_NAMECHANGE_FIELDS)
+    frame = namechange[namechange["ts_code"].astype(str).str.upper() == str(ts_code).upper()].copy()
+    if frame.empty:
+        return frame
+    if "start_date" not in frame.columns:
+        frame["start_date"] = ""
+    frame["_start"] = frame["start_date"].map(_normalize_date)
+    return frame.sort_values(["_start", "name"]).drop(columns=["_start"], errors="ignore")
+
+
+def _exchange_from_tushare(ts_code: str, exchange: object) -> str:
+    value = str(exchange or "").strip().upper()
+    if value in {"SSE", "SZSE", "BSE"}:
+        return value
+    text = str(ts_code).upper()
+    if text.endswith(".SH"):
+        return "SSE"
+    if text.endswith(".SZ"):
+        return "SZSE"
+    if text.endswith(".BJ"):
+        return "BSE"
+    return value
+
+
+def _is_st_name(name: object) -> bool:
+    text = str(name or "").upper().replace(" ", "")
+    return "ST" in text or "退" in text
 
 
 def _write_symbol_csv(frame: pd.DataFrame, output_dir: str | Path, symbol: str) -> Path:
