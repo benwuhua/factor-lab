@@ -71,6 +71,68 @@ class DailyPipelineTests(unittest.TestCase):
             self.assertTrue(report["passed"])
             self.assertEqual(report["provider_end_time"], "2026-04-27")
 
+    def test_provider_data_freshness_uses_latest_available_vendor_date_for_holidays(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "configs").mkdir()
+            qlib_dir = root / "data/qlib/cn_data_current"
+            (qlib_dir / "calendars").mkdir(parents=True)
+            (qlib_dir / "calendars/day.txt").write_text("2026-04-29\n2026-04-30\n", encoding="utf-8")
+            (root / "configs/provider_current.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "provider_uri": "data/qlib/cn_data_current",
+                        "freq": "day",
+                        "end_time": "2026-04-30",
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            report = check_provider_data_freshness(
+                root,
+                Path("configs/provider_current.yaml"),
+                now=pd.Timestamp("2026-05-05 16:00:00"),
+                max_age_days=3,
+                latest_available_data_date="2026-04-30",
+            )
+
+            self.assertTrue(report["passed"], report["detail"])
+            self.assertEqual(report["latest_available_data_date"], "2026-04-30")
+            self.assertEqual(report["age_days"], 5)
+            self.assertEqual(report["freshness_basis"], "latest_available_data_date")
+
+    def test_provider_data_freshness_fails_when_local_calendar_lags_vendor_available_date(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "configs").mkdir()
+            qlib_dir = root / "data/qlib/cn_data_current"
+            (qlib_dir / "calendars").mkdir(parents=True)
+            (qlib_dir / "calendars/day.txt").write_text("2026-04-29\n2026-04-30\n", encoding="utf-8")
+            (root / "configs/provider_current.yaml").write_text(
+                yaml.safe_dump(
+                    {
+                        "provider_uri": "data/qlib/cn_data_current",
+                        "freq": "day",
+                        "end_time": "2026-04-30",
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            report = check_provider_data_freshness(
+                root,
+                Path("configs/provider_current.yaml"),
+                now=pd.Timestamp("2026-05-05 16:00:00"),
+                max_age_days=3,
+                latest_available_data_date="2026-05-05",
+            )
+
+            self.assertFalse(report["passed"])
+            self.assertIn("calendar_behind_available_data", report["detail"])
+
     def test_daily_pipeline_cli_writes_run_bundle(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -30,6 +30,7 @@ from .combo_spec import (
 )
 from .data_governance import build_data_governance_report, load_data_governance_config, write_data_governance_report
 from .data_quality import check_signal_quality, load_data_quality_config, write_quality_report
+from .data_update import load_env_file
 from .expert_review import (
     apply_expert_review_portfolio_gate,
     build_expert_review_packet,
@@ -61,6 +62,7 @@ from .signal import (
 from .state import write_positions_state
 from .stock_cards import build_stock_cards, write_stock_cards
 from .tradability import apply_tradability_filter, load_trading_config
+from .tushare_data import get_tushare_token, resolve_latest_tushare_daily_date
 
 
 @dataclass(frozen=True)
@@ -149,6 +151,7 @@ def run_daily_pipeline(root: str | Path, inputs: DailyPipelineInputs) -> DailyPi
             root_path,
             signal_config.provider_config,
             max_age_days=int(freshness_config.get("max_age_days", 3)),
+            latest_available_data_date=_latest_available_data_date(root_path, freshness_config),
         )
         freshness_run_date = str(freshness_report.get("provider_end_time") or datetime.now().date())
         run_dir = _resolve(root_path, _run_dir(execution_config, freshness_run_date))
@@ -464,6 +467,7 @@ def check_provider_data_freshness(
     *,
     now: pd.Timestamp | datetime | None = None,
     max_age_days: int = 3,
+    latest_available_data_date: str | None = None,
 ) -> dict[str, Any]:
     root_path = Path(root).expanduser().resolve()
     config_path = _resolve(root_path, provider_config_path)
@@ -472,6 +476,7 @@ def check_provider_data_freshness(
     current = pd.Timestamp(now or datetime.now()).normalize()
     provider_end = _normalize_date_text(project_config.end_time)
     calendar_end = _normalize_date_text(latest_calendar_date)
+    available_end = _normalize_date_text(latest_available_data_date)
     failures: list[str] = []
     age_days: int | None = None
 
@@ -481,7 +486,14 @@ def check_provider_data_freshness(
         age_days = int((current - pd.Timestamp(calendar_end)).days)
         if age_days < 0:
             failures.append("calendar_after_current_date")
-        if age_days > max_age_days:
+        if available_end is not None:
+            calendar_ts = pd.Timestamp(calendar_end)
+            available_ts = pd.Timestamp(available_end)
+            if calendar_ts < available_ts:
+                failures.append(f"calendar_behind_available_data:{calendar_end}!={available_end}")
+            if calendar_ts > available_ts:
+                failures.append(f"calendar_after_available_data:{calendar_end}!={available_end}")
+        elif age_days > max_age_days:
             failures.append(f"stale_calendar_age_{age_days}d_gt_{max_age_days}d")
 
     if provider_end is None:
@@ -495,6 +507,8 @@ def check_provider_data_freshness(
         "provider_uri": str(project_config.provider_uri),
         "provider_end_time": provider_end or "",
         "latest_calendar_date": calendar_end or "",
+        "latest_available_data_date": available_end or "",
+        "freshness_basis": "latest_available_data_date" if available_end else "calendar_age_days",
         "current_date": str(current.date()),
         "max_age_days": max_age_days,
         "age_days": "" if age_days is None else age_days,
@@ -513,6 +527,8 @@ def write_provider_data_freshness_report(report: dict[str, Any], output_path: st
         f"- provider_uri: {report.get('provider_uri', '')}",
         f"- provider_end_time: {report.get('provider_end_time', '')}",
         f"- latest_calendar_date: {report.get('latest_calendar_date', '')}",
+        f"- latest_available_data_date: {report.get('latest_available_data_date', '')}",
+        f"- freshness_basis: {report.get('freshness_basis', '')}",
         f"- current_date: {report.get('current_date', '')}",
         f"- max_age_days: {report.get('max_age_days', '')}",
         f"- age_days: {report.get('age_days', '')}",
@@ -520,6 +536,20 @@ def write_provider_data_freshness_report(report: dict[str, Any], output_path: st
     ]
     output.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return output
+
+
+def _latest_available_data_date(root: Path, freshness_config: dict[str, Any]) -> str | None:
+    provider = str(freshness_config.get("latest_available_provider", "") or "").strip().lower()
+    if not provider:
+        return None
+    if provider != "tushare":
+        raise ValueError(f"unsupported data freshness latest_available_provider: {provider}")
+    env_file = freshness_config.get("env_file", ".env")
+    env_path = Path(str(env_file))
+    env = load_env_file(env_path if env_path.is_absolute() else root / env_path)
+    token = get_tushare_token(env=env)
+    as_of_date = pd.Timestamp(datetime.now()).strftime("%Y%m%d")
+    return resolve_latest_tushare_daily_date(as_of_date, token=token)
 
 
 def _should_check_provider_freshness(run_date: str, exposures_csv: Path | None, data: dict[str, Any]) -> bool:

@@ -22,6 +22,8 @@ reconcile:
 data_freshness:
   enabled: true
   max_age_days: 3
+  latest_available_provider: tushare
+  env_file: .env
 
 expert_review:
   enabled: true
