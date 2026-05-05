@@ -33,6 +33,7 @@ from qlib_factor_lab.workbench import (
     build_research_evidence_summary,
     build_research_pipeline_status,
     build_stock_card_announcement_evidence_summary,
+    build_tushare_data_coverage,
     classify_gate_decision,
     find_latest_multilane_report,
     find_latest_run_dir,
@@ -180,6 +181,7 @@ def render_data_governance() -> None:
     freshness = pd.DataFrame(snapshot.freshness)
     factor_gaps = build_factor_data_gap_summary(ROOT)
     domain_health = build_data_domain_health(ROOT)
+    tushare_coverage = build_tushare_data_coverage(ROOT)
     provider_rows = _provider_rows()
     quality_rows = _quality_rows(snapshot)
 
@@ -225,6 +227,11 @@ def render_data_governance() -> None:
             st.info("暂无 data_governance CSV。先运行 make data-governance 或 make daily-data-update。")
         else:
             st.dataframe(domain_health["rows"], width="stretch", hide_index=True)
+
+        st.markdown(_section_header_html("Tushare 数据覆盖", "vendor-backed PIT, dividend and disclosure domains"), unsafe_allow_html=True)
+        st.caption("展示当前已接入的权威/准权威数据域: PIT 主数据、分红派息、财报披露日期和公告证据。它们决定基本面因子、事件证据和组合复核能不能进入 active 状态。")
+        st.markdown(_tushare_data_coverage_cards_html(tushare_coverage["cards"]), unsafe_allow_html=True)
+        st.dataframe(tushare_coverage["rows"], width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("质量检查动作", "quality gate"), unsafe_allow_html=True)
         st.markdown(_workflow_card_grid_html(quality_rows), unsafe_allow_html=True)
@@ -1449,6 +1456,26 @@ def _data_domain_health_cards_html(cards: dict[str, object]) -> str:
         for label, value in items
     )
     return f'<section class="evidence-grid data-domain-health-grid">{html}</section>'
+
+
+def _tushare_data_coverage_cards_html(cards: dict[str, object]) -> str:
+    items = [
+        ("Tushare PIT 主数据", cards.get("pit_instruments", 0), f'{cards.get("pit_rows", 0)} rows'),
+        ("Tushare 分红", cards.get("tushare_dividend_instruments", 0), f'{cards.get("tushare_dividend_rows", 0)} rows'),
+        ("财报披露事件", cards.get("financial_disclosure_instruments", 0), f'{cards.get("financial_disclosure_events", 0)} rows'),
+        (
+            "披露证据",
+            cards.get("financial_disclosure_evidence_instruments", 0),
+            f'{cards.get("financial_disclosure_evidence", 0)} rows',
+        ),
+    ]
+    html = "".join(
+        '<div class="evidence-card">'
+        f"<label>{_html(label)}</label><strong>{_html(value)}</strong><span>{_html(note)}</span>"
+        "</div>"
+        for label, value, note in items
+    )
+    return f'<section class="evidence-grid evidence-health-grid">{html}</section>'
 
 
 def _evidence_health_cards_html(cards: dict[str, object]) -> str:

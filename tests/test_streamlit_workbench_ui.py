@@ -80,6 +80,9 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
 
         self.assertIn("因子数据缺口", text)
         self.assertIn("revenue_growth_yoy", text)
+        self.assertIn("Tushare 数据覆盖", text)
+        self.assertIn("Tushare PIT 主数据", text)
+        self.assertIn("财报披露事件", text)
 
     def test_autoresearch_page_surfaces_queue_multilane_and_loop_actions(self):
         app = self.run_page("04 自动挖掘")

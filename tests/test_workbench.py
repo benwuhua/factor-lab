@@ -24,6 +24,7 @@ from qlib_factor_lab.workbench import (
     build_research_evidence_summary,
     build_research_pipeline_status,
     build_stock_card_announcement_evidence_summary,
+    build_tushare_data_coverage,
     build_workbench_freshness,
     find_latest_stock_cards,
     find_latest_multilane_report,
@@ -865,6 +866,54 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual("blocked", by_field.loc["operating_cashflow_to_net_profit", "status"])
         self.assertEqual("ready", by_field.loc["roe", "status"])
         self.assertGreater(float(by_field.loc["roe", "coverage_pct"]), 0.99)
+
+    def test_tushare_data_coverage_summarizes_pit_dividend_and_disclosure_domains(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            data = root / "data"
+            data.mkdir()
+            pd.DataFrame(
+                {
+                    "instrument": ["000001.SZ", "000002.SZ", "000001.SZ"],
+                    "source": ["tushare_pit", "tushare_pit", "tushare_pit"],
+                    "valid_from": ["2020-01-01", "2020-01-01", "2026-04-30"],
+                }
+            ).to_csv(data / "security_master_history.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["000001.SZ", "000001.SZ", "000002.SZ"],
+                    "source": ["tushare_dividend", "cninfo_dividend", "tushare_dividend"],
+                    "record_date": ["2025-06-01", "2024-06-01", "2025-05-20"],
+                }
+            ).to_csv(data / "cninfo_dividends.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["000001.SZ", "000002.SZ", "000003.SZ"],
+                    "event_type": ["financial_report_disclosure", "financial_report_disclosure", "buyback"],
+                    "source": ["tushare_disclosure_date", "tushare_disclosure_date", "cninfo"],
+                    "event_date": ["2026-04-30", "2026-04-29", "2026-04-28"],
+                }
+            ).to_csv(data / "company_events.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["000001.SZ", "000002.SZ", "000003.SZ"],
+                    "event_type": ["financial_report_disclosure", "financial_report_disclosure", "regulatory_inquiry"],
+                    "source": ["tushare_disclosure_date", "tushare_disclosure_date", "cninfo"],
+                    "publish_time": ["2026-04-30", "2026-04-29", "2026-04-28"],
+                }
+            ).to_csv(data / "announcement_evidence.csv", index=False)
+
+            coverage = build_tushare_data_coverage(root)
+
+        cards = coverage["cards"]
+        by_domain = coverage["rows"].set_index("domain")
+        self.assertEqual(2, cards["pit_instruments"])
+        self.assertEqual(2, cards["tushare_dividend_rows"])
+        self.assertEqual(2, cards["financial_disclosure_events"])
+        self.assertEqual(2, cards["financial_disclosure_evidence"])
+        self.assertEqual("tushare_pit", by_domain.loc["PIT 主数据", "source"])
+        self.assertEqual("tushare_dividend", by_domain.loc["分红派息", "source"])
+        self.assertEqual("tushare_disclosure_date", by_domain.loc["财报披露事件", "source"])
 
     def test_combo_profile_summary_classifies_offensive_and_defensive_specs(self):
         with tempfile.TemporaryDirectory() as tmp:

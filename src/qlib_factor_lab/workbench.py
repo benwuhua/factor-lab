@@ -27,6 +27,10 @@ FUNDAMENTAL_QUALITY = Path("data/fundamental_quality.csv")
 DATA_GOVERNANCE_REPORT_GLOB = "data_governance_*.csv"
 LIQUIDITY_MICROSTRUCTURE = Path("data/liquidity_microstructure.csv")
 EMOTION_ATMOSPHERE = Path("data/emotion_atmosphere.csv")
+SECURITY_MASTER_HISTORY = Path("data/security_master_history.csv")
+DIVIDENDS = Path("data/cninfo_dividends.csv")
+COMPANY_EVENTS = Path("data/company_events.csv")
+ANNOUNCEMENT_EVIDENCE = Path("data/announcement_evidence.csv")
 
 OFFENSIVE_FACTOR_FAMILIES = {"momentum", "volume_confirm", "quiet_breakout", "growth_improvement", "event_catalyst", "theme"}
 DEFENSIVE_FACTOR_FAMILIES = {"value", "dividend", "gap_risk", "cashflow_quality", "fundamental_quality", "low_vol"}
@@ -961,6 +965,59 @@ def build_factor_data_gap_summary(
     return pd.DataFrame(rows)
 
 
+def build_tushare_data_coverage(
+    root: str | Path = ".",
+    *,
+    security_master_history_path: str | Path = SECURITY_MASTER_HISTORY,
+    dividends_path: str | Path = DIVIDENDS,
+    company_events_path: str | Path = COMPANY_EVENTS,
+    announcement_evidence_path: str | Path = ANNOUNCEMENT_EVIDENCE,
+) -> dict[str, Any]:
+    root_path = Path(root)
+    master_history = _read_csv_or_empty(_resolve(root_path, security_master_history_path))
+    dividends = _read_csv_or_empty(_resolve(root_path, dividends_path))
+    events = _read_csv_or_empty(_resolve(root_path, company_events_path))
+    evidence = _read_csv_or_empty(_resolve(root_path, announcement_evidence_path))
+
+    pit = _source_subset(master_history, "tushare_pit")
+    tushare_dividends = _source_subset(dividends, "tushare_dividend")
+    disclosure_events = _event_source_subset(events, "financial_report_disclosure", "tushare_disclosure_date")
+    disclosure_evidence = _event_source_subset(evidence, "financial_report_disclosure", "tushare_disclosure_date")
+
+    rows = pd.DataFrame(
+        [
+            _vendor_domain_row("PIT 主数据", "tushare_pit", pit, ["as_of_date", "valid_from", "list_date", "trade_date", "date"]),
+            _vendor_domain_row(
+                "分红派息",
+                "tushare_dividend",
+                tushare_dividends,
+                ["available_at", "announce_date", "record_date", "ex_date", "ann_date", "end_date"],
+            ),
+            _vendor_domain_row("财报披露事件", "tushare_disclosure_date", disclosure_events, ["event_date", "publish_time", "ann_date"]),
+            _vendor_domain_row("公告证据", "tushare_disclosure_date", disclosure_evidence, ["publish_time", "event_date", "ann_date"]),
+        ]
+    )
+    return {
+        "cards": {
+            "pit_rows": int(len(pit)),
+            "pit_instruments": _instrument_count(pit),
+            "tushare_dividend_rows": int(len(tushare_dividends)),
+            "tushare_dividend_instruments": _instrument_count(tushare_dividends),
+            "financial_disclosure_events": int(len(disclosure_events)),
+            "financial_disclosure_instruments": _instrument_count(disclosure_events),
+            "financial_disclosure_evidence": int(len(disclosure_evidence)),
+            "financial_disclosure_evidence_instruments": _instrument_count(disclosure_evidence),
+        },
+        "rows": rows,
+        "paths": {
+            "security_master_history": str(_resolve(root_path, security_master_history_path)),
+            "dividends": str(_resolve(root_path, dividends_path)),
+            "company_events": str(_resolve(root_path, company_events_path)),
+            "announcement_evidence": str(_resolve(root_path, announcement_evidence_path)),
+        },
+    }
+
+
 def build_data_domain_health(
     root: str | Path = ".",
     *,
@@ -1073,6 +1130,59 @@ def _latest_date_from_csv(path: Path, column: str) -> str:
         return ""
     dates = pd.to_datetime(frame[column], errors="coerce").dropna()
     return dates.max().strftime("%Y-%m-%d") if not dates.empty else ""
+
+
+def _source_subset(frame: pd.DataFrame, source: str) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    if "source" not in frame.columns:
+        return frame.iloc[0:0].copy()
+    return frame.loc[frame["source"].fillna("").astype(str) == source].copy()
+
+
+def _event_source_subset(frame: pd.DataFrame, event_type: str, source: str) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    if "source" not in frame.columns or "event_type" not in frame.columns:
+        return frame.iloc[0:0].copy()
+    source_mask = frame.get("source", pd.Series(dtype=str)).fillna("").astype(str) == source
+    event_mask = frame.get("event_type", pd.Series(dtype=str)).fillna("").astype(str) == event_type
+    return frame.loc[source_mask & event_mask].copy()
+
+
+def _vendor_domain_row(domain: str, source: str, frame: pd.DataFrame, date_columns: list[str]) -> dict[str, Any]:
+    rows = int(len(frame))
+    instruments = _instrument_count(frame)
+    return {
+        "domain": domain,
+        "source": source,
+        "status": "active" if rows > 0 else "missing",
+        "rows": rows,
+        "instruments": instruments,
+        "latest_date": _latest_date_from_frame(frame, date_columns),
+        "coverage_note": f"{instruments} instruments / {rows} rows" if rows > 0 else "no vendor rows",
+    }
+
+
+def _latest_date_from_frame(frame: pd.DataFrame, columns: list[str]) -> str:
+    if frame.empty:
+        return ""
+    dates: list[pd.Series] = []
+    for column in columns:
+        if column in frame.columns:
+            parsed = pd.to_datetime(frame[column], errors="coerce").dropna()
+            if not parsed.empty:
+                dates.append(parsed)
+    if not dates:
+        return ""
+    merged = pd.concat(dates, ignore_index=True)
+    return merged.max().strftime("%Y-%m-%d") if not merged.empty else ""
+
+
+def _instrument_count(frame: pd.DataFrame) -> int:
+    if frame.empty or "instrument" not in frame.columns:
+        return 0
+    return int(frame["instrument"].dropna().astype(str).nunique())
 
 
 def _truthy_series(values: pd.Series) -> pd.Series:
