@@ -24,6 +24,9 @@ def main() -> int:
     parser.add_argument("--fundamental-provider", default="tushare", choices=["akshare", "tushare"])
     parser.add_argument("--derive-valuation-fields", action="store_true", help="Derive EP/CFP/dividend yield from PIT close prices and dividend records.")
     parser.add_argument("--fetch-cninfo-dividends", action="store_true", help="Fetch dividend records from CNINFO via AkShare.")
+    parser.add_argument("--fetch-dividends", action="store_true", help="Fetch dividend records from the configured dividend provider.")
+    parser.add_argument("--dividend-provider", default="tushare", choices=["tushare", "cninfo", "akshare"])
+    parser.add_argument("--fetch-disclosure-events", action="store_true", help="Fetch financial report disclosure dates as company events.")
     parser.add_argument("--evidence-lookback-days", type=int, default=180, help="Rolling announcement evidence window. Use a negative value to keep all visible events.")
     parser.add_argument("--limit", type=int, default=None, help="Limit instruments for smoke tests.")
     parser.add_argument("--offset", type=int, default=0, help="Skip the first N instruments for batched refreshes.")
@@ -39,6 +42,9 @@ def main() -> int:
         fundamental_provider=args.fundamental_provider,
         derive_valuation_fields=args.derive_valuation_fields,
         fetch_cninfo_dividends=args.fetch_cninfo_dividends,
+        fetch_dividends=args.fetch_dividends,
+        dividend_provider=args.dividend_provider,
+        fetch_disclosure_events=args.fetch_disclosure_events,
         evidence_lookback_days=None if args.evidence_lookback_days < 0 else args.evidence_lookback_days,
         limit=args.limit,
         offset=args.offset,

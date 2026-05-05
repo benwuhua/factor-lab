@@ -74,6 +74,11 @@ def _default_event_taxonomy() -> dict[str, dict[str, str]]:
             "default_severity": "info",
             "portfolio_action": "boost",
         }
+    taxonomy["financial_report_disclosure"] = {
+        "event_class": "information_event",
+        "default_severity": "info",
+        "portfolio_action": "review",
+    }
     for event_type in _WATCH_RISKS:
         taxonomy[event_type] = {
             "event_class": "watch_risk",

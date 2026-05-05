@@ -34,7 +34,11 @@ class DailyUpdateScheduleTest(unittest.TestCase):
         self.assertIn("20260505", command)
         self.assertIn("--fetch-fundamentals", command)
         self.assertIn("--derive-valuation-fields", command)
-        self.assertIn("--fetch-cninfo-dividends", command)
+        self.assertNotIn("--fetch-cninfo-dividends", command)
+        self.assertIn("--fetch-dividends", command)
+        self.assertIn("--dividend-provider", command)
+        self.assertIn("tushare", command)
+        self.assertIn("--fetch-disclosure-events", command)
         self.assertIn("--env-file", command)
         self.assertIn(".env", command)
 

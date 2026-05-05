@@ -19,6 +19,9 @@ class DailyDataUpdateConfig:
     fundamental_provider: str = "tushare"
     derive_valuation_fields: bool = False
     fetch_cninfo_dividends: bool = False
+    fetch_dividends: bool = False
+    dividend_provider: str = "tushare"
+    fetch_disclosure_events: bool = False
     fundamental_source: Path | None = None
     security_master_history_source: Path | None = None
     env_file: Path | None = None
@@ -243,7 +246,11 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
         research_domain_command += ("--derive-valuation-fields",)
     if config.fetch_cninfo_dividends:
         research_domain_command += ("--fetch-cninfo-dividends",)
-    if config.fetch_fundamentals or config.fetch_cninfo_dividends:
+    if config.fetch_dividends:
+        research_domain_command += ("--fetch-dividends", "--dividend-provider", str(config.dividend_provider))
+    if config.fetch_disclosure_events:
+        research_domain_command += ("--fetch-disclosure-events",)
+    if config.fetch_fundamentals or config.fetch_cninfo_dividends or config.fetch_dividends or config.fetch_disclosure_events:
         research_domain_command += _offset_args(config.offset)
     if config.fundamental_source is not None:
         research_domain_command += ("--fundamental-source", str(config.fundamental_source))

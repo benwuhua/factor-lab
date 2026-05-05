@@ -118,6 +118,25 @@ TUSHARE_DAILY_BASIC_FIELDS = [
 
 TUSHARE_ADJ_FACTOR_FIELDS = ["ts_code", "trade_date", "adj_factor"]
 
+TUSHARE_DIVIDEND_FIELDS = [
+    "ts_code",
+    "ann_date",
+    "end_date",
+    "cash_div_tax",
+    "record_date",
+    "ex_date",
+    "pay_date",
+]
+
+TUSHARE_DISCLOSURE_DATE_FIELDS = [
+    "ts_code",
+    "ann_date",
+    "end_date",
+    "pre_date",
+    "actual_date",
+    "modify_date",
+]
+
 TUSHARE_STOCK_BASIC_FIELDS = [
     "ts_code",
     "symbol",
@@ -230,12 +249,12 @@ DEFAULT_PERMISSION_PROBES = [
     {
         "api_name": "dividend",
         "params": {"ann_date": "20250430"},
-        "fields": ["ts_code", "ann_date", "end_date", "cash_div_tax"],
+        "fields": TUSHARE_DIVIDEND_FIELDS,
     },
     {
         "api_name": "disclosure_date",
         "params": {"end_date": "20260331"},
-        "fields": ["ts_code", "ann_date", "end_date", "pre_date", "actual_date"],
+        "fields": TUSHARE_DISCLOSURE_DATE_FIELDS,
     },
 ]
 
@@ -820,6 +839,206 @@ def fetch_fundamental_quality_from_tushare(
     if accrual_frames:
         combined = _fill_statement_accruals(combined, pd.concat(accrual_frames, ignore_index=True))
     return _derive_change_fields(combined)
+
+
+def normalize_tushare_dividend(
+    raw: pd.DataFrame,
+    *,
+    source: str = "tushare_dividend",
+) -> pd.DataFrame:
+    columns = ["instrument", "announce_date", "available_at", "dividend_cash_per_10", "source"]
+    if raw is None or raw.empty:
+        return pd.DataFrame(columns=columns)
+    rows: list[dict[str, object]] = []
+    for _, item in raw.iterrows():
+        ts_code = str(item.get("ts_code", "")).strip()
+        if not ts_code:
+            continue
+        instrument = _safe_qlib_symbol_from_tushare(ts_code)
+        if not instrument:
+            continue
+        announce_date = _date_from_row(item, ["ann_date", "announce_date"])
+        available_at = announce_date or _date_from_row(item, ["record_date", "ex_date", "pay_date"])
+        cash = _number_from_row(item, ["cash_div_tax", "cash_div", "dividend_cash_per_10"])
+        if not available_at or cash is None:
+            continue
+        rows.append(
+            {
+                "instrument": instrument,
+                "announce_date": announce_date,
+                "available_at": available_at,
+                "dividend_cash_per_10": cash,
+                "source": source,
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    return (
+        pd.DataFrame(rows, columns=columns)
+        .sort_values(["instrument", "available_at", "dividend_cash_per_10"])
+        .drop_duplicates(["instrument", "available_at", "dividend_cash_per_10"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
+def fetch_tushare_dividends(
+    instruments: Iterable[str],
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    delay: float = 0.2,
+    token: str | None = None,
+    transport: Transport | None = None,
+) -> pd.DataFrame:
+    symbols = list(dict.fromkeys(str(item).upper() for item in instruments if str(item).strip()))
+    if offset > 0:
+        symbols = symbols[offset:]
+    if limit is not None:
+        symbols = symbols[:limit]
+    frames: list[pd.DataFrame] = []
+    for symbol in symbols:
+        try:
+            raw = call_tushare_api(
+                "dividend",
+                params={"ts_code": tushare_code_from_qlib(symbol)},
+                fields=TUSHARE_DIVIDEND_FIELDS,
+                token=token,
+                transport=transport,
+            )
+        except Exception as exc:  # pragma: no cover - network/vendor dependent
+            print(f"skip tushare_dividend {symbol}: {exc}")
+            continue
+        normalized = normalize_tushare_dividend(raw)
+        if not normalized.empty:
+            frames.append(normalized)
+        if delay > 0:
+            time.sleep(delay)
+    if not frames:
+        return pd.DataFrame(columns=["instrument", "announce_date", "available_at", "dividend_cash_per_10", "source"])
+    return pd.concat(frames, ignore_index=True)
+
+
+def normalize_tushare_disclosure_dates(
+    raw: pd.DataFrame,
+    *,
+    as_of_date: str,
+    source: str = "tushare_disclosure_date",
+) -> pd.DataFrame:
+    columns = [
+        "event_id",
+        "instrument",
+        "event_type",
+        "event_date",
+        "source",
+        "source_url",
+        "title",
+        "severity",
+        "summary",
+        "evidence",
+        "active_until",
+    ]
+    if raw is None or raw.empty:
+        return pd.DataFrame(columns=columns)
+    rows: list[dict[str, object]] = []
+    normalized_as_of = pd.Timestamp(_normalize_date(as_of_date))
+    for _, item in raw.iterrows():
+        instrument = _safe_qlib_symbol_from_tushare(item.get("ts_code"))
+        report_period = _date_from_row(item, ["end_date", "report_period"])
+        event_date = _date_from_row(item, ["actual_date", "ann_date", "pre_date"])
+        if not instrument or not report_period or not event_date:
+            continue
+        event_ts = pd.Timestamp(event_date)
+        if event_ts > normalized_as_of:
+            continue
+        active_until = (event_ts + pd.Timedelta(days=30)).strftime("%Y-%m-%d")
+        title = f"Financial report disclosure {report_period}"
+        rows.append(
+            {
+                "event_id": f"{source}:{instrument}:{report_period}:{event_date}",
+                "instrument": instrument,
+                "event_type": "financial_report_disclosure",
+                "event_date": event_date,
+                "source": source,
+                "source_url": "",
+                "title": title,
+                "severity": "info",
+                "summary": f"Actual disclosure date {event_date}; report_period {report_period}.",
+                "evidence": (
+                    f"Tushare disclosure_date: ann_date={_date_from_row(item, ['ann_date'])}; "
+                    f"pre_date={_date_from_row(item, ['pre_date'])}; actual_date={event_date}."
+                ),
+                "active_until": active_until,
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    return (
+        pd.DataFrame(rows, columns=columns)
+        .drop_duplicates(["event_id"], keep="last")
+        .sort_values(["event_date", "instrument", "event_type"])
+        .reset_index(drop=True)
+    )
+
+
+def fetch_tushare_disclosure_events(
+    instruments: Iterable[str],
+    *,
+    as_of_date: str,
+    periods: Iterable[str] | None = None,
+    start_year: int = 2015,
+    limit: int | None = None,
+    offset: int = 0,
+    delay: float = 0.2,
+    token: str | None = None,
+    transport: Transport | None = None,
+) -> pd.DataFrame:
+    symbols = list(dict.fromkeys(str(item).upper() for item in instruments if str(item).strip()))
+    if offset > 0:
+        symbols = symbols[offset:]
+    if limit is not None:
+        symbols = symbols[:limit]
+    selected = set(symbols)
+    if not selected:
+        return pd.DataFrame(
+            columns=[
+                "event_id",
+                "instrument",
+                "event_type",
+                "event_date",
+                "source",
+                "source_url",
+                "title",
+                "severity",
+                "summary",
+                "evidence",
+                "active_until",
+            ]
+        )
+    frames: list[pd.DataFrame] = []
+    for period in list(periods or _quarter_periods(start_year=start_year, as_of_date=as_of_date)):
+        try:
+            raw = call_tushare_api(
+                "disclosure_date",
+                params={"end_date": _yyyymmdd(period)},
+                fields=TUSHARE_DISCLOSURE_DATE_FIELDS,
+                token=token,
+                transport=transport,
+            )
+        except Exception as exc:  # pragma: no cover - network/vendor dependent
+            print(f"skip tushare_disclosure_date period={period}: {exc}")
+            continue
+        if raw is None or raw.empty or "ts_code" not in raw.columns:
+            continue
+        filtered = raw.copy()
+        filtered["instrument"] = filtered["ts_code"].map(_safe_qlib_symbol_from_tushare)
+        filtered = filtered[filtered["instrument"].isin(selected)]
+        if not filtered.empty:
+            frames.append(normalize_tushare_disclosure_dates(filtered, as_of_date=as_of_date))
+        if delay > 0:
+            time.sleep(delay)
+    if not frames:
+        return normalize_tushare_disclosure_dates(pd.DataFrame(), as_of_date=as_of_date)
+    return pd.concat(frames, ignore_index=True).drop_duplicates(["event_id"], keep="last").reset_index(drop=True)
 
 
 def _fetch_statement_accruals_for_period(

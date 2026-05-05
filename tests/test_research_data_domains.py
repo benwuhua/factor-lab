@@ -708,6 +708,64 @@ class ResearchDataDomainsTest(unittest.TestCase):
             self.assertEqual(["SZ000001"], result["instrument"].tolist())
             self.assertEqual(["tushare_fina_indicator_vip"], result["source"].tolist())
 
+    def test_write_research_data_domains_can_fetch_tushare_dividends_and_disclosure_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame([{"instrument": "SZ000001", "name": "平安银行"}]).to_csv(
+                root / "data/security_master.csv",
+                index=False,
+            )
+            fetched_dividends = pd.DataFrame(
+                [
+                    {
+                        "instrument": "SZ000001",
+                        "announce_date": "2026-04-20",
+                        "available_at": "2026-04-20",
+                        "dividend_cash_per_10": 2.5,
+                        "source": "tushare_dividend",
+                    }
+                ]
+            )
+            fetched_events = pd.DataFrame(
+                [
+                    {
+                        "event_id": "tushare_disclosure_date:SZ000001:2026-03-31:2026-04-21",
+                        "instrument": "SZ000001",
+                        "event_type": "financial_report_disclosure",
+                        "event_date": "2026-04-21",
+                        "source": "tushare_disclosure_date",
+                        "source_url": "",
+                        "title": "Financial report disclosure 2026-03-31",
+                        "severity": "info",
+                        "summary": "Actual disclosure date 2026-04-21.",
+                        "evidence": "tushare disclosure_date",
+                        "active_until": "2026-05-21",
+                    }
+                ]
+            )
+
+            with patch("qlib_factor_lab.research_data_domains.fetch_tushare_dividends", return_value=fetched_dividends) as dividends, patch(
+                "qlib_factor_lab.research_data_domains.fetch_tushare_disclosure_events",
+                return_value=fetched_events,
+            ) as disclosure_events:
+                write_research_data_domains(
+                    root,
+                    as_of_date="2026-04-30",
+                    fetch_dividends=True,
+                    dividend_provider="tushare",
+                    fetch_disclosure_events=True,
+                )
+
+            dividends.assert_called_once()
+            disclosure_events.assert_called_once()
+            dividend_result = pd.read_csv(root / "data/cninfo_dividends.csv")
+            event_result = pd.read_csv(root / "data/company_events.csv")
+            evidence_result = pd.read_csv(root / "data/announcement_evidence.csv")
+            self.assertEqual(["tushare_dividend"], dividend_result["source"].tolist())
+            self.assertIn("financial_report_disclosure", event_result["event_type"].tolist())
+            self.assertIn("financial_report_disclosure", evidence_result["event_type"].tolist())
+
     def test_write_research_data_domains_passes_offset_to_live_fetchers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

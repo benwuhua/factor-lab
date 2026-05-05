@@ -22,7 +22,9 @@ def build_daily_update_command(
     env_file: str | Path | None = ".env",
     fetch_fundamentals: bool = True,
     derive_valuation_fields: bool = True,
-    fetch_cninfo_dividends: bool = True,
+    fetch_cninfo_dividends: bool = False,
+    dividend_provider: str = "tushare",
+    fetch_disclosure_events: bool = True,
 ) -> tuple[str, ...]:
     command = [python_bin, "scripts/update_daily_data.py"]
     if as_of_date:
@@ -33,6 +35,11 @@ def build_daily_update_command(
         command.append("--derive-valuation-fields")
     if fetch_cninfo_dividends:
         command.append("--fetch-cninfo-dividends")
+    command.extend(["--dividend-provider", str(dividend_provider)])
+    if dividend_provider:
+        command.append("--fetch-dividends")
+    if fetch_disclosure_events:
+        command.append("--fetch-disclosure-events")
     if env_file:
         command.extend(["--env-file", str(env_file)])
     return tuple(command)

@@ -137,7 +137,7 @@ python scripts/run_after_close_daily_update.py --run-now --env-file .env
 make after-close-daily-data-update
 ```
 
-The full refresh defaults to Tushare market data, Tushare fundamentals, derived valuation fields, CNINFO dividends, liquidity, emotion, company events, research data domains, and data governance.
+The full refresh defaults to Tushare market data, Tushare fundamentals, Tushare dividends, Tushare financial-report disclosure events, derived valuation fields, liquidity, emotion, company events, research data domains, and data governance. CNINFO dividends remain available through `--fetch-cninfo-dividends` for comparison or fallback runs.
 
 `security_master_history.csv` is the point-in-time master-data layer used by governance and future portfolio attribution. When no licensed historical master feed is supplied, Factor Lab creates a conservative proxy from the current security master plus the first available local trade date and marks those rows as `current_snapshot_backfilled`.
 

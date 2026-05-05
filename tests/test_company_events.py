@@ -41,6 +41,7 @@ class CompanyEventTests(unittest.TestCase):
             "order_contract": ("positive_catalyst", "info", "boost"),
             "earnings_preannouncement_up": ("positive_catalyst", "info", "boost"),
             "equity_incentive": ("positive_catalyst", "info", "boost"),
+            "financial_report_disclosure": ("information_event", "info", "review"),
             "shareholder_reduction": ("watch_risk", "watch", "watch"),
             "large_unlock": ("watch_risk", "watch", "watch"),
             "regulatory_inquiry": ("watch_risk", "watch", "watch"),

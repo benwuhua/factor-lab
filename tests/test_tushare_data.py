@@ -10,7 +10,11 @@ from qlib_factor_lab.tushare_data import (
     download_tushare_history_csvs,
     fetch_security_master_history_from_tushare,
     fetch_fundamental_quality_from_tushare,
+    fetch_tushare_disclosure_events,
+    fetch_tushare_dividends,
     format_permission_probe_rows,
+    normalize_tushare_disclosure_dates,
+    normalize_tushare_dividend,
     normalize_tushare_history,
     normalize_tushare_security_master_history,
     normalize_tushare_fina_indicator,
@@ -490,6 +494,100 @@ class TushareDataTest(unittest.TestCase):
         self.assertAlmostEqual(5.0, float(latest["gross_margin_change_yoy"]))
         self.assertAlmostEqual(3.0, float(latest["revenue_growth_change_yoy"]))
         self.assertAlmostEqual(3.0, float(latest["net_profit_growth_change_yoy"]))
+
+    def test_normalize_tushare_dividend_keeps_cash_dividend_pit_dates(self) -> None:
+        raw = pd.DataFrame(
+            [
+                {
+                    "ts_code": "000001.SZ",
+                    "ann_date": "20260420",
+                    "end_date": "20251231",
+                    "cash_div_tax": 2.5,
+                    "record_date": "20260510",
+                    "ex_date": "20260511",
+                }
+            ]
+        )
+
+        result = normalize_tushare_dividend(raw)
+
+        self.assertEqual(["SZ000001"], result["instrument"].tolist())
+        self.assertEqual(["2026-04-20"], result["announce_date"].tolist())
+        self.assertEqual(["2026-04-20"], result["available_at"].tolist())
+        self.assertAlmostEqual(2.5, float(result.loc[0, "dividend_cash_per_10"]))
+        self.assertEqual("tushare_dividend", result.loc[0, "source"])
+
+    def test_fetch_tushare_dividends_filters_symbols(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
+            calls.append(payload)
+            return {
+                "code": 0,
+                "msg": "",
+                "data": {
+                    "fields": ["ts_code", "ann_date", "end_date", "cash_div_tax"],
+                    "items": [["000001.SZ", "20260420", "20251231", 2.5]],
+                },
+            }
+
+        result = fetch_tushare_dividends(["SZ000001"], token="token", transport=fake_transport)
+
+        self.assertEqual(["dividend"], [str(call["api_name"]) for call in calls])
+        self.assertEqual({"ts_code": "000001.SZ"}, calls[0]["params"])
+        self.assertEqual(["SZ000001"], result["instrument"].tolist())
+
+    def test_normalize_tushare_disclosure_dates_to_company_events(self) -> None:
+        raw = pd.DataFrame(
+            [
+                {
+                    "ts_code": "000001.SZ",
+                    "end_date": "20260331",
+                    "ann_date": "20260420",
+                    "pre_date": "20260422",
+                    "actual_date": "20260421",
+                }
+            ]
+        )
+
+        result = normalize_tushare_disclosure_dates(raw, as_of_date="2026-04-30")
+
+        self.assertEqual(["tushare_disclosure_date:SZ000001:2026-03-31:2026-04-21"], result["event_id"].tolist())
+        self.assertEqual(["SZ000001"], result["instrument"].tolist())
+        self.assertEqual(["financial_report_disclosure"], result["event_type"].tolist())
+        self.assertEqual(["2026-04-21"], result["event_date"].tolist())
+        self.assertEqual(["info"], result["severity"].tolist())
+        self.assertIn("2026-03-31", result.loc[0, "title"])
+
+    def test_fetch_tushare_disclosure_events_batches_by_period_and_filters_symbols(self) -> None:
+        calls: list[dict[str, object]] = []
+
+        def fake_transport(_endpoint: str, payload: dict[str, object], _timeout: float) -> dict[str, object]:
+            calls.append(payload)
+            period = dict(payload["params"])["end_date"]
+            return {
+                "code": 0,
+                "msg": "",
+                "data": {
+                    "fields": ["ts_code", "end_date", "actual_date", "ann_date"],
+                    "items": [
+                        ["000001.SZ", period, "20260421", "20260420"],
+                        ["600000.SH", period, "20260422", "20260420"],
+                    ],
+                },
+            }
+
+        result = fetch_tushare_disclosure_events(
+            ["SZ000001"],
+            as_of_date="2026-04-30",
+            periods=["20260331"],
+            token="token",
+            transport=fake_transport,
+        )
+
+        self.assertEqual(["disclosure_date"], [str(call["api_name"]) for call in calls])
+        self.assertEqual({"end_date": "20260331"}, calls[0]["params"])
+        self.assertEqual(["SZ000001"], result["instrument"].tolist())
 
 
 if __name__ == "__main__":

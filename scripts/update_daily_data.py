@@ -26,6 +26,9 @@ def main() -> int:
     parser.add_argument("--fundamental-provider", default="tushare", choices=["akshare", "tushare"])
     parser.add_argument("--derive-valuation-fields", action="store_true")
     parser.add_argument("--fetch-cninfo-dividends", action="store_true")
+    parser.add_argument("--fetch-dividends", action="store_true")
+    parser.add_argument("--dividend-provider", default="tushare", choices=["tushare", "cninfo", "akshare"])
+    parser.add_argument("--fetch-disclosure-events", action="store_true")
     parser.add_argument("--fundamental-source", default=None)
     parser.add_argument("--security-master-history-source", default=None)
     parser.add_argument("--env-file", default=None, help="Optional local .env file for vendor tokens such as TUSHARE_TOKEN.")
@@ -54,6 +57,9 @@ def main() -> int:
         fundamental_provider=args.fundamental_provider,
         derive_valuation_fields=args.derive_valuation_fields,
         fetch_cninfo_dividends=args.fetch_cninfo_dividends,
+        fetch_dividends=args.fetch_dividends,
+        dividend_provider=args.dividend_provider,
+        fetch_disclosure_events=args.fetch_disclosure_events,
         fundamental_source=Path(args.fundamental_source) if args.fundamental_source else None,
         security_master_history_source=Path(args.security_master_history_source) if args.security_master_history_source else None,
         env_file=Path(args.env_file) if args.env_file else None,

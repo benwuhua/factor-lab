@@ -9,7 +9,8 @@ from typing import Any, Iterable
 import pandas as pd
 
 from .akshare_data import akshare_code_from_qlib, classify_notice_event, qlib_symbol_from_code
-from .tushare_data import fetch_fundamental_quality_from_tushare
+from .company_events import COMPANY_EVENT_COLUMNS
+from .tushare_data import fetch_fundamental_quality_from_tushare, fetch_tushare_disclosure_events, fetch_tushare_dividends
 
 
 FUNDAMENTAL_QUALITY_COLUMNS = [
@@ -659,12 +660,16 @@ def write_research_data_domains(
     fundamental_provider: str = "akshare",
     derive_valuation_fields: bool = False,
     fetch_cninfo_dividends: bool = False,
+    fetch_dividends: bool = False,
+    dividend_provider: str = "tushare",
+    fetch_disclosure_events: bool = False,
     limit: int | None = None,
     offset: int = 0,
     delay: float = 0.2,
 ) -> dict[str, str]:
     root = Path(project_root).expanduser().resolve()
-    events = _read_csv_if_exists(_resolve(root, company_events_path))
+    events_path = _resolve(root, company_events_path)
+    events = _read_csv_if_exists(events_path)
     security_master = _read_csv_if_exists(_resolve(root, security_master_path))
     security_history_source_frame = (
         pd.read_csv(_resolve(root, security_master_history_source)) if security_master_history_source is not None else None
@@ -703,15 +708,45 @@ def write_research_data_domains(
     else:
         fundamentals = existing_fundamentals
 
-    dividends_path = _resolve(root, dividend_output)
-    dividends = _read_existing_or_empty(dividends_path, CNINFO_DIVIDEND_COLUMNS)
-    if fetch_cninfo_dividends:
-        fetched_dividends = fetch_cninfo_dividends_from_akshare(
-            security_master.get("instrument", pd.Series(dtype=str)).dropna().astype(str).tolist(),
+    if fetch_disclosure_events:
+        instruments = security_master.get("instrument", pd.Series(dtype=str)).dropna().astype(str).tolist()
+        fetched_events = fetch_tushare_disclosure_events(
+            instruments,
+            as_of_date=as_of_date,
             limit=limit,
             offset=offset,
             delay=delay,
         )
+        events = _merge_domain_rows(
+            events,
+            fetched_events,
+            keys=["event_id"],
+            columns=_domain_columns(COMPANY_EVENT_COLUMNS, events, fetched_events),
+        )
+
+    dividends_path = _resolve(root, dividend_output)
+    dividends = _read_existing_or_empty(dividends_path, CNINFO_DIVIDEND_COLUMNS)
+    if fetch_cninfo_dividends or fetch_dividends:
+        instruments = security_master.get("instrument", pd.Series(dtype=str)).dropna().astype(str).tolist()
+        provider = str(dividend_provider or "tushare").strip().lower()
+        if fetch_cninfo_dividends and not fetch_dividends:
+            provider = "cninfo"
+        if provider in {"cninfo", "akshare"}:
+            fetched_dividends = fetch_cninfo_dividends_from_akshare(
+                instruments,
+                limit=limit,
+                offset=offset,
+                delay=delay,
+            )
+        elif provider == "tushare":
+            fetched_dividends = fetch_tushare_dividends(
+                instruments,
+                limit=limit,
+                offset=offset,
+                delay=delay,
+            )
+        else:
+            raise ValueError(f"unsupported dividend_provider: {dividend_provider}")
         dividends = _merge_domain_rows(
             dividends,
             fetched_dividends,
@@ -740,6 +775,8 @@ def write_research_data_domains(
     )
     _write_csv(fundamentals, paths.fundamental_quality)
     _write_csv(dividends, dividends_path)
+    if fetch_disclosure_events:
+        _write_csv(events, events_path)
     _write_csv(security_history, paths.security_master_history)
     _write_csv(shareholder, paths.shareholder_capital)
     _write_csv(evidence, paths.announcement_evidence)
@@ -802,6 +839,15 @@ def _merge_domain_rows(existing: pd.DataFrame, fetched: pd.DataFrame, *, keys: l
     if not frames:
         return _empty(columns)
     return pd.concat(frames, ignore_index=True).drop_duplicates(keys, keep="last").loc[:, columns]
+
+
+def _domain_columns(base_columns: list[str], *frames: pd.DataFrame) -> list[str]:
+    columns = list(base_columns)
+    for frame in frames:
+        for column in getattr(frame, "columns", []):
+            if column not in columns:
+                columns.append(str(column))
+    return columns
 
 
 def _resolve(root: Path, path: str | Path) -> Path:
