@@ -184,6 +184,52 @@ class DataGovernanceTests(unittest.TestCase):
 
             self.assertFalse(report.passed)
 
+    def test_trusted_source_ratio_can_shadow_current_snapshot_pit_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame({"instrument": ["AAA", "BBB"]}).to_csv(root / "data/universe.csv", index=False)
+            pd.DataFrame(
+                {
+                    "instrument": ["AAA", "BBB"],
+                    "valid_from": ["2020-01-01", "2021-01-01"],
+                    "as_of_date": ["2026-04-30", "2026-04-30"],
+                    "source": ["vendor_pit", "current_snapshot_backfilled"],
+                }
+            ).to_csv(root / "data/security_master_history.csv", index=False)
+            config_path = root / "configs/data_governance.yaml"
+            config_path.parent.mkdir()
+            config_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "data_governance": {
+                            "expected_universe_path": "data/universe.csv",
+                            "domains": {
+                                "security_master_history": {
+                                    "path": "data/security_master_history.csv",
+                                    "required_fields": ["instrument", "valid_from", "as_of_date", "source"],
+                                    "pit_fields": ["valid_from", "as_of_date"],
+                                    "trusted_source_field": "source",
+                                    "trusted_sources": ["vendor_pit", "official_exchange_pit"],
+                                    "min_trusted_source_ratio": 0.8,
+                                    "activation_if_failed": "shadow",
+                                }
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            report = build_data_governance_report(load_data_governance_config(config_path), project_root=root)
+
+            row = report.to_frame().iloc[0]
+            self.assertEqual(row["status"], "fail")
+            self.assertEqual(row["activation_status"], "shadow")
+            self.assertAlmostEqual(row["trusted_source_ratio"], 0.5)
+            self.assertIn("trusted_source_below_0.8", row["detail"])
+            self.assertTrue(report.passed)
+
 
 if __name__ == "__main__":
     unittest.main()

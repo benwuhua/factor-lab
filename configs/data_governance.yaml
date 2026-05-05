@@ -24,6 +24,16 @@ data_governance:
       pit_fields:
         - valid_from
         - as_of_date
+      trusted_source_field: source
+      trusted_sources:
+        - vendor_pit
+        - wind_pit
+        - choice_pit
+        - joinquant_pit
+        - ricequant_pit
+        - official_exchange_pit
+        - tushare_pit
+      min_trusted_source_ratio: 0.80
       min_coverage_ratio: 0.95
       activation_lane: security_master_history
     company_events:
@@ -115,8 +125,16 @@ data_governance:
         - available_at
         - chunk_text
         - source_url
+        - source
+        - source_tier
+        - evidence_url
       pit_fields:
         - event_date
         - available_at
+      trusted_source_field: source_tier
+      trusted_sources:
+        - official
+        - aggregator
+      min_trusted_source_ratio: 0.95
       min_coverage_ratio: 0.01
       activation_lane: announcement_evidence

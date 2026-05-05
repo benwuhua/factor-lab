@@ -27,6 +27,8 @@ def main() -> int:
     parser.add_argument("--derive-valuation-fields", action="store_true")
     parser.add_argument("--fetch-cninfo-dividends", action="store_true")
     parser.add_argument("--fundamental-source", default=None)
+    parser.add_argument("--security-master-history-source", default=None)
+    parser.add_argument("--env-file", default=None, help="Optional local .env file for vendor tokens such as TUSHARE_TOKEN.")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--delay", type=float, default=0.2)
@@ -47,6 +49,8 @@ def main() -> int:
         derive_valuation_fields=args.derive_valuation_fields,
         fetch_cninfo_dividends=args.fetch_cninfo_dividends,
         fundamental_source=Path(args.fundamental_source) if args.fundamental_source else None,
+        security_master_history_source=Path(args.security_master_history_source) if args.security_master_history_source else None,
+        env_file=Path(args.env_file) if args.env_file else None,
         limit=args.limit,
         offset=args.offset,
         delay=args.delay,

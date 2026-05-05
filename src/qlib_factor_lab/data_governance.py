@@ -21,6 +21,9 @@ class DataDomainConfig:
     activation_if_failed: str = "shadow"
     freshness_date_column: str = ""
     max_age_days: int | None = None
+    trusted_source_field: str = ""
+    trusted_sources: tuple[str, ...] = ()
+    min_trusted_source_ratio: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,7 @@ class DataGovernanceReport:
                 "coverage_ratio",
                 "pit_field_completeness",
                 "freshness_status",
+                "trusted_source_ratio",
                 "rows",
                 "detail",
             ],
@@ -71,6 +75,9 @@ def load_data_governance_config(path: str | Path) -> DataGovernanceConfig:
                 activation_if_failed=str(domain.get("activation_if_failed", raw.get("activation_if_failed", "shadow"))),
                 freshness_date_column=str(domain.get("freshness_date_column", "")),
                 max_age_days=int(domain["max_age_days"]) if domain.get("max_age_days") is not None else None,
+                trusted_source_field=str(domain.get("trusted_source_field", "")),
+                trusted_sources=tuple(str(item) for item in domain.get("trusted_sources", ())),
+                min_trusted_source_ratio=float(domain.get("min_trusted_source_ratio", 0.0)),
             )
         )
     return DataGovernanceConfig(
@@ -108,8 +115,8 @@ def write_data_governance_report(report: DataGovernanceReport, output_path: str 
         "",
         f"- status: {'pass' if report.passed else 'fail'}",
         "",
-        "| domain | status | activation | coverage | pit_completeness | freshness | rows | detail |",
-        "|---|---|---|---:|---:|---|---:|---|",
+        "| domain | status | activation | coverage | pit_completeness | freshness | trusted_source | rows | detail |",
+        "|---|---|---|---:|---:|---|---:|---:|---|",
     ]
     for _, row in frame.iterrows():
         lines.append(
@@ -122,6 +129,7 @@ def write_data_governance_report(report: DataGovernanceReport, output_path: str 
                     _format_ratio(row["coverage_ratio"]),
                     _format_ratio(row["pit_field_completeness"]),
                     str(row["freshness_status"]),
+                    _format_ratio(row["trusted_source_ratio"]),
                     str(row["rows"]),
                     str(row["detail"]),
                 ]
@@ -142,13 +150,14 @@ def _evaluate_domain(
 ) -> dict[str, Any]:
     path = _resolve_optional(root, domain.path, as_of_date=as_of_date)
     if path is None or not path.exists():
-        return _row(domain, "missing", domain.activation_if_missing, 0.0, 0.0, "missing", 0, "file missing")
+        return _row(domain, "missing", domain.activation_if_missing, 0.0, 0.0, "missing", 0.0, 0, "file missing")
 
     frame = pd.read_csv(path)
     missing_required = [column for column in domain.required_fields if column not in frame.columns]
     coverage = _coverage_ratio(frame, expected_instruments)
     pit_completeness = _pit_completeness(frame, domain.pit_fields)
     freshness_status = _freshness_status(frame, domain, as_of_date)
+    trusted_source_ratio = _trusted_source_ratio(frame, domain)
     failures = []
     if frame.empty:
         failures.append("empty")
@@ -162,6 +171,8 @@ def _evaluate_domain(
         failures.append("freshness_missing")
     if freshness_status == "stale":
         failures.append("stale")
+    if trusted_source_ratio < domain.min_trusted_source_ratio:
+        failures.append(f"trusted_source_below_{domain.min_trusted_source_ratio:g}")
 
     status = "fail" if failures else "pass"
     activation = "active" if status == "pass" else domain.activation_if_failed
@@ -172,6 +183,7 @@ def _evaluate_domain(
         coverage,
         pit_completeness,
         freshness_status,
+        trusted_source_ratio,
         len(frame),
         "; ".join(failures),
     )
@@ -214,6 +226,18 @@ def _freshness_status(frame: pd.DataFrame, domain: DataDomainConfig, as_of_date:
     return "pass" if (current - latest).days <= domain.max_age_days else "stale"
 
 
+def _trusted_source_ratio(frame: pd.DataFrame, domain: DataDomainConfig) -> float:
+    if not domain.trusted_source_field or not domain.trusted_sources:
+        return 1.0
+    if frame.empty or domain.trusted_source_field not in frame.columns:
+        return 0.0
+    trusted = {str(item).strip().lower() for item in domain.trusted_sources if str(item).strip()}
+    if not trusted:
+        return 1.0
+    source = frame[domain.trusted_source_field].fillna("").astype(str).str.strip().str.lower()
+    return float(source.isin(trusted).mean())
+
+
 def _load_expected_instruments(path: Path | None) -> set[str]:
     if path is None or not path.exists():
         return set()
@@ -230,6 +254,7 @@ def _row(
     coverage_ratio: float,
     pit_field_completeness: float,
     freshness_status: str,
+    trusted_source_ratio: float,
     rows: int,
     detail: str,
 ) -> dict[str, Any]:
@@ -241,6 +266,7 @@ def _row(
         "coverage_ratio": float(coverage_ratio),
         "pit_field_completeness": float(pit_field_completeness),
         "freshness_status": freshness_status,
+        "trusted_source_ratio": float(trusted_source_ratio),
         "rows": int(rows),
         "detail": detail,
     }

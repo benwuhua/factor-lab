@@ -125,6 +125,20 @@ The daily update does these steps in order:
 - Build `data/security_master_history.csv`, `data/fundamental_quality.csv`, `data/shareholder_capital.csv`, and `data/announcement_evidence.csv`.
 - Write `reports/data_governance_<date>.md` and `reports/daily_data_update_<date>.md`.
 
+For unattended local refreshes, put vendor tokens in `.env` using `.env.example` as the template. `.env` is gitignored. The update runner loads this file and passes the values to child processes without overwriting already-exported shell variables.
+
+After-close update options:
+
+```bash
+# Run immediately with the full research-domain refresh.
+python scripts/run_after_close_daily_update.py --run-now --env-file .env
+
+# Wait until 15:45 Asia/Shanghai, then run the same refresh.
+make after-close-daily-data-update
+```
+
+The full refresh defaults to Tushare market data, Tushare fundamentals, derived valuation fields, CNINFO dividends, liquidity, emotion, company events, research data domains, and data governance.
+
 `security_master_history.csv` is the point-in-time master-data layer used by governance and future portfolio attribution. When no licensed historical master feed is supplied, Factor Lab creates a conservative proxy from the current security master plus the first available local trade date and marks those rows as `current_snapshot_backfilled`.
 
 For a licensed vendor PIT file, use the stable template at `docs/templates/security_master_history_vendor.csv`:
@@ -135,6 +149,14 @@ python scripts/build_research_data_domains.py \
   --security-master-history-source /path/to/security_master_history_vendor.csv
 ```
 
+Or wire it into the daily refresh:
+
+```bash
+make daily-data-update \
+  DAILY_DATA_AS_OF=20260430 \
+  DAILY_DATA_SECURITY_MASTER_HISTORY_SOURCE=/path/to/security_master_history_vendor.csv
+```
+
 Required columns:
 
 ```text
@@ -142,6 +164,16 @@ instrument,name,exchange,board,industry_sw,industry_csrc,is_st,listing_date,deli
 ```
 
 `valid_from` is mandatory and `valid_to` should be blank for the currently active row. If a vendor provides historical industry, ST, board, listing or universe changes, put each effective interval on its own row.
+
+Governance now reports `trusted_source_ratio`. Rows sourced from `current_snapshot_backfilled` are usable for research scaffolding, but they are not counted as trusted PIT master data. Vendor or official PIT rows should use sources such as `vendor_pit`, `wind_pit`, `choice_pit`, `joinquant_pit`, `ricequant_pit`, `official_exchange_pit`, or `tushare_pit`.
+
+`announcement_evidence.csv` carries source audit fields:
+
+```text
+source,source_tier,official_source,evidence_url,document_title
+```
+
+`source_tier=official` is reserved for CNINFO, SSE, SZSE, BSE, or explicit official exchange feeds. `source_tier=aggregator` is allowed in research mode, but should be treated as a weaker evidence source than official filings during expert review.
 
 `fundamental_quality.csv` has a stable PIT schema but is only populated when an offline source is supplied or AkShare fundamentals are explicitly enabled:
 

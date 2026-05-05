@@ -4,7 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from qlib_factor_lab.data_update import DailyDataUpdateConfig, build_daily_data_update_plan, write_update_manifest
+from qlib_factor_lab.data_update import (
+    DailyDataUpdateConfig,
+    build_daily_data_update_plan,
+    load_env_file,
+    write_update_manifest,
+)
 
 
 class DailyDataUpdateTest(unittest.TestCase):
@@ -141,6 +146,41 @@ class DailyDataUpdateTest(unittest.TestCase):
 
         self.assertIn("--fundamental-provider", research_step.command)
         self.assertIn("akshare", research_step.command)
+
+    def test_plan_passes_security_master_history_source_to_research_domains(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-27",
+            security_master_history_source=Path("vendor/security_master_history.csv"),
+        )
+
+        steps = build_daily_data_update_plan(config)
+        research_step = steps[-2]
+
+        self.assertIn("--security-master-history-source", research_step.command)
+        self.assertIn("vendor/security_master_history.csv", research_step.command)
+
+    def test_load_env_file_sets_missing_values_without_overwriting(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env_path = Path(tmp) / ".env"
+            env_path.write_text(
+                "\n".join(
+                    [
+                        "# local secrets",
+                        "TUSHARE_TOKEN=from_file",
+                        "EXISTING=from_file",
+                        "QUOTED=\"hello world\"",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            env = {"EXISTING": "keep_me"}
+
+            loaded = load_env_file(env_path, env=env)
+
+            self.assertEqual(loaded["TUSHARE_TOKEN"], "from_file")
+            self.assertEqual(loaded["EXISTING"], "keep_me")
+            self.assertEqual(loaded["QUOTED"], "hello world")
 
     def test_write_update_manifest_records_step_statuses(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

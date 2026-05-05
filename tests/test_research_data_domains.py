@@ -344,6 +344,43 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertEqual({"2026-04-20"}, set(result["available_at"]))
         self.assertTrue(result["chunk_text"].str.len().le(12).all())
 
+    def test_announcement_evidence_index_marks_official_source_tier(self) -> None:
+        events = pd.DataFrame(
+            [
+                {
+                    "event_id": "e1",
+                    "instrument": "SH600000",
+                    "event_type": "announcement",
+                    "event_date": "2026-04-20",
+                    "title": "年度报告",
+                    "summary": "官方披露文本",
+                    "source": "cninfo_notice",
+                    "source_url": "https://www.cninfo.com.cn/new/disclosure/detail?stockCode=600000",
+                    "severity": "info",
+                },
+                {
+                    "event_id": "e2",
+                    "instrument": "SH600001",
+                    "event_type": "announcement",
+                    "event_date": "2026-04-20",
+                    "title": "聚合公告",
+                    "summary": "聚合器文本",
+                    "source": "akshare_notice",
+                    "source_url": "https://example.test/notice",
+                    "severity": "info",
+                },
+            ]
+        )
+
+        result = build_announcement_evidence_index(events, as_of_date="2026-04-27", chunk_size=80)
+        by_event = result.drop_duplicates("event_id").set_index("event_id")
+
+        self.assertEqual(by_event.loc["e1", "source_tier"], "official")
+        self.assertEqual(by_event.loc["e1", "official_source"], True)
+        self.assertEqual(by_event.loc["e1", "evidence_url"], "https://www.cninfo.com.cn/new/disclosure/detail?stockCode=600000")
+        self.assertEqual(by_event.loc["e2", "source_tier"], "aggregator")
+        self.assertEqual(by_event.loc["e2", "official_source"], False)
+
     def test_announcement_evidence_index_applies_lookback_and_no_future_events(self) -> None:
         events = pd.DataFrame(
             [

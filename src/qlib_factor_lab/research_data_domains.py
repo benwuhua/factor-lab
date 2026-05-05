@@ -70,7 +70,12 @@ ANNOUNCEMENT_EVIDENCE_COLUMNS = [
     "available_at",
     "severity",
     "title",
+    "document_title",
+    "source",
+    "source_tier",
+    "official_source",
     "source_url",
+    "evidence_url",
     "chunk_id",
     "chunk_text",
     "keywords",
@@ -470,6 +475,9 @@ def build_announcement_evidence_index(
             continue
         chunks = _chunk_text(text, max(1, int(chunk_size)))
         keywords = _keywords(text)
+        source = str(item.get("source", "")).strip()
+        source_url = str(item.get("source_url", "")).strip()
+        source_tier = _announcement_source_tier(source=source, source_url=source_url)
         for chunk_index, chunk in enumerate(chunks):
             rows.append(
                 {
@@ -480,7 +488,12 @@ def build_announcement_evidence_index(
                     "available_at": available_at,
                     "severity": str(item.get("severity", "")),
                     "title": title,
-                    "source_url": str(item.get("source_url", "")),
+                    "document_title": title,
+                    "source": source,
+                    "source_tier": source_tier,
+                    "official_source": source_tier == "official",
+                    "source_url": source_url,
+                    "evidence_url": source_url,
                     "chunk_id": f"{event_id}_{chunk_index:03d}",
                     "chunk_text": chunk,
                     "keywords": ",".join(keywords),
@@ -489,6 +502,15 @@ def build_announcement_evidence_index(
     if not rows:
         return _empty(ANNOUNCEMENT_EVIDENCE_COLUMNS)
     return pd.DataFrame(rows, columns=ANNOUNCEMENT_EVIDENCE_COLUMNS)
+
+
+def _announcement_source_tier(*, source: str, source_url: str) -> str:
+    text = f"{source} {source_url}".lower()
+    if any(token in text for token in ("cninfo.com.cn", "sse.com.cn", "szse.cn", "bse.cn", "official_exchange")):
+        return "official"
+    if any(token in text for token in ("akshare", "eastmoney", "10jqka", "ifind", "choice", "wind")):
+        return "aggregator"
+    return "unknown"
 
 
 def _event_available_date(item: pd.Series, *, fallback_as_of_date: str) -> str:

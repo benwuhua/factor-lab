@@ -103,6 +103,10 @@ DAILY_DATA_FETCH_CNINFO_DIVIDENDS ?= 0
 DAILY_DATA_FETCH_CNINFO_DIVIDENDS_ARG = $(if $(filter 1 true yes TRUE YES,$(DAILY_DATA_FETCH_CNINFO_DIVIDENDS)),--fetch-cninfo-dividends,)
 DAILY_DATA_FUNDAMENTAL_SOURCE ?=
 DAILY_DATA_FUNDAMENTAL_SOURCE_ARG = $(if $(DAILY_DATA_FUNDAMENTAL_SOURCE),--fundamental-source $(DAILY_DATA_FUNDAMENTAL_SOURCE),)
+DAILY_DATA_SECURITY_MASTER_HISTORY_SOURCE ?=
+DAILY_DATA_SECURITY_MASTER_HISTORY_SOURCE_ARG = $(if $(DAILY_DATA_SECURITY_MASTER_HISTORY_SOURCE),--security-master-history-source $(DAILY_DATA_SECURITY_MASTER_HISTORY_SOURCE),)
+DAILY_DATA_ENV_FILE ?= .env
+DAILY_DATA_ENV_FILE_ARG = $(if $(DAILY_DATA_ENV_FILE),--env-file $(DAILY_DATA_ENV_FILE),)
 DAILY_DATA_LIMIT ?=
 DAILY_DATA_LIMIT_ARG = $(if $(DAILY_DATA_LIMIT),--limit $(DAILY_DATA_LIMIT),)
 DAILY_DATA_OFFSET ?= 0
@@ -122,7 +126,7 @@ COMBO_DIAGNOSTICS_WINDOW_ARGS = $(if $(COMBO_DIAGNOSTICS_START_TIME),--start-tim
 EXPERT_REVIEWER ?= manual-reviewer
 EXPERT_CONFIRM_REASON ?= reviewed in workbench
 
-.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context event-backfill research-data-domains daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar liquidity-microstructure emotion-atmosphere daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution portfolio-intraday-performance paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
+.PHONY: help install test workbench workbench-e2e check-env industry-overrides research-context event-backfill research-data-domains daily-data-update after-close-daily-data-update data-governance factor-research candidates mine-csi500 mine-csi300 event-csi500 event-csi300 summarize-event autoresearch-expression autoresearch-multilane autoresearch-multilane-loop autoresearch-ledger autoresearch-codex-loop select-factors combo-diagnostics execution-calendar liquidity-microstructure emotion-atmosphere daily-signal check-data-quality target-portfolio combo-manual-confirm stock-cards theme-scan exposure-attribution portfolio-intraday-performance paper-orders reconcile-account paper-batch historical-paper-batch replay-daily-run manual-ticket lgb-dry-run clean-pyc
 
 help:
 	@printf "Qlib Factor Lab commands\n"
@@ -137,6 +141,7 @@ help:
 	@printf "  make event-backfill   Backfill historical company events with merge dedupe\n"
 	@printf "  make research-data-domains Build fundamental/shareholder/evidence data domains\n"
 	@printf "  make daily-data-update Incrementally refresh market data and research data domains\n"
+	@printf "  make after-close-daily-data-update Wait until after close, then run full data refresh\n"
 	@printf "  make data-governance Check PIT data-domain coverage and lane readiness\n"
 	@printf "  make factor-research Run the one-command factor research pipeline\n"
 	@printf "  make candidates       Generate candidate factor table for CSI500 config\n"
@@ -263,9 +268,15 @@ daily-data-update:
 		$(DAILY_DATA_DERIVE_VALUATION_FIELDS_ARG) \
 		$(DAILY_DATA_FETCH_CNINFO_DIVIDENDS_ARG) \
 		$(DAILY_DATA_FUNDAMENTAL_SOURCE_ARG) \
+		$(DAILY_DATA_SECURITY_MASTER_HISTORY_SOURCE_ARG) \
+		$(DAILY_DATA_ENV_FILE_ARG) \
 		$(DAILY_DATA_LIMIT_ARG) \
 		$(DAILY_DATA_OFFSET_ARG) \
 		$(DAILY_DATA_DRY_RUN_ARG)
+
+after-close-daily-data-update:
+	$(PYTHON) scripts/run_after_close_daily_update.py \
+		--env-file $(DAILY_DATA_ENV_FILE)
 
 data-governance:
 	$(PYTHON) scripts/check_data_governance.py \

@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from dataclasses import dataclass
+from os import environ
 from pathlib import Path
 
 
@@ -19,6 +20,8 @@ class DailyDataUpdateConfig:
     derive_valuation_fields: bool = False
     fetch_cninfo_dividends: bool = False
     fundamental_source: Path | None = None
+    security_master_history_source: Path | None = None
+    env_file: Path | None = None
     limit: int | None = None
     offset: int = 0
     delay: float = 0.2
@@ -186,6 +189,8 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
         research_domain_command += _offset_args(config.offset)
     if config.fundamental_source is not None:
         research_domain_command += ("--fundamental-source", str(config.fundamental_source))
+    if config.security_master_history_source is not None:
+        research_domain_command += ("--security-master-history-source", str(config.security_master_history_source))
     steps.append(DataUpdateStep("research_data_domains", research_domain_command))
 
     steps.append(
@@ -208,6 +213,7 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
 
 def run_daily_data_update(config: DailyDataUpdateConfig, *, dry_run: bool = False) -> list[tuple[DataUpdateStep, str, int, str]]:
     rows: list[tuple[DataUpdateStep, str, int, str]] = []
+    env = load_env_file(config.env_file, env=dict(environ)) if config.env_file is not None else None
     for step in build_daily_data_update_plan(config):
         if dry_run:
             rows.append((step, "dry_run", 0, ""))
@@ -218,6 +224,7 @@ def run_daily_data_update(config: DailyDataUpdateConfig, *, dry_run: bool = Fals
             text=True,
             capture_output=True,
             check=False,
+            env=env,
         )
         output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part)
         status = "pass" if completed.returncode == 0 else "fail"
@@ -225,6 +232,25 @@ def run_daily_data_update(config: DailyDataUpdateConfig, *, dry_run: bool = Fals
         if completed.returncode != 0:
             break
     return rows
+
+
+def load_env_file(path: str | Path | None, *, env: dict[str, str] | None = None) -> dict[str, str]:
+    loaded = dict(environ if env is None else env)
+    if path is None:
+        return loaded
+    env_path = Path(path).expanduser()
+    if not env_path.exists():
+        return loaded
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in loaded:
+            continue
+        loaded[key] = _unquote_env_value(value.strip())
+    return loaded
 
 
 def write_update_manifest(
@@ -278,6 +304,12 @@ def _force_start_args(force_start: str | None) -> tuple[str, ...]:
     if not force_start:
         return ()
     return ("--force-start", str(force_start))
+
+
+def _unquote_env_value(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1]
+    return value
 
 
 def _yyyymmdd(value: str) -> str:
