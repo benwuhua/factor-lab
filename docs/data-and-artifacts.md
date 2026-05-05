@@ -167,6 +167,48 @@ instrument,name,exchange,board,industry_sw,industry_csrc,is_st,listing_date,deli
 
 Governance now reports `trusted_source_ratio`. Rows sourced from `current_snapshot_backfilled` are usable for research scaffolding, but they are not counted as trusted PIT master data. Vendor or official PIT rows should use sources such as `vendor_pit`, `wind_pit`, `choice_pit`, `joinquant_pit`, `ricequant_pit`, `official_exchange_pit`, or `tushare_pit`.
 
+### RQData PIT Master Data
+
+Factor Lab can export a PIT-compatible security master history from RQData. This adapter uses RQData's A-share instrument, historical industry, and ST APIs, writes `source=rqdata_pit`, and feeds the result into `security_master_history.csv`.
+
+Prepare credentials in `.env`:
+
+```bash
+RQDATA_USERNAME=your_username
+RQDATA_PASSWORD=your_password
+```
+
+Install the optional vendor client in your local environment:
+
+```bash
+.venv/bin/pip install rqdatac
+```
+
+Export a vendor PIT CSV directly:
+
+```bash
+.venv/bin/python scripts/build_rqdata_vendor_data.py \
+  --instruments SH600000 SZ000001 \
+  --start-date 2015-01-01 \
+  --end-date 2026-05-05 \
+  --as-of-date 2026-05-05 \
+  --research-universe csi300 \
+  --env-file .env \
+  --output data/vendor/security_master_history_rqdata.csv
+```
+
+Or enable RQData in the daily refresh:
+
+```bash
+make daily-data-update \
+  DAILY_DATA_AS_OF=20260505 \
+  DAILY_DATA_RQDATA_SECURITY_MASTER_HISTORY=1 \
+  DAILY_DATA_RQDATA_START_DATE=2015-01-01 \
+  DAILY_DATA_ENV_FILE=.env
+```
+
+The daily update then runs `scripts/build_rqdata_vendor_data.py` before `scripts/build_research_data_domains.py` and automatically passes `data/vendor/security_master_history_rqdata.csv` as the PIT source.
+
 `announcement_evidence.csv` carries source audit fields:
 
 ```text

@@ -22,6 +22,9 @@ class DailyDataUpdateConfig:
     fundamental_source: Path | None = None
     security_master_history_source: Path | None = None
     env_file: Path | None = None
+    rqdata_security_master_history: bool = False
+    rqdata_start_date: str | None = None
+    rqdata_output: Path = Path("data/vendor/security_master_history_rqdata.csv")
     limit: int | None = None
     offset: int = 0
     delay: float = 0.2
@@ -166,6 +169,33 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
             )
         )
 
+    security_master_history_source = config.security_master_history_source
+    if config.rqdata_security_master_history:
+        security_master_history_source = config.rqdata_output
+        steps.append(
+            DataUpdateStep(
+                "rqdata_security_master_history",
+                (
+                    python_bin,
+                    "scripts/build_rqdata_vendor_data.py",
+                    "--instruments",
+                )
+                + _security_master_instruments_args(root)
+                + (
+                    "--start-date",
+                    str(config.rqdata_start_date or "2015-01-01"),
+                    "--end-date",
+                    config.as_of_date,
+                    "--as-of-date",
+                    config.as_of_date,
+                    "--env-file",
+                    str(config.env_file or ".env"),
+                    "--output",
+                    str(config.rqdata_output),
+                ),
+            )
+        )
+
     research_domain_command = (
         python_bin,
         "scripts/build_research_data_domains.py",
@@ -189,8 +219,8 @@ def build_daily_data_update_plan(config: DailyDataUpdateConfig) -> list[DataUpda
         research_domain_command += _offset_args(config.offset)
     if config.fundamental_source is not None:
         research_domain_command += ("--fundamental-source", str(config.fundamental_source))
-    if config.security_master_history_source is not None:
-        research_domain_command += ("--security-master-history-source", str(config.security_master_history_source))
+    if security_master_history_source is not None:
+        research_domain_command += ("--security-master-history-source", str(security_master_history_source))
     steps.append(DataUpdateStep("research_data_domains", research_domain_command))
 
     steps.append(
@@ -304,6 +334,22 @@ def _force_start_args(force_start: str | None) -> tuple[str, ...]:
     if not force_start:
         return ()
     return ("--force-start", str(force_start))
+
+
+def _security_master_instruments_args(root: Path) -> tuple[str, ...]:
+    path = root / "data/security_master.csv"
+    if not path.exists():
+        return ()
+    try:
+        import pandas as pd
+
+        frame = pd.read_csv(path, usecols=lambda column: column == "instrument")
+    except Exception:
+        return ()
+    if "instrument" not in frame.columns:
+        return ()
+    symbols = frame["instrument"].dropna().astype(str).str.upper().drop_duplicates().tolist()
+    return tuple(symbols)
 
 
 def _unquote_env_value(value: str) -> str:

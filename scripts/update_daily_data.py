@@ -29,6 +29,9 @@ def main() -> int:
     parser.add_argument("--fundamental-source", default=None)
     parser.add_argument("--security-master-history-source", default=None)
     parser.add_argument("--env-file", default=None, help="Optional local .env file for vendor tokens such as TUSHARE_TOKEN.")
+    parser.add_argument("--rqdata-security-master-history", action="store_true", help="Export RQData PIT security master history before rebuilding research domains.")
+    parser.add_argument("--rqdata-start-date", default=None, help="Start date for RQData PIT security master export.")
+    parser.add_argument("--rqdata-output", default="data/vendor/security_master_history_rqdata.csv")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--delay", type=float, default=0.2)
@@ -51,6 +54,9 @@ def main() -> int:
         fundamental_source=Path(args.fundamental_source) if args.fundamental_source else None,
         security_master_history_source=Path(args.security_master_history_source) if args.security_master_history_source else None,
         env_file=Path(args.env_file) if args.env_file else None,
+        rqdata_security_master_history=args.rqdata_security_master_history,
+        rqdata_start_date=args.rqdata_start_date,
+        rqdata_output=Path(args.rqdata_output),
         limit=args.limit,
         offset=args.offset,
         delay=args.delay,

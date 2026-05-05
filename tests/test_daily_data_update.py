@@ -160,6 +160,26 @@ class DailyDataUpdateTest(unittest.TestCase):
         self.assertIn("--security-master-history-source", research_step.command)
         self.assertIn("vendor/security_master_history.csv", research_step.command)
 
+    def test_plan_can_export_rqdata_security_master_history_before_research_domains(self) -> None:
+        config = DailyDataUpdateConfig(
+            project_root=Path("/repo"),
+            as_of_date="2026-04-27",
+            rqdata_security_master_history=True,
+            rqdata_start_date="2026-01-01",
+        )
+
+        steps = build_daily_data_update_plan(config)
+        names = [step.name for step in steps]
+
+        self.assertIn("rqdata_security_master_history", names)
+        rq_step = steps[names.index("rqdata_security_master_history")]
+        research_step = steps[-2]
+        self.assertIn("scripts/build_rqdata_vendor_data.py", rq_step.command)
+        self.assertIn("--start-date", rq_step.command)
+        self.assertIn("2026-01-01", rq_step.command)
+        self.assertIn("--security-master-history-source", research_step.command)
+        self.assertIn("data/vendor/security_master_history_rqdata.csv", research_step.command)
+
     def test_load_env_file_sets_missing_values_without_overwriting(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             env_path = Path(tmp) / ".env"
