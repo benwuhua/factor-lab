@@ -47,6 +47,18 @@ def main() -> int:
     parser.add_argument("--timezone", default="Asia/Shanghai")
     parser.add_argument("--sleep-sec", type=float, default=60.0)
     parser.add_argument("--max-crashes", type=int, default=5)
+    parser.add_argument(
+        "--min-remaining-sec",
+        type=float,
+        default=1800.0,
+        help="Do not start a new iteration unless at least this many seconds remain before --until/--max-hours.",
+    )
+    parser.add_argument(
+        "--max-iteration-sec",
+        type=float,
+        default=7200.0,
+        help="Hard timeout for one multilane iteration. Set 0 to disable.",
+    )
     parser.add_argument("--lane-factor-batch-size", type=int, default=2)
     parser.add_argument(
         "--stop-on-rotation-exhausted",
@@ -94,6 +106,8 @@ def main() -> int:
         max_iterations=max_iterations,
         max_crashes=args.max_crashes,
         sleep_sec=args.sleep_sec,
+        min_remaining_sec=args.min_remaining_sec,
+        max_iteration_sec=args.max_iteration_sec if args.max_iteration_sec > 0 else None,
         lane_factor_batch_size=args.lane_factor_batch_size,
         include_reversal_expression_candidates=args.include_reversal_expression_candidates,
         stop_on_rotation_exhausted=args.stop_on_rotation_exhausted,

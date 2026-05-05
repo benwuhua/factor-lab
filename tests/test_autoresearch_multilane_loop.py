@@ -1,8 +1,11 @@
 import json
 import tempfile
+import time
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from qlib_factor_lab.autoresearch.multilane import MultiLaneReport
 from qlib_factor_lab.autoresearch.multilane_loop import run_multilane_loop
@@ -129,6 +132,72 @@ class AutoresearchMultilaneLoopTests(unittest.TestCase):
             self.assertEqual(result.crash_count, 1)
             self.assertEqual(result.stop_reason, "max_crashes")
             self.assertIn("provider exploded", (result.log_dir / "iteration_001_error.txt").read_text(encoding="utf-8"))
+
+    def test_loop_does_not_start_iteration_without_remaining_time_budget(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls: list[dict] = []
+            tzinfo = ZoneInfo("Asia/Shanghai")
+
+            def fake_runner(**kwargs):
+                calls.append(kwargs)
+                return MultiLaneReport((), output_path=Path(kwargs["output_path"]))
+
+            result = run_multilane_loop(
+                project_root=root,
+                lane_space_path="lane_space.yaml",
+                contract_path="contract.yaml",
+                expression_space_path="space.yaml",
+                expression_candidate_path="candidate.yaml",
+                mining_config_path="mining.yaml",
+                provider_config_path="provider.yaml",
+                output_root="reports/autoresearch/multilane_loop",
+                deadline=datetime(2026, 5, 2, 8, 30, tzinfo=tzinfo),
+                min_remaining_sec=1800,
+                max_iterations=None,
+                sleep_sec=0,
+                runner=fake_runner,
+                now_fn=lambda _tz: datetime(2026, 5, 2, 8, 10, tzinfo=tzinfo),
+            )
+
+            self.assertEqual(calls, [])
+            self.assertEqual(result.iterations_started, 0)
+            self.assertEqual(result.stop_reason, "deadline_budget")
+            summary = json.loads((result.log_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["stop_reason"], "deadline_budget")
+            self.assertEqual(summary["min_remaining_sec"], 1800)
+
+    def test_loop_times_out_long_running_iteration_and_records_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def fake_runner(**kwargs):
+                time.sleep(1)
+                return MultiLaneReport((), output_path=Path(kwargs["output_path"]))
+
+            result = run_multilane_loop(
+                project_root=root,
+                lane_space_path="lane_space.yaml",
+                contract_path="contract.yaml",
+                expression_space_path="space.yaml",
+                expression_candidate_path="candidate.yaml",
+                mining_config_path="mining.yaml",
+                provider_config_path="provider.yaml",
+                output_root="reports/autoresearch/multilane_loop",
+                max_iterations=3,
+                max_crashes=1,
+                max_iteration_sec=0.05,
+                sleep_sec=0,
+                runner=fake_runner,
+            )
+
+            self.assertEqual(result.iterations_started, 1)
+            self.assertEqual(result.crash_count, 1)
+            self.assertEqual(result.stop_reason, "max_crashes")
+            error = (result.log_dir / "iteration_001_error.txt").read_text(encoding="utf-8")
+            self.assertIn("timed out", error)
+            summary = json.loads((result.log_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["iterations"][0]["status"], "crash")
 
     def test_loop_prioritizes_non_reversal_expression_candidates_and_non_reversal_lanes(self):
         with tempfile.TemporaryDirectory() as tmp:

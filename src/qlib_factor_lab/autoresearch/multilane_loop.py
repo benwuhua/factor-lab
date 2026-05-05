@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import math
+import signal
+import threading
 import time
 import traceback
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from types import FrameType
 from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
@@ -68,6 +72,7 @@ class MultiLaneLoopResult:
 
 
 MultiLaneRunner = Callable[..., MultiLaneReport]
+NowFn = Callable[[Any], datetime]
 
 
 def run_multilane_loop(
@@ -94,11 +99,14 @@ def run_multilane_loop(
     lane_factor_batch_size: int = 2,
     include_reversal_expression_candidates: bool = False,
     stop_on_rotation_exhausted: bool = False,
+    min_remaining_sec: float = 0.0,
+    max_iteration_sec: float | None = None,
+    now_fn: NowFn | None = None,
     runner: MultiLaneRunner = run_multilane_autoresearch,
 ) -> MultiLaneLoopResult:
     root = Path(project_root)
     tzinfo = deadline.tzinfo if deadline is not None else ZoneInfo("Asia/Shanghai")
-    started = datetime.now(tzinfo)
+    started = _now(tzinfo, now_fn)
     final_deadline = _min_datetime(deadline, started + timedelta(hours=max_hours) if max_hours is not None else None)
     output_base = _resolve(root, output_root)
     log_dir = output_base / started.strftime("%Y%m%dT%H%M%S")
@@ -132,13 +140,20 @@ def run_multilane_loop(
         stop_reason="running",
         skipped_expression_candidates=skipped_expression_candidates,
         strategy_dictionary_seed=strategy_dictionary_seed,
+        min_remaining_sec=min_remaining_sec,
+        max_iteration_sec=max_iteration_sec,
     )
 
     seen_rotation_keys: set[str] = set()
     while True:
-        if final_deadline is not None and datetime.now(final_deadline.tzinfo) >= final_deadline:
-            stop_reason = "deadline"
-            break
+        if final_deadline is not None:
+            remaining_sec = (final_deadline - _now(final_deadline.tzinfo, now_fn)).total_seconds()
+            if remaining_sec <= 0:
+                stop_reason = "deadline"
+                break
+            if min_remaining_sec > 0 and remaining_sec < min_remaining_sec:
+                stop_reason = "deadline_budget"
+                break
         if max_iterations is not None and iteration >= max_iterations:
             stop_reason = "max_iterations"
             break
@@ -160,7 +175,7 @@ def run_multilane_loop(
         iteration = next_iteration
         iterations_started += 1
         iteration_output = log_dir / f"multilane_iteration_{iteration:03d}.md"
-        iteration_started_at = datetime.now(tzinfo)
+        iteration_started_at = _now(tzinfo, now_fn)
         iteration_row: dict[str, Any] = {
             "iteration": iteration,
             "started_at": iteration_started_at.isoformat(timespec="seconds"),
@@ -172,22 +187,23 @@ def run_multilane_loop(
         }
 
         try:
-            report = runner(
-                lane_space_path=lane_space_path,
-                project_root=root,
-                contract_path=contract_path,
-                expression_space_path=expression_space_path,
-                expression_candidate_path=expression_candidate_for_iteration,
-                mining_config_path=mining_config_path,
-                provider_config_path=provider_config_path,
-                output_path=iteration_output,
-                data_governance_report_path=data_governance_report_path,
-                include_shadow=include_shadow,
-                max_workers=max_workers,
-                start_time=start_time,
-                end_time=end_time,
-                lane_factor_name_overrides=lane_factor_overrides,
-            )
+            with _iteration_timeout(max_iteration_sec):
+                report = runner(
+                    lane_space_path=lane_space_path,
+                    project_root=root,
+                    contract_path=contract_path,
+                    expression_space_path=expression_space_path,
+                    expression_candidate_path=expression_candidate_for_iteration,
+                    mining_config_path=mining_config_path,
+                    provider_config_path=provider_config_path,
+                    output_path=iteration_output,
+                    data_governance_report_path=data_governance_report_path,
+                    include_shadow=include_shadow,
+                    max_workers=max_workers,
+                    start_time=start_time,
+                    end_time=end_time,
+                    lane_factor_name_overrides=lane_factor_overrides,
+                )
             frame = report.to_frame()
             lanes = _json_safe(frame.to_dict(orient="records"))
             lane_crashes = int((frame["run_status"] == "crash").sum()) if "run_status" in frame else 0
@@ -205,7 +221,7 @@ def run_multilane_loop(
                 encoding="utf-8",
             )
 
-        iteration_row["finished_at"] = datetime.now(tzinfo).isoformat(timespec="seconds")
+        iteration_row["finished_at"] = _now(tzinfo, now_fn).isoformat(timespec="seconds")
         iteration_row["crash_count_after_iteration"] = crash_count
         iterations.append(iteration_row)
         _write_loop_summary(
@@ -217,13 +233,15 @@ def run_multilane_loop(
             stop_reason="running",
             skipped_expression_candidates=skipped_expression_candidates,
             strategy_dictionary_seed=strategy_dictionary_seed,
+            min_remaining_sec=min_remaining_sec,
+            max_iteration_sec=max_iteration_sec,
         )
 
         if crash_count >= crash_budget:
             stop_reason = "max_crashes"
             break
         if sleep_sec > 0:
-            time.sleep(sleep_sec)
+            time.sleep(_bounded_sleep_sec(sleep_sec, final_deadline=final_deadline, now_fn=now_fn))
 
     _write_loop_summary(
         log_dir,
@@ -234,6 +252,8 @@ def run_multilane_loop(
         stop_reason=stop_reason,
         skipped_expression_candidates=skipped_expression_candidates,
         strategy_dictionary_seed=strategy_dictionary_seed,
+        min_remaining_sec=min_remaining_sec,
+        max_iteration_sec=max_iteration_sec,
     )
     return MultiLaneLoopResult(
         iterations_started=iterations_started,
@@ -346,12 +366,16 @@ def _write_loop_summary(
     stop_reason: str,
     skipped_expression_candidates: list[dict[str, str]] | None = None,
     strategy_dictionary_seed: dict[str, Any] | None = None,
+    min_remaining_sec: float = 0.0,
+    max_iteration_sec: float | None = None,
 ) -> None:
     payload = {
         "iterations_started": iterations_started,
         "crash_count": crash_count,
         "lane_crash_count": lane_crash_count,
         "stop_reason": stop_reason,
+        "min_remaining_sec": min_remaining_sec,
+        "max_iteration_sec": max_iteration_sec,
         "skipped_expression_candidates": skipped_expression_candidates or [],
         "strategy_dictionary_seed": strategy_dictionary_seed or {"enabled": False},
         "iterations": iterations,
@@ -362,6 +386,8 @@ def _write_loop_summary(
         f"crash_count: {crash_count}",
         f"lane_crash_count: {lane_crash_count}",
         f"stop_reason: {stop_reason}",
+        f"min_remaining_sec: {min_remaining_sec:g}",
+        f"max_iteration_sec: {max_iteration_sec if max_iteration_sec is not None else ''}",
         f"skipped_expression_candidates: {len(skipped_expression_candidates or [])}",
         f"strategy_dictionary_seed_written_candidates: {(strategy_dictionary_seed or {}).get('written_candidates', 0)}",
         "",
@@ -462,3 +488,38 @@ def _min_datetime(left: datetime | None, right: datetime | None) -> datetime | N
     if right is None:
         return left
     return min(left, right)
+
+
+def _now(tzinfo: Any, now_fn: NowFn | None) -> datetime:
+    return now_fn(tzinfo) if now_fn is not None else datetime.now(tzinfo)
+
+
+def _bounded_sleep_sec(sleep_sec: float, *, final_deadline: datetime | None, now_fn: NowFn | None) -> float:
+    if final_deadline is None:
+        return sleep_sec
+    remaining_sec = (final_deadline - _now(final_deadline.tzinfo, now_fn)).total_seconds()
+    return max(0.0, min(sleep_sec, remaining_sec))
+
+
+@contextlib.contextmanager
+def _iteration_timeout(max_iteration_sec: float | None):
+    if (
+        max_iteration_sec is None
+        or max_iteration_sec <= 0
+        or threading.current_thread() is not threading.main_thread()
+    ):
+        yield
+        return
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+
+    def _raise_timeout(signum: int, frame: FrameType | None) -> None:
+        raise TimeoutError(f"multilane iteration timed out after {max_iteration_sec:g} seconds")
+
+    signal.signal(signal.SIGALRM, _raise_timeout)
+    signal.setitimer(signal.ITIMER_REAL, max_iteration_sec)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
