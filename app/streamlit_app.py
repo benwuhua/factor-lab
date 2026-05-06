@@ -11,7 +11,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 APP_ICON = ROOT / "app/assets/factor_lab_icon.png"
-WORKBENCH_PAGES = ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 AI产业链", "06 证据库"]
+WORKBENCH_PAGES = ["01 AI产业链", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 总览仪表盘", "06 证据库"]
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -101,12 +101,14 @@ def main() -> None:
         render_factor_research()
     elif page == "04 自动挖掘":
         render_autoresearch_queue()
-    elif page == "05 AI产业链":
+    elif page == "01 AI产业链":
         render_ai_semiconductor_theme()
     elif page == "06 证据库":
         render_evidence_library()
-    else:
+    elif page == "05 总览仪表盘":
         render_dashboard()
+    else:
+        render_ai_semiconductor_theme()
 
 
 def render_dashboard() -> None:
@@ -905,6 +907,12 @@ def render_ai_semiconductor_theme() -> None:
         ]
     )
 
+    st.markdown(_section_header_html("子链筛选", "chip design, foundry, equipment, materials, memory and interconnect"), unsafe_allow_html=True)
+    if "sub_chain" in candidates.columns:
+        sub_chain_options = sorted(candidates["sub_chain"].dropna().astype(str).unique().tolist())
+        selected_sub_chains = st.multiselect("子链筛选", options=sub_chain_options, default=sub_chain_options)
+        candidates = _filter_theme_candidates_by_sub_chain(candidates, selected_sub_chains)
+
     st.markdown(_section_header_html("主题候选分档", "theme signal candidates, not advice"), unsafe_allow_html=True)
     st.caption("分档依据: 主题相关性、质量、成长、动量、事件催化和风险扣分。C档不代表看空，只表示需要先核查事件/交易风险。非投资建议。")
     display_cols = [
@@ -958,6 +966,13 @@ def render_ai_semiconductor_theme() -> None:
     ]
     st.markdown(_workflow_card_grid_html(rows), unsafe_allow_html=True)
     _render_workflow_task_buttons(rows, "ai-theme")
+
+
+def _filter_theme_candidates_by_sub_chain(candidates: pd.DataFrame, selected_sub_chains: list[str]) -> pd.DataFrame:
+    if candidates.empty or "sub_chain" not in candidates.columns or not selected_sub_chains:
+        return candidates
+    selected = {str(item) for item in selected_sub_chains}
+    return candidates[candidates["sub_chain"].astype(str).isin(selected)].reset_index(drop=True)
 
 
 def render_autoresearch_queue() -> None:

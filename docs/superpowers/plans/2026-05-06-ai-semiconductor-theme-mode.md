@@ -15,7 +15,7 @@
 - Modify `src/qlib_factor_lab/theme_scanner.py`: add simplified component scoring, A/B/C tiering, and business-readable reasons while preserving existing columns.
 - Create `configs/themes/ai_semiconductor.yaml`: focused AI industry-chain universe for chips, semiconductors, storage, advanced packaging, optical interconnect, and compute integration.
 - Modify `app/streamlit_app.py`: add an `AI产业链` page that reads the latest theme scan and displays tiers, scores, and reasons.
-- Modify `app/streamlit_app.py`: narrow default navigation to data, factor research, autoresearch, AI theme, and evidence. Hide portfolio gate, expert review, stock-card, and paper execution pages from the main product surface.
+- Modify `app/streamlit_app.py`: make `01 AI产业链` the default landing page and narrow navigation to AI theme, data, factor research, autoresearch, dashboard, and evidence. Hide portfolio gate, expert review, stock-card, and paper execution pages from the main product surface.
 - Modify `tests/test_theme_scanner.py`: test component scores, tiers, reasons, markdown output, and the new config.
 - Modify `tests/test_streamlit_workbench_ui.py`: verify the new page renders and is available in navigation.
 
@@ -55,7 +55,7 @@
 ## Task 3: Workbench Theme Page
 
 - [ ] **Step 1: Add UI tests**
-  - Extend page render tests to include `10 AI产业链`.
+  - Extend page render tests to include `01 AI产业链`.
   - Assert the page shows `AI产业链主题研究`, `A重点研究`, and `非投资建议`.
 
 - [ ] **Step 2: Implement page**

@@ -80,7 +80,7 @@ Start the local Streamlit research workbench:
 make workbench
 ```
 
-The workbench is a read-only local UI for signal research. It reads existing artifacts such as autoresearch ledgers, approved factors, daily signals, theme scans, and evidence files. It does not execute trading commands from the browser, and the default navigation does not expose portfolio or paper-trading workflows.
+The workbench is a read-only local UI for signal research. It opens on `01 AI产业链` by default, reads existing artifacts such as autoresearch ledgers, approved factors, daily signals, theme scans, and evidence files, and keeps the product surface focused on research signals. It does not execute trading commands from the browser, and the default navigation does not expose portfolio or paper-trading workflows.
 
 Check the local Qlib environment after data has been downloaded or built:
 

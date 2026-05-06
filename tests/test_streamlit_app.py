@@ -13,6 +13,7 @@ from app.streamlit_app import (
     _evidence_library_rows,
     _event_library_cards_html,
     _factor_research_rows,
+    _filter_theme_candidates_by_sub_chain,
     _multilane_health_cards_html,
     _page_topbar_html,
     _research_context_env_overrides,
@@ -316,12 +317,24 @@ class StreamlitAppUiTests(unittest.TestCase):
         self.assertEqual(env["AUTORESEARCH_END_TIME"], "2026-04-20")
         self.assertEqual(env["AUTORESEARCH_MULTILANE_OUTPUT"], "reports/autoresearch/multilane_smoke_20260420.md")
 
-    def test_resolve_nav_page_supports_deep_link_shortcuts(self):
-        pages = ["01 总览仪表盘", "08 证据库"]
+    def test_filter_theme_candidates_by_sub_chain_keeps_selected_sub_chain(self):
+        frame = pd.DataFrame(
+            [
+                {"instrument": "SH688981", "sub_chain": "foundry"},
+                {"instrument": "SZ301308", "sub_chain": "memory_storage"},
+            ]
+        )
 
-        self.assertEqual(_resolve_nav_page("08", pages), "08 证据库")
-        self.assertEqual(_resolve_nav_page("08 证据库", pages), "08 证据库")
-        self.assertEqual(_resolve_nav_page("missing", pages), "01 总览仪表盘")
+        filtered = _filter_theme_candidates_by_sub_chain(frame, ["memory_storage"])
+
+        self.assertEqual(filtered["instrument"].tolist(), ["SZ301308"])
+
+    def test_resolve_nav_page_supports_deep_link_shortcuts(self):
+        pages = ["01 AI产业链", "05 总览仪表盘", "06 证据库"]
+
+        self.assertEqual(_resolve_nav_page("06", pages), "06 证据库")
+        self.assertEqual(_resolve_nav_page("总览", pages), "05 总览仪表盘")
+        self.assertEqual(_resolve_nav_page("missing", pages), "01 AI产业链")
 
     def test_sidebar_nav_html_uses_links_and_marks_current_page(self):
         html = _sidebar_nav_html(["01 总览仪表盘", "03 因子研究"], "03 因子研究")

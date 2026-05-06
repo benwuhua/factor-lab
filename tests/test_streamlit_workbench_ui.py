@@ -22,11 +22,11 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
 
     def test_all_workbench_pages_render_without_exceptions(self):
         pages = [
-            ("01 总览仪表盘", "投研业务流总览"),
+            ("01 AI产业链", "AI产业链主题研究"),
             ("02 数据治理", "数据治理"),
             ("03 因子研究", "因子研究"),
             ("04 自动挖掘", "自动挖掘"),
-            ("05 AI产业链", "AI产业链主题研究"),
+            ("05 总览仪表盘", "投研业务流总览"),
             ("06 证据库", "证据库"),
         ]
 
@@ -39,11 +39,11 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
         labels = _sidebar_button_labels(app)
 
         for page in [
-            "01 总览仪表盘",
+            "01 AI产业链",
             "02 数据治理",
             "03 因子研究",
             "04 自动挖掘",
-            "05 AI产业链",
+            "05 总览仪表盘",
             "06 证据库",
         ]:
             with self.subTest(page=page):
@@ -90,12 +90,19 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
         self.assertIn("Run · 多车道挖掘", labels)
         self.assertIn("Queue · 启动自动挖掘", labels)
 
+    def test_default_page_is_ai_theme_signal_mode(self):
+        app = AppTest.from_file(APP_PATH, default_timeout=20)
+        app.run(timeout=30)
+
+        self.assertIn("AI产业链主题研究", _app_text(app))
+
     def test_ai_theme_page_and_evidence_page_focus_on_signal_outputs(self):
-        theme = self.run_page("05 AI产业链")
+        theme = self.run_page("01 AI产业链")
         evidence = self.run_page("06 证据库")
 
         self.assertIn("AI产业链主题研究", _app_text(theme))
         self.assertIn("A重点研究", _app_text(theme))
+        self.assertIn("子链筛选", _app_text(theme))
         self.assertIn("非投资建议", _app_text(theme))
         self.assertIn("theme-scan", _app_text(theme))
         self.assertIn("刷新证据库", _app_text(evidence))
