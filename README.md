@@ -13,7 +13,7 @@ The current project focuses on:
 
 ![Factor Lab commercial research pipeline](docs/assets/factor-lab-commercial-pipeline.svg)
 
-Factor Lab follows one conservative operating loop: govern the data first, research factors inside bounded lanes, combine approved factor families, then pass every portfolio through review gates before paper execution.
+Factor Lab follows one conservative daily operating loop: govern the data first, turn approved factor families into signals, build a research portfolio, then pass every candidate through expert review and risk gates before paper execution. Each run writes an auditable package under `runs/YYYYMMDD/`.
 
 Generated market data, Qlib binaries, MLflow records, and backtest reports are intentionally ignored by Git. See [docs/data-and-artifacts.md](docs/data-and-artifacts.md).
 

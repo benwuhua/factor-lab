@@ -1,218 +1,225 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="920" viewBox="0 0 1440 920" role="img" aria-labelledby="title desc">
-  <title id="title">Factor Lab commercial research pipeline</title>
-  <desc id="desc">A business-facing overview of Factor Lab: governed data, multi-lane factor research, family-first portfolio construction, review gates, and execution replay.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">Factor Lab daily research pipeline</title>
+  <desc id="desc">A business-facing overview of Factor Lab daily pipeline: governed A-share data flows through factor signals, review gates, portfolio controls, and paper execution artifacts.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f8fbff"/>
-      <stop offset="0.45" stop-color="#f5f7f3"/>
-      <stop offset="1" stop-color="#fff8f1"/>
+    <linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fbff"/>
+      <stop offset="0.48" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#fff7ed"/>
     </linearGradient>
-    <linearGradient id="dataGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1e88e5"/>
-      <stop offset="1" stop-color="#00a6a6"/>
+    <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
     </linearGradient>
-    <linearGradient id="factorGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7c4dff"/>
-      <stop offset="1" stop-color="#d81b60"/>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#2563eb"/>
     </linearGradient>
-    <linearGradient id="portfolioGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#00a676"/>
-      <stop offset="1" stop-color="#7cb342"/>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#059669"/>
+      <stop offset="1" stop-color="#84cc16"/>
     </linearGradient>
-    <linearGradient id="reviewGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ff8f00"/>
-      <stop offset="1" stop-color="#ef5350"/>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#db2777"/>
     </linearGradient>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.12"/>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#ef4444"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.14"/>
     </filter>
-    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.10"/>
     </filter>
-    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-      <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
+    <marker id="arrow" markerWidth="13" markerHeight="13" refX="10.5" refY="6.5" orient="auto">
+      <path d="M2,2 L11,6.5 L2,11 Z" fill="#334155"/>
     </marker>
     <style>
-      .title { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 44px; font-weight: 760; fill: #0f172a; letter-spacing: 0; }
-      .subtitle { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 18px; font-weight: 500; fill: #475569; letter-spacing: 0; }
-      .sectionTitle { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 22px; font-weight: 760; fill: #ffffff; letter-spacing: 0; }
-      .sectionMeta { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 13px; font-weight: 650; fill: rgba(255,255,255,0.82); letter-spacing: 0; }
-      .bodyTitle { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 17px; font-weight: 740; fill: #0f172a; letter-spacing: 0; }
-      .body { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 14px; font-weight: 520; fill: #475569; letter-spacing: 0; }
-      .small { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 12px; font-weight: 640; fill: #64748b; letter-spacing: 0; }
-      .chipText { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 12px; font-weight: 700; fill: #334155; letter-spacing: 0; }
-      .metric { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 28px; font-weight: 780; fill: #0f172a; letter-spacing: 0; }
-      .label { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 12px; font-weight: 680; fill: #64748b; letter-spacing: 0; }
-      .line { stroke: #334155; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
-      .softLine { stroke: #cbd5e1; stroke-width: 1.5; fill: none; }
+      .h1 { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 48px; font-weight: 780; fill: #0f172a; letter-spacing: 0; }
+      .sub { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 18px; font-weight: 520; fill: #475569; letter-spacing: 0; }
+      .kicker { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 12px; font-weight: 760; fill: #64748b; letter-spacing: 1.2px; }
+      .panelTitle { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 24px; font-weight: 760; fill: #0f172a; letter-spacing: 0; }
+      .panelSub { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 13px; font-weight: 650; fill: #64748b; letter-spacing: 0; }
+      .whiteTitle { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 22px; font-weight: 760; fill: #ffffff; letter-spacing: 0; }
+      .whiteSub { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 13px; font-weight: 620; fill: rgba(255,255,255,0.82); letter-spacing: 0; }
+      .cardTitle { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 16px; font-weight: 760; fill: #0f172a; letter-spacing: 0; }
+      .body { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 13px; font-weight: 540; fill: #475569; letter-spacing: 0; }
+      .small { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 11px; font-weight: 650; fill: #64748b; letter-spacing: 0; }
+      .chip { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 12px; font-weight: 760; fill: #334155; letter-spacing: 0; }
+      .metric { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 34px; font-weight: 800; fill: #0f172a; letter-spacing: 0; }
+      .metricLabel { font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; font-size: 12px; font-weight: 700; fill: #64748b; letter-spacing: 0; }
+      .flow { stroke: #334155; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #cbd5e1; stroke-width: 1.3; fill: none; }
     </style>
   </defs>
 
-  <rect width="1440" height="920" fill="url(#bg)"/>
-  <path d="M0 150 C210 75 330 235 520 160 S880 50 1050 145 S1260 300 1440 190 L1440 0 L0 0 Z" fill="#ffffff" opacity="0.72"/>
-  <path d="M0 835 C250 740 360 890 560 810 S930 700 1110 790 S1300 900 1440 810 L1440 920 L0 920 Z" fill="#ffffff" opacity="0.70"/>
+  <rect width="1600" height="980" fill="url(#canvas)"/>
+  <path d="M0 120 C220 40 380 150 540 92 C770 8 995 62 1168 138 C1345 216 1478 155 1600 78 L1600 0 L0 0 Z" fill="#ffffff" opacity="0.78"/>
+  <path d="M0 862 C250 770 390 905 590 838 C815 760 985 788 1184 866 C1370 938 1478 900 1600 835 L1600 980 L0 980 Z" fill="#ffffff" opacity="0.66"/>
 
   <g transform="translate(70,58)">
-    <text class="title" x="0" y="0">Factor Lab 投研工作流</text>
-    <text class="subtitle" x="0" y="36">覆盖数据治理、因子研究、组合构建、专家复核与纸面执行的 A 股 AI 投研平台</text>
+    <text class="kicker" x="0" y="0">FACTOR LAB DAILY PIPELINE</text>
+    <text class="h1" x="0" y="50">A 股 AI 投研流水线</text>
+    <text class="sub" x="0" y="86">从可信数据到因子信号、组合门禁、专家复核与纸面执行，每日沉淀可审计的研究资产。</text>
   </g>
 
-  <g transform="translate(1120,54)">
-    <rect x="0" y="0" width="235" height="66" rx="8" fill="#0f172a" filter="url(#cardShadow)"/>
-    <text x="22" y="28" class="sectionMeta">Platform Scope</text>
-    <text x="22" y="50" style="font-family: Inter, 'PingFang SC', Arial, sans-serif; font-size: 18px; font-weight: 760; fill: #ffffff;">Research Platform</text>
+  <g transform="translate(1190,54)">
+    <rect x="0" y="0" width="320" height="92" rx="8" fill="url(#navy)" filter="url(#softShadow)"/>
+    <text class="whiteSub" x="24" y="30">Operating Principle</text>
+    <text class="whiteTitle" x="24" y="61">先治理，再研究；先复核，再执行</text>
   </g>
 
-  <g transform="translate(70,160)">
-    <rect x="0" y="0" width="294" height="560" rx="8" fill="#ffffff" filter="url(#softShadow)"/>
-    <rect x="0" y="0" width="294" height="92" rx="8" fill="url(#dataGrad)"/>
-    <text class="sectionMeta" x="28" y="32">01 DATA GOVERNANCE</text>
-    <text class="sectionTitle" x="28" y="63">数据治理底座</text>
-    <circle cx="235" cy="47" r="25" fill="#ffffff" opacity="0.18"/>
-    <path d="M224 45 h22 M224 53 h22 M229 37 h12" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <g transform="translate(66,170)">
+    <rect x="0" y="0" width="330" height="680" rx="8" fill="#ffffff" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="330" height="84" rx="8" fill="url(#blue)"/>
+    <text class="whiteSub" x="26" y="30">01 GOVERNED DATA ASSETS</text>
+    <text class="whiteTitle" x="26" y="58">可信数据资产</text>
 
-    <g transform="translate(24,122)">
-      <text class="bodyTitle" x="0" y="0">统一研究范围</text>
-      <text class="body" x="0" y="28">沪深300 / 中证500</text>
-      <text class="body" x="0" y="52">行情数据与交易状态</text>
-      <text class="body" x="0" y="76">证券主数据与公告事件</text>
+    <g transform="translate(24,112)">
+      <rect width="282" height="86" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
+      <text class="cardTitle" x="18" y="29">行情与交易状态</text>
+      <text class="body" x="18" y="55">OHLCV / 停复牌 / 涨跌停 / 流动性</text>
     </g>
-    <g transform="translate(24,245)">
-      <text class="bodyTitle" x="0" y="0">时点一致性</text>
-      <text class="body" x="0" y="28">as_of_date / available_at</text>
-      <text class="body" x="0" y="52">覆盖率 / 新鲜度 / PIT 门禁</text>
-      <text class="body" x="0" y="76">未达标数据仅用于影子研究</text>
+    <g transform="translate(24,216)">
+      <rect width="282" height="86" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+      <text class="cardTitle" x="18" y="29">PIT 主数据与财务域</text>
+      <text class="body" x="18" y="55">行业 / ST / 市值 / EP / CFP / ROE</text>
     </g>
-    <g transform="translate(24,382)">
-      <rect x="0" y="0" width="246" height="44" rx="8" fill="#e0f2fe"/>
-      <text class="chipText" x="18" y="27">数据通过门禁后方可进入组合</text>
-      <rect x="0" y="60" width="112" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
-      <text class="metric" x="18" y="97">2</text>
-      <text class="label" x="18" y="116">核心样本池</text>
-      <rect x="134" y="60" width="112" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
-      <text class="metric" x="152" y="97">PIT</text>
-      <text class="label" x="152" y="116">时点合同</text>
+    <g transform="translate(24,320)">
+      <rect width="282" height="108" rx="8" fill="#fff7ed" stroke="#fed7aa"/>
+      <text class="cardTitle" x="18" y="29">公告与事件证据</text>
+      <text class="body" x="18" y="55">回购 / 减持 / 担保 / 监管 / 业绩预告</text>
+      <text class="body" x="18" y="78">事件方向分 + 事件强度分</text>
     </g>
-  </g>
-
-  <g transform="translate(418,160)">
-    <rect x="0" y="0" width="330" height="560" rx="8" fill="#ffffff" filter="url(#softShadow)"/>
-    <rect x="0" y="0" width="330" height="92" rx="8" fill="url(#factorGrad)"/>
-    <text class="sectionMeta" x="28" y="32">02 FACTOR FACTORY</text>
-    <text class="sectionTitle" x="28" y="63">多车道因子研究</text>
-    <circle cx="270" cy="47" r="25" fill="#ffffff" opacity="0.18"/>
-    <path d="M258 54 l10 -18 l9 13 l8 -7 l8 12" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-
-    <g transform="translate(24,120)">
-      <text class="bodyTitle" x="0" y="0">候选生成</text>
-      <text class="body" x="0" y="28">人工定义因子 / JoinQuant 迁移</text>
-      <text class="body" x="0" y="52">151 策略字典提供研究启发</text>
-      <text class="body" x="0" y="76">候选规范可变，评估器锁定</text>
+    <g transform="translate(24,452)">
+      <rect width="282" height="78" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+      <text class="cardTitle" x="18" y="29">数据治理门禁</text>
+      <text class="body" x="18" y="55">覆盖率 / 新鲜度 / PIT / Vendor Gate</text>
     </g>
-
-    <g transform="translate(24,240)">
-      <rect x="0" y="0" width="132" height="34" rx="8" fill="#f5f3ff"/>
-      <text class="chipText" x="14" y="22">量价表达式</text>
-      <rect x="148" y="0" width="134" height="34" rx="8" fill="#fdf2f8"/>
-      <text class="chipText" x="162" y="22">形态事件</text>
-      <rect x="0" y="48" width="132" height="34" rx="8" fill="#ecfeff"/>
-      <text class="chipText" x="14" y="70">市场情绪</text>
-      <rect x="148" y="48" width="134" height="34" rx="8" fill="#f0fdf4"/>
-      <text class="chipText" x="162" y="70">基本面质量</text>
-      <rect x="0" y="96" width="132" height="34" rx="8" fill="#fff7ed"/>
-      <text class="chipText" x="14" y="118">流动性结构</text>
-      <rect x="148" y="96" width="134" height="34" rx="8" fill="#fefce8"/>
-      <text class="chipText" x="162" y="118">风险结构</text>
-    </g>
-
-    <g transform="translate(24,410)">
-      <text class="bodyTitle" x="0" y="0">单因子诊断</text>
-      <text class="body" x="0" y="28">IC / Rank IC / ICIR</text>
-      <text class="body" x="0" y="52">分层收益 / 多空收益 / 换手</text>
-      <text class="body" x="0" y="76">事件收益 / MFE-MAE / 样本数</text>
+    <g transform="translate(24,566)">
+      <rect x="0" y="0" width="128" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
+      <text class="metric" x="18" y="39">800</text>
+      <text class="metricLabel" x="18" y="56">CSI300+CSI500</text>
+      <rect x="154" y="0" width="128" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
+      <text class="metric" x="172" y="39">PIT</text>
+      <text class="metricLabel" x="172" y="56">时点一致</text>
     </g>
   </g>
 
-  <g transform="translate(802,160)">
-    <rect x="0" y="0" width="292" height="560" rx="8" fill="#ffffff" filter="url(#softShadow)"/>
-    <rect x="0" y="0" width="292" height="92" rx="8" fill="url(#portfolioGrad)"/>
-    <text class="sectionMeta" x="28" y="32">03 PORTFOLIO ENGINE</text>
-    <text class="sectionTitle" x="28" y="63">因子族优先组合</text>
-    <circle cx="235" cy="47" r="25" fill="#ffffff" opacity="0.18"/>
-    <path d="M222 57 v-22 M235 57 v-32 M248 57 v-14" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <g transform="translate(452,170)">
+    <rect x="0" y="0" width="690" height="680" rx="8" fill="#ffffff" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="690" height="84" rx="8" fill="url(#violet)"/>
+    <text class="whiteSub" x="28" y="30">02 DAILY RESEARCH ENGINE</text>
+    <text class="whiteTitle" x="28" y="58">每日投研引擎</text>
 
-    <g transform="translate(24,122)">
-      <text class="bodyTitle" x="0" y="0">汇总因子族得分</text>
-      <text class="body" x="0" y="28">同类因子保留代表信号</text>
-      <text class="body" x="0" y="52">净化: MAD / z-score / 中性化</text>
-      <text class="body" x="0" y="76">控制单一逻辑与因子族集中</text>
+    <g transform="translate(34,116)">
+      <rect width="286" height="96" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
+      <text class="cardTitle" x="18" y="30">数据新鲜度检查</text>
+      <text class="body" x="18" y="56">确认 Qlib 日历与最新可用交易日</text>
+      <text class="small" x="18" y="78">失败即停止：data_freshness_failed</text>
     </g>
-    <g transform="translate(24,246)">
-      <text class="bodyTitle" x="0" y="0">生成目标组合</text>
-      <text class="body" x="0" y="28">signal -> target_portfolio.csv</text>
-      <text class="body" x="0" y="52">主要因子贡献可追溯</text>
-      <text class="body" x="0" y="76">行业 / 风格 / 暴露归因</text>
+    <g transform="translate(370,116)">
+      <rect width="286" height="96" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
+      <text class="cardTitle" x="18" y="30">数据治理检查</text>
+      <text class="body" x="18" y="56">非价格数据未达标进入 shadow</text>
+      <text class="small" x="18" y="78">阻断项失败：data_governance_failed</text>
     </g>
-    <g transform="translate(24,382)">
-      <rect x="0" y="0" width="244" height="44" rx="8" fill="#dcfce7"/>
-      <text class="chipText" x="18" y="27">组合依据来自多维研究证据</text>
-      <rect x="0" y="60" width="112" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
-      <text class="metric" x="18" y="97">约束</text>
-      <text class="label" x="18" y="116">集中度控制</text>
-      <rect x="132" y="60" width="112" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
-      <text class="metric" x="150" y="97">追溯</text>
-      <text class="label" x="150" y="116">贡献因子</text>
+
+    <path class="flow" d="M320 164 H362"/>
+
+    <g transform="translate(34,252)">
+      <rect width="286" height="118" rx="8" fill="#faf5ff" stroke="#e9d5ff"/>
+      <text class="cardTitle" x="18" y="30">因子信号构建</text>
+      <text class="body" x="18" y="56">Qlib 表达式 + 基本面 CSV 因子</text>
+      <text class="body" x="18" y="80">价值 / 质量 / 成长 / 红利 / 事件</text>
+      <text class="small" x="18" y="102">输出：signals.csv</text>
+    </g>
+    <g transform="translate(370,252)">
+      <rect width="286" height="118" rx="8" fill="#ecfeff" stroke="#a5f3fc"/>
+      <text class="cardTitle" x="18" y="30">事件风险增强</text>
+      <text class="body" x="18" y="56">把公告事件映射到每只股票</text>
+      <text class="body" x="18" y="80">正向催化 / watch / block / 证据链接</text>
+      <text class="small" x="18" y="102">输出：event_risk_snapshot.csv</text>
+    </g>
+
+    <path class="flow" d="M320 311 H362"/>
+
+    <g transform="translate(34,424)">
+      <rect width="286" height="118" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+      <text class="cardTitle" x="18" y="30">研究组合生成</text>
+      <text class="body" x="18" y="56">交易过滤后按综合分生成候选</text>
+      <text class="body" x="18" y="80">保留 top drivers 与 family contribution</text>
+      <text class="small" x="18" y="102">输出：research_portfolio.csv</text>
+    </g>
+    <g transform="translate(370,424)">
+      <rect width="286" height="118" rx="8" fill="#fff7ed" stroke="#fed7aa"/>
+      <text class="cardTitle" x="18" y="30">专家复核包</text>
+      <text class="body" x="18" y="56">组合、因子诊断、股票卡片、证据库</text>
+      <text class="body" x="18" y="80">LLM/人工复核 caution 或 reject</text>
+      <text class="small" x="18" y="102">输出：expert_review_packet.md</text>
+    </g>
+
+    <path class="flow" d="M320 483 H362"/>
+
+    <g transform="translate(34,584)">
+      <rect width="286" height="64" rx="8" fill="#fef2f2" stroke="#fecaca"/>
+      <text class="cardTitle" x="18" y="27">组合风险门禁</text>
+      <text class="body" x="18" y="50">行业 / family / logic / 换手 / vendor gate</text>
+    </g>
+    <g transform="translate(370,584)">
+      <rect width="286" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
+      <text class="cardTitle" x="18" y="27">审计归档</text>
+      <text class="body" x="18" y="50">manifest 汇总所有产物与本轮配置</text>
+    </g>
+
+    <path class="flow" d="M180 214 V244"/>
+    <path class="flow" d="M516 214 V244"/>
+    <path class="flow" d="M180 372 V416"/>
+    <path class="flow" d="M516 372 V416"/>
+    <path class="flow" d="M180 544 V576"/>
+    <path class="flow" d="M516 544 V576"/>
+  </g>
+
+  <g transform="translate(1198,170)">
+    <rect x="0" y="0" width="336" height="680" rx="8" fill="#ffffff" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="336" height="84" rx="8" fill="url(#green)"/>
+    <text class="whiteSub" x="26" y="30">03 CONTROLLED OUTPUTS</text>
+    <text class="whiteTitle" x="26" y="58">可控交付物</text>
+
+    <g transform="translate(26,112)">
+      <rect width="284" height="86" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
+      <text class="cardTitle" x="18" y="30">执行组合</text>
+      <text class="body" x="18" y="56">expert gate 后生成目标组合</text>
+      <text class="small" x="18" y="76">target_portfolio.csv</text>
+    </g>
+    <g transform="translate(26,216)">
+      <rect width="284" height="86" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
+      <text class="cardTitle" x="18" y="30">纸面执行</text>
+      <text class="body" x="18" y="56">生成订单、成交、预期仓位</text>
+      <text class="small" x="18" y="76">orders.csv / fills.csv</text>
+    </g>
+    <g transform="translate(26,320)">
+      <rect width="284" height="108" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
+      <text class="cardTitle" x="18" y="30">复盘与留痕</text>
+      <text class="body" x="18" y="56">风险报告、组合解释、运行摘要</text>
+      <text class="body" x="18" y="80">每轮实验可追溯、可复查、可回放</text>
+    </g>
+    <g transform="translate(26,464)">
+      <rect width="284" height="132" rx="8" fill="url(#amber)" opacity="0.95"/>
+      <text class="whiteSub" x="22" y="34">Business Value</text>
+      <text class="whiteTitle" x="22" y="66">更快覆盖，更少误判</text>
+      <text class="whiteSub" x="22" y="94">让 AI 负责阅读、归因与初筛</text>
+      <text class="whiteSub" x="22" y="116">让门禁与人工负责最后控制</text>
     </g>
   </g>
 
-  <g transform="translate(1148,160)">
-    <rect x="0" y="0" width="222" height="560" rx="8" fill="#ffffff" filter="url(#softShadow)"/>
-    <rect x="0" y="0" width="222" height="92" rx="8" fill="url(#reviewGrad)"/>
-    <text class="sectionMeta" x="24" y="32">04 REVIEW &amp; REPLAY</text>
-    <text class="sectionTitle" x="24" y="63">复核与验证</text>
-    <circle cx="174" cy="47" r="24" fill="#ffffff" opacity="0.18"/>
-    <path d="M163 47 l7 7 l16 -18" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path class="flow" d="M402 510 H444"/>
+  <path class="flow" d="M1148 510 H1190"/>
 
-    <g transform="translate(22,120)">
-      <text class="bodyTitle" x="0" y="0">组合准入门禁</text>
-      <text class="body" x="0" y="28">通过 / 谨慎 / 拒绝</text>
-      <text class="body" x="0" y="52">事件风险校验</text>
-      <text class="body" x="0" y="76">流动性与可交易性</text>
-    </g>
-    <g transform="translate(22,246)">
-      <text class="bodyTitle" x="0" y="0">专家复核材料</text>
-      <text class="body" x="0" y="28">公司研究卡片</text>
-      <text class="body" x="0" y="52">公告与异动证据</text>
-      <text class="body" x="0" y="76">LLM 辅助 + 人工确认</text>
-    </g>
-    <g transform="translate(22,372)">
-      <text class="bodyTitle" x="0" y="0">纸面执行验证</text>
-      <text class="body" x="0" y="28">订单生成</text>
-      <text class="body" x="0" y="52">模拟成交与对账</text>
-      <text class="body" x="0" y="76">执行过程回放</text>
-    </g>
-    <g transform="translate(22,500)">
-      <rect x="0" y="0" width="178" height="42" rx="8" fill="#fff1f2"/>
-      <text class="chipText" x="17" y="26">研究辅助，不输出确定性建议</text>
-    </g>
-  </g>
-
-  <path class="line" d="M364 440 C385 440 395 440 418 440"/>
-  <path class="line" d="M748 440 C772 440 780 440 802 440"/>
-  <path class="line" d="M1094 440 C1118 440 1126 440 1148 440"/>
-
-  <g transform="translate(92,766)">
-    <rect x="0" y="0" width="1256" height="96" rx="8" fill="#0f172a" filter="url(#cardShadow)"/>
-    <text x="30" y="34" style="font-family: Inter, 'PingFang SC', Arial, sans-serif; font-size: 20px; font-weight: 780; fill: #ffffff;">核心价值</text>
-    <text x="30" y="62" style="font-family: Inter, 'PingFang SC', Arial, sans-serif; font-size: 16px; font-weight: 520; fill: #cbd5e1;">将 AI 研究探索纳入可审计、可复现、可复核的投研流程</text>
-    <text x="30" y="84" style="font-family: Inter, 'PingFang SC', Arial, sans-serif; font-size: 14px; font-weight: 560; fill: #94a3b8;">数据治理 · 因子评估 · 组合约束 · 风险复核 · 执行验证</text>
-    <g transform="translate(915,22)">
-      <rect x="0" y="0" width="118" height="52" rx="8" fill="#1e293b"/>
-      <text x="18" y="21" class="label" fill="#94a3b8">Agent 治理</text>
-      <text x="18" y="41" style="font-family: Inter, 'PingFang SC', Arial, sans-serif; font-size: 15px; font-weight: 760; fill: #ffffff;">bounded</text>
-      <rect x="132" y="0" width="118" height="52" rx="8" fill="#1e293b"/>
-      <text x="150" y="21" class="label" fill="#94a3b8">组合流程</text>
-      <text x="150" y="41" style="font-family: Inter, 'PingFang SC', Arial, sans-serif; font-size: 15px; font-weight: 760; fill: #ffffff;">auditable</text>
-    </g>
+  <g transform="translate(70,890)">
+    <rect x="0" y="-38" width="1460" height="64" rx="8" fill="#0f172a" filter="url(#softShadow)"/>
+    <text x="26" y="2" style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif; font-size: 18px; font-weight: 740; fill: #ffffff; letter-spacing: 0;">Daily Pipeline = 可信数据资产 -> 因子信号 -> 研究组合 -> 专家复核 -> 风险门禁 -> 目标组合 -> 纸面执行 -> 审计归档</text>
   </g>
 </svg>
