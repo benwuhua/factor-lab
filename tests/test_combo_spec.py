@@ -244,6 +244,7 @@ class ComboSpecTests(unittest.TestCase):
             "fundamental_dividend_stability": ("dividend", "dividend_stability"),
             "fundamental_dividend_cashflow_coverage": ("dividend", "dividend_cashflow_coverage"),
             "financial_disclosure_recency_30d": ("event_catalyst", "financial_disclosure_recency_30d"),
+            "financial_disclosure_event_score_90d": ("event_catalyst", "financial_disclosure_event_score_90d"),
         }
 
         for spec_name in ["balanced_multifactor_v1.yaml", "offensive_multifactor_v1.yaml"]:

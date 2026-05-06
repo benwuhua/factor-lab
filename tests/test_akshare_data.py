@@ -14,6 +14,7 @@ import yaml
 
 from qlib_factor_lab.akshare_data import (
     build_dump_bin_command,
+    classify_notice_event,
     dump_csvs_to_qlib,
     enrich_security_master_industries,
     filter_source_csvs_to_existing_qlib_fields,
@@ -372,6 +373,24 @@ class AkShareDataTests(unittest.TestCase):
         self.assertEqual(result[result["instrument"] == "SH601106"].iloc[0]["event_type"], "buyback")
         self.assertEqual(result[result["instrument"] == "SZ002156"].iloc[0]["event_type"], "shareholder_increase")
         self.assertEqual(result[result["instrument"] == "SH688981"].iloc[0]["event_type"], "holder_count_change")
+
+    def test_classify_notice_event_distinguishes_performance_warning_direction(self):
+        self.assertEqual(
+            classify_notice_event("2025年度业绩预增公告", "业绩预告"),
+            ("performance_warning_up", "watch"),
+        )
+        self.assertEqual(
+            classify_notice_event("2025年度业绩预告：亏损同比收窄", "业绩预告"),
+            ("performance_warning_repair", "info"),
+        )
+        self.assertEqual(
+            classify_notice_event("2025年度业绩预亏公告", "业绩预告"),
+            ("performance_warning_down", "risk"),
+        )
+        self.assertEqual(
+            classify_notice_event("2025年度业绩预告", "业绩预告"),
+            ("performance_warning_neutral", "info"),
+        )
 
     def test_fetch_company_notices_skips_upstream_schema_errors(self):
         class FakeAkshare:

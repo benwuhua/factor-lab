@@ -4,14 +4,29 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import yaml
 
-from qlib_factor_lab.daily_pipeline import check_provider_data_freshness
+from qlib_factor_lab.daily_pipeline import _load_announcement_evidence, check_provider_data_freshness
 
 
 class DailyPipelineTests(unittest.TestCase):
+    def test_load_announcement_evidence_uses_low_memory_false(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            (root / "data/announcement_evidence.csv").write_text(
+                "event_id,instrument,event_type\n1,AAA,financial_report_disclosure\n",
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.daily_pipeline.pd.read_csv", wraps=pd.read_csv) as read_csv:
+                _load_announcement_evidence(root)
+
+            read_csv.assert_called_once_with(root / "data" / "announcement_evidence.csv", low_memory=False)
+
     def test_provider_data_freshness_fails_when_latest_calendar_is_stale(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

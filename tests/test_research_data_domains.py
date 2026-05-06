@@ -145,6 +145,69 @@ class ResearchDataDomainsTest(unittest.TestCase):
         self.assertAlmostEqual(1 - 2 / 30, float(current["financial_disclosure_recency_30d"]))
         self.assertAlmostEqual(2.0, float(current["financial_disclosure_days_since"]))
 
+    def test_derive_fundamental_quality_fields_scores_directional_disclosure_events(self) -> None:
+        fundamentals = pd.DataFrame(
+            [
+                {
+                    "instrument": "AAA",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-30",
+                    "available_at": "2026-04-30",
+                },
+                {
+                    "instrument": "BBB",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-30",
+                    "available_at": "2026-04-30",
+                },
+            ]
+        )
+        disclosures = pd.DataFrame(
+            [
+                {
+                    "instrument": "AAA",
+                    "event_type": "buyback",
+                    "event_date": "2026-04-28",
+                    "severity": "info",
+                },
+                {
+                    "instrument": "AAA",
+                    "event_type": "earnings_preannouncement_up",
+                    "event_date": "2026-04-20",
+                    "severity": "info",
+                },
+                {
+                    "instrument": "BBB",
+                    "event_type": "shareholder_reduction",
+                    "event_date": "2026-04-29",
+                    "severity": "risk",
+                },
+                {
+                    "instrument": "BBB",
+                    "event_type": "regulatory_inquiry",
+                    "event_date": "2026-03-20",
+                    "severity": "watch",
+                },
+            ]
+        )
+
+        result = derive_fundamental_quality_fields(fundamentals, disclosures=disclosures)
+        by_instrument = result.set_index("instrument")
+
+        self.assertIn("financial_disclosure_positive_score_90d", result.columns)
+        self.assertIn("financial_disclosure_negative_score_90d", result.columns)
+        self.assertIn("financial_disclosure_event_score_90d", result.columns)
+        self.assertGreater(float(by_instrument.loc["AAA", "financial_disclosure_event_score_90d"]), 0.0)
+        self.assertLess(float(by_instrument.loc["BBB", "financial_disclosure_event_score_90d"]), 0.0)
+        self.assertGreater(
+            float(by_instrument.loc["AAA", "financial_disclosure_positive_score_90d"]),
+            float(by_instrument.loc["AAA", "financial_disclosure_negative_score_90d"]),
+        )
+        self.assertGreater(
+            float(by_instrument.loc["BBB", "financial_disclosure_negative_score_90d"]),
+            float(by_instrument.loc["BBB", "financial_disclosure_positive_score_90d"]),
+        )
+
     def test_normalize_fundamental_quality_derives_ratios_from_price_when_raw_ratios_missing(self) -> None:
         raw = pd.DataFrame(
             [

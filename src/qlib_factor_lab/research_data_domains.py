@@ -40,6 +40,9 @@ FUNDAMENTAL_QUALITY_COLUMNS = [
     "dividend_cashflow_coverage",
     "financial_disclosure_recency_30d",
     "financial_disclosure_days_since",
+    "financial_disclosure_positive_score_90d",
+    "financial_disclosure_negative_score_90d",
+    "financial_disclosure_event_score_90d",
     "valuation_source",
     "source",
 ]
@@ -110,6 +113,41 @@ CAPITAL_EVENT_TYPES = {
     "pledge_release",
     "capital_structure_change",
     "holder_count_change",
+}
+
+POSITIVE_DISCLOSURE_EVENT_TYPES = {
+    "buyback",
+    "shareholder_increase",
+    "order_contract",
+    "earnings_preannouncement_up",
+    "equity_incentive",
+    "performance_warning_up",
+    "performance_warning_repair",
+    "dividend_plan",
+}
+
+NEGATIVE_DISCLOSURE_EVENT_TYPES = {
+    "shareholder_reduction",
+    "large_unlock",
+    "regulatory_inquiry",
+    "pledge_risk",
+    "guarantee",
+    "lawsuit",
+    "disciplinary_action",
+    "investigation",
+    "st_risk",
+    "delisting_risk",
+    "nonstandard_audit",
+    "major_penalty",
+    "performance_warning_down",
+    "impairment",
+}
+
+DISCLOSURE_SEVERITY_WEIGHTS = {
+    "info": 0.5,
+    "watch": 0.7,
+    "risk": 1.0,
+    "block": 1.5,
 }
 
 
@@ -1083,13 +1121,11 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
     if not required <= set(disclosures.columns):
         return output
     events = disclosures.copy()
-    events = events[events["event_type"].fillna("").astype(str) == "financial_report_disclosure"].copy()
-    if events.empty:
-        return output
     events["event_date"] = pd.to_datetime(events["event_date"], errors="coerce")
     events = events.dropna(subset=["instrument", "event_date"]).sort_values(["instrument", "event_date"])
     if events.empty:
         return output
+    financial_events = events[events["event_type"].fillna("").astype(str) == "financial_report_disclosure"].copy()
 
     work = output.reset_index(drop=True).copy()
     work["_row_id"] = work.index
@@ -1098,18 +1134,46 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
     for _, item in work.iterrows():
         available_at = item.get("_available_at_dt")
         if pd.isna(available_at):
-            rows.append({"_row_id": item["_row_id"], "financial_disclosure_days_since_derived": pd.NA})
+            rows.append(
+                {
+                    "_row_id": item["_row_id"],
+                    "financial_disclosure_days_since_derived": pd.NA,
+                    "financial_disclosure_positive_score_90d_derived": pd.NA,
+                    "financial_disclosure_negative_score_90d_derived": pd.NA,
+                    "financial_disclosure_event_score_90d_derived": pd.NA,
+                }
+            )
             continue
-        history = events[
-            (events["instrument"].astype(str) == str(item.get("instrument", "")))
-            & (events["event_date"] <= available_at)
+        instrument_events = events[events["instrument"].astype(str) == str(item.get("instrument", ""))].sort_values("event_date")
+        history = financial_events[
+            (financial_events["instrument"].astype(str) == str(item.get("instrument", "")))
+            & (financial_events["event_date"] <= available_at)
         ].sort_values("event_date")
-        if history.empty:
-            rows.append({"_row_id": item["_row_id"], "financial_disclosure_days_since_derived": pd.NA})
+        if history.empty and instrument_events.empty:
+            rows.append(
+                {
+                    "_row_id": item["_row_id"],
+                    "financial_disclosure_days_since_derived": pd.NA,
+                    "financial_disclosure_positive_score_90d_derived": 0.0,
+                    "financial_disclosure_negative_score_90d_derived": 0.0,
+                    "financial_disclosure_event_score_90d_derived": 0.0,
+                }
+            )
             continue
-        latest_event_date = history.iloc[-1]["event_date"]
-        days_since = float((available_at - latest_event_date).days)
-        rows.append({"_row_id": item["_row_id"], "financial_disclosure_days_since_derived": max(days_since, 0.0)})
+        days_since = pd.NA
+        if not history.empty:
+            latest_event_date = history.iloc[-1]["event_date"]
+            days_since = max(float((available_at - latest_event_date).days), 0.0)
+        positive_score, negative_score = _directional_disclosure_scores(instrument_events, available_at)
+        rows.append(
+            {
+                "_row_id": item["_row_id"],
+                "financial_disclosure_days_since_derived": days_since,
+                "financial_disclosure_positive_score_90d_derived": positive_score,
+                "financial_disclosure_negative_score_90d_derived": negative_score,
+                "financial_disclosure_event_score_90d_derived": positive_score - negative_score,
+            }
+        )
     derived = pd.DataFrame(rows)
     if derived.empty:
         return output
@@ -1124,7 +1188,65 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
         merged.get("financial_disclosure_recency_30d"),
         recency,
     )
-    return merged.drop(columns=["_row_id", "_available_at_dt", "financial_disclosure_days_since_derived"], errors="ignore")
+    for column in [
+        "financial_disclosure_positive_score_90d",
+        "financial_disclosure_negative_score_90d",
+        "financial_disclosure_event_score_90d",
+    ]:
+        merged[column] = _fill_missing_numeric(
+            merged.get(column),
+            pd.to_numeric(merged[f"{column}_derived"], errors="coerce"),
+        )
+    return merged.drop(
+        columns=[
+            "_row_id",
+            "_available_at_dt",
+            "financial_disclosure_days_since_derived",
+            "financial_disclosure_positive_score_90d_derived",
+            "financial_disclosure_negative_score_90d_derived",
+            "financial_disclosure_event_score_90d_derived",
+        ],
+        errors="ignore",
+    )
+
+
+def _directional_disclosure_scores(events: pd.DataFrame, available_at: pd.Timestamp) -> tuple[float, float]:
+    lookback_start = available_at - pd.Timedelta(days=90)
+    recent = events[(events["event_date"] >= lookback_start) & (events["event_date"] <= available_at)].copy()
+    if recent.empty:
+        return 0.0, 0.0
+    positive = 0.0
+    negative = 0.0
+    for _, event in recent.iterrows():
+        direction = _disclosure_event_direction(event)
+        if direction == 0:
+            continue
+        days_since = max(float((available_at - event["event_date"]).days), 0.0)
+        recency_weight = max(0.0, 1.0 - days_since / 90.0)
+        severity_weight = _disclosure_severity_weight(event.get("severity"))
+        contribution = recency_weight * severity_weight
+        if direction > 0:
+            positive += contribution
+        else:
+            negative += contribution
+    return positive, negative
+
+
+def _disclosure_event_direction(event: pd.Series) -> int:
+    event_type = str(event.get("event_type", "")).strip().lower()
+    severity = str(event.get("severity", "")).strip().lower()
+    if event_type in POSITIVE_DISCLOSURE_EVENT_TYPES:
+        return 1
+    if event_type in NEGATIVE_DISCLOSURE_EVENT_TYPES:
+        return -1
+    if severity in {"risk", "block"}:
+        return -1
+    return 0
+
+
+def _disclosure_severity_weight(value: Any) -> float:
+    severity = str(value or "info").strip().lower()
+    return DISCLOSURE_SEVERITY_WEIGHTS.get(severity, DISCLOSURE_SEVERITY_WEIGHTS["info"])
 
 
 def _fill_missing_numeric(current: pd.Series | None, derived: pd.Series) -> pd.Series:

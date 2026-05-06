@@ -46,6 +46,8 @@ _POSITIVE_CATALYSTS = {
     "shareholder_increase",
     "order_contract",
     "earnings_preannouncement_up",
+    "performance_warning_up",
+    "performance_warning_repair",
     "equity_incentive",
 }
 _WATCH_RISKS = {
@@ -75,6 +77,11 @@ def _default_event_taxonomy() -> dict[str, dict[str, str]]:
             "portfolio_action": "boost",
         }
     taxonomy["financial_report_disclosure"] = {
+        "event_class": "information_event",
+        "default_severity": "info",
+        "portfolio_action": "review",
+    }
+    taxonomy["performance_warning_neutral"] = {
         "event_class": "information_event",
         "default_severity": "info",
         "portfolio_action": "review",

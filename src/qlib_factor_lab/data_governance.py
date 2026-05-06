@@ -152,7 +152,7 @@ def _evaluate_domain(
     if path is None or not path.exists():
         return _row(domain, "missing", domain.activation_if_missing, 0.0, 0.0, "missing", 0.0, 0, "file missing")
 
-    frame = pd.read_csv(path)
+    frame = pd.read_csv(path, low_memory=False)
     missing_required = [column for column in domain.required_fields if column not in frame.columns]
     coverage = _coverage_ratio(frame, expected_instruments)
     pit_completeness = _pit_completeness(frame, domain.pit_fields)
@@ -241,7 +241,7 @@ def _trusted_source_ratio(frame: pd.DataFrame, domain: DataDomainConfig) -> floa
 def _load_expected_instruments(path: Path | None) -> set[str]:
     if path is None or not path.exists():
         return set()
-    frame = pd.read_csv(path)
+    frame = pd.read_csv(path, low_memory=False)
     if "instrument" not in frame.columns:
         return set()
     return set(frame["instrument"].dropna().astype(str))

@@ -60,19 +60,19 @@ def main() -> int:
     universe_symbols = _load_universe_symbols(root, args)
     if not args.skip_security_master:
         if args.security_master_source_csv:
-            raw_master = pd.read_csv(_resolve(root, args.security_master_source_csv))
+            raw_master = pd.read_csv(_resolve(root, args.security_master_source_csv), low_memory=False)
             master = normalize_security_master_snapshot(raw_master, as_of_date=args.as_of_date)
         else:
             master = fetch_security_master_snapshot(args.as_of_date, limit=args.limit)
         industry_source = _default_industry_source(root, args.industry_source_csv)
         if industry_source is not None:
-            master = enrich_security_master_industries(master, pd.read_csv(industry_source))
+            master = enrich_security_master_industries(master, pd.read_csv(industry_source, low_memory=False))
         master = filter_frame_to_universes(master, universe_symbols)
         _write_csv(master, _resolve(root, args.security_master_output))
 
     if not args.skip_company_events:
         if args.notice_source_csv:
-            raw_notices = pd.read_csv(_resolve(root, args.notice_source_csv))
+            raw_notices = pd.read_csv(_resolve(root, args.notice_source_csv), low_memory=False)
             events = normalize_akshare_notices(raw_notices)
         else:
             notice_start = _normalize_date_arg(args.notice_start or args.as_of_date)
@@ -97,7 +97,7 @@ def _read_existing_events(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
     try:
-        return pd.read_csv(path)
+        return pd.read_csv(path, low_memory=False)
     except EmptyDataError:
         return pd.DataFrame(columns=COMPANY_EVENT_COLUMNS)
 

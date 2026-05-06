@@ -363,8 +363,14 @@ def classify_notice_event(title: str, category: str = "") -> tuple[str, str]:
         return "holder_count_change", "info"
     if any(word in text for word in ["解禁", "限售股上市流通", "限售股份上市流通"]):
         return "large_unlock", "watch"
-    if any(word in text for word in ["业绩预告", "预亏", "业绩下修", "向下修正"]):
+    if any(word in text for word in ["预增", "预盈", "扭亏为盈", "业绩上修", "向上修正"]):
+        return "performance_warning_up", "watch"
+    if any(word in text for word in ["减亏", "亏损收窄", "亏损同比收窄", "亏损减少", "亏损幅度收窄"]):
+        return "performance_warning_repair", "info"
+    if any(word in text for word in ["预亏", "首亏", "续亏", "预减", "业绩下修", "向下修正", "由盈转亏"]):
         return "performance_warning_down", "risk"
+    if "业绩预告" in text:
+        return "performance_warning_neutral", "info"
     if any(word in text for word in ["诉讼", "仲裁"]):
         return "lawsuit", "risk"
     if "担保" in text:

@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import yaml
@@ -13,6 +14,40 @@ from qlib_factor_lab.data_governance import (
 
 
 class DataGovernanceTests(unittest.TestCase):
+    def test_report_reads_domain_csvs_with_low_memory_false(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            pd.DataFrame({"instrument": ["AAA"]}).to_csv(root / "data/universe.csv", index=False)
+            pd.DataFrame({"instrument": ["AAA"], "valid_from": ["2026-01-01"]}).to_csv(
+                root / "data/security_master.csv",
+                index=False,
+            )
+            config_path = root / "configs/data_governance.yaml"
+            config_path.parent.mkdir()
+            config_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "data_governance": {
+                            "expected_universe_path": "data/universe.csv",
+                            "domains": {
+                                "security_master": {
+                                    "path": "data/security_master.csv",
+                                    "required_fields": ["instrument"],
+                                    "pit_fields": ["valid_from"],
+                                },
+                            },
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch("qlib_factor_lab.data_governance.pd.read_csv", wraps=pd.read_csv) as read_csv:
+                build_data_governance_report(load_data_governance_config(config_path), project_root=root)
+
+            self.assertTrue(any(call.kwargs.get("low_memory") is False for call in read_csv.call_args_list))
+
     def test_report_scores_coverage_pit_completeness_and_activation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

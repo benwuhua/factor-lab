@@ -45,14 +45,28 @@ class CompanyEventTests(unittest.TestCase):
 
         read_csv.assert_called_once_with(path, low_memory=False)
 
+    def test_research_context_existing_event_reader_uses_low_memory_false(self):
+        module = _load_research_context_script()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "company_events.csv"
+            path.write_text("event_id,instrument,event_type\n1,AAA,financial_report_disclosure\n", encoding="utf-8")
+
+            with patch.object(module.pd, "read_csv", wraps=pd.read_csv) as read_csv:
+                module._read_existing_events(path)
+
+        read_csv.assert_called_once_with(path, low_memory=False)
+
     def test_classify_event_type_maps_p2_taxonomy(self):
         expected = {
             "buyback": ("positive_catalyst", "info", "boost"),
             "shareholder_increase": ("positive_catalyst", "info", "boost"),
             "order_contract": ("positive_catalyst", "info", "boost"),
             "earnings_preannouncement_up": ("positive_catalyst", "info", "boost"),
+            "performance_warning_up": ("positive_catalyst", "info", "boost"),
+            "performance_warning_repair": ("positive_catalyst", "info", "boost"),
             "equity_incentive": ("positive_catalyst", "info", "boost"),
             "financial_report_disclosure": ("information_event", "info", "review"),
+            "performance_warning_neutral": ("information_event", "info", "review"),
             "shareholder_reduction": ("watch_risk", "watch", "watch"),
             "large_unlock": ("watch_risk", "watch", "watch"),
             "regulatory_inquiry": ("watch_risk", "watch", "watch"),

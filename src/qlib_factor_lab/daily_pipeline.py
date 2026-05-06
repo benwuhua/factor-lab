@@ -572,7 +572,7 @@ def _normalize_date_text(value: Any) -> str | None:
 
 def _load_exposures(root: Path, exposures_csv: Path | None, signal_config: Any, factors: Any) -> pd.DataFrame:
     if exposures_csv is not None:
-        return pd.read_csv(_resolve(root, exposures_csv))
+        return pd.read_csv(_resolve(root, exposures_csv), low_memory=False)
     project_config = load_project_config(_resolve(root, signal_config.provider_config))
     return fetch_daily_factor_exposures(project_config, factors, signal_config.run_date)
 
@@ -584,7 +584,7 @@ def _load_current_positions(root: Path, current_positions_csv: Path | None) -> p
     path = _resolve(root, current_positions_csv)
     if not path.exists():
         return pd.DataFrame(columns=columns)
-    return pd.read_csv(path)
+    return pd.read_csv(path, low_memory=False)
 
 
 def _preflight_run_date(run_date: str) -> str | None:
@@ -610,7 +610,7 @@ def _load_factor_diagnostics(root: Path, run_date: str, combo_name: str | None =
         ]
     for path in candidates:
         if path.exists():
-            return pd.read_csv(path)
+            return pd.read_csv(path, low_memory=False)
     return None
 
 
@@ -618,7 +618,7 @@ def _load_announcement_evidence(root: Path) -> pd.DataFrame | None:
     path = root / "data" / "announcement_evidence.csv"
     if not path.exists():
         return None
-    return pd.read_csv(path)
+    return pd.read_csv(path, low_memory=False)
 
 
 def _enrich_signal_with_event_risk(
