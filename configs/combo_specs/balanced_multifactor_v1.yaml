@@ -216,6 +216,19 @@ members:
       - field: financial_disclosure_event_score_90d
         direction: 1
         weight: 1.00
+  - name: financial_disclosure_net_intensity_score_90d
+    source: fundamental_quality
+    family: event_catalyst
+    logic_bucket: financial_disclosure
+    direction: 1
+    weight: 0.02
+    approval_status: data_gated
+    regime_profile: all_weather
+    description: "source_table=data/fundamental_quality.csv; source_field=financial_disclosure_net_intensity_score_90d; role=directional disclosure catalyst adjusted by parsed amount/percentage intensity."
+    components:
+      - field: financial_disclosure_net_intensity_score_90d
+        direction: 1
+        weight: 1.00
   - name: growth_improvement
     source: fundamental_quality
     family: growth_improvement

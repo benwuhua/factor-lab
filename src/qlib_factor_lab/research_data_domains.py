@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,6 +45,9 @@ FUNDAMENTAL_QUALITY_COLUMNS = [
     "financial_disclosure_positive_score_90d",
     "financial_disclosure_negative_score_90d",
     "financial_disclosure_event_score_90d",
+    "financial_disclosure_positive_intensity_score_90d",
+    "financial_disclosure_negative_intensity_score_90d",
+    "financial_disclosure_net_intensity_score_90d",
     "valuation_source",
     "source",
 ]
@@ -1141,6 +1146,9 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
                     "financial_disclosure_positive_score_90d_derived": pd.NA,
                     "financial_disclosure_negative_score_90d_derived": pd.NA,
                     "financial_disclosure_event_score_90d_derived": pd.NA,
+                    "financial_disclosure_positive_intensity_score_90d_derived": pd.NA,
+                    "financial_disclosure_negative_intensity_score_90d_derived": pd.NA,
+                    "financial_disclosure_net_intensity_score_90d_derived": pd.NA,
                 }
             )
             continue
@@ -1157,6 +1165,9 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
                     "financial_disclosure_positive_score_90d_derived": 0.0,
                     "financial_disclosure_negative_score_90d_derived": 0.0,
                     "financial_disclosure_event_score_90d_derived": 0.0,
+                    "financial_disclosure_positive_intensity_score_90d_derived": 0.0,
+                    "financial_disclosure_negative_intensity_score_90d_derived": 0.0,
+                    "financial_disclosure_net_intensity_score_90d_derived": 0.0,
                 }
             )
             continue
@@ -1164,7 +1175,10 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
         if not history.empty:
             latest_event_date = history.iloc[-1]["event_date"]
             days_since = max(float((available_at - latest_event_date).days), 0.0)
-        positive_score, negative_score = _directional_disclosure_scores(instrument_events, available_at)
+        positive_score, negative_score, positive_intensity, negative_intensity = _directional_disclosure_scores(
+            instrument_events,
+            available_at,
+        )
         rows.append(
             {
                 "_row_id": item["_row_id"],
@@ -1172,6 +1186,9 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
                 "financial_disclosure_positive_score_90d_derived": positive_score,
                 "financial_disclosure_negative_score_90d_derived": negative_score,
                 "financial_disclosure_event_score_90d_derived": positive_score - negative_score,
+                "financial_disclosure_positive_intensity_score_90d_derived": positive_intensity,
+                "financial_disclosure_negative_intensity_score_90d_derived": negative_intensity,
+                "financial_disclosure_net_intensity_score_90d_derived": positive_intensity - negative_intensity,
             }
         )
     derived = pd.DataFrame(rows)
@@ -1192,6 +1209,9 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
         "financial_disclosure_positive_score_90d",
         "financial_disclosure_negative_score_90d",
         "financial_disclosure_event_score_90d",
+        "financial_disclosure_positive_intensity_score_90d",
+        "financial_disclosure_negative_intensity_score_90d",
+        "financial_disclosure_net_intensity_score_90d",
     ]:
         merged[column] = _fill_missing_numeric(
             merged.get(column),
@@ -1205,18 +1225,23 @@ def _derive_financial_disclosure_fields(frame: pd.DataFrame, disclosures: pd.Dat
             "financial_disclosure_positive_score_90d_derived",
             "financial_disclosure_negative_score_90d_derived",
             "financial_disclosure_event_score_90d_derived",
+            "financial_disclosure_positive_intensity_score_90d_derived",
+            "financial_disclosure_negative_intensity_score_90d_derived",
+            "financial_disclosure_net_intensity_score_90d_derived",
         ],
         errors="ignore",
     )
 
 
-def _directional_disclosure_scores(events: pd.DataFrame, available_at: pd.Timestamp) -> tuple[float, float]:
+def _directional_disclosure_scores(events: pd.DataFrame, available_at: pd.Timestamp) -> tuple[float, float, float, float]:
     lookback_start = available_at - pd.Timedelta(days=90)
     recent = events[(events["event_date"] >= lookback_start) & (events["event_date"] <= available_at)].copy()
     if recent.empty:
-        return 0.0, 0.0
+        return 0.0, 0.0, 0.0, 0.0
     positive = 0.0
     negative = 0.0
+    positive_intensity = 0.0
+    negative_intensity = 0.0
     for _, event in recent.iterrows():
         direction = _disclosure_event_direction(event)
         if direction == 0:
@@ -1225,11 +1250,14 @@ def _directional_disclosure_scores(events: pd.DataFrame, available_at: pd.Timest
         recency_weight = max(0.0, 1.0 - days_since / 90.0)
         severity_weight = _disclosure_severity_weight(event.get("severity"))
         contribution = recency_weight * severity_weight
+        intensity_contribution = contribution * _disclosure_event_intensity_multiplier(event)
         if direction > 0:
             positive += contribution
+            positive_intensity += intensity_contribution
         else:
             negative += contribution
-    return positive, negative
+            negative_intensity += intensity_contribution
+    return positive, negative, positive_intensity, negative_intensity
 
 
 def _disclosure_event_direction(event: pd.Series) -> int:
@@ -1247,6 +1275,43 @@ def _disclosure_event_direction(event: pd.Series) -> int:
 def _disclosure_severity_weight(value: Any) -> float:
     severity = str(value or "info").strip().lower()
     return DISCLOSURE_SEVERITY_WEIGHTS.get(severity, DISCLOSURE_SEVERITY_WEIGHTS["info"])
+
+
+def _disclosure_event_intensity_multiplier(event: pd.Series) -> float:
+    text = _event_text(event)
+    money_multiplier = _money_intensity_multiplier(text)
+    percent_multiplier = _percent_intensity_multiplier(text)
+    return max(1.0, money_multiplier, percent_multiplier)
+
+
+def _event_text(event: pd.Series) -> str:
+    pieces = []
+    for field in ["title", "summary", "evidence"]:
+        value = event.get(field)
+        if value is not None and not pd.isna(value):
+            pieces.append(str(value))
+    return " ".join(pieces)
+
+
+def _money_intensity_multiplier(text: str) -> float:
+    values = []
+    for raw, unit in re.findall(r"([0-9]+(?:\.[0-9]+)?)\s*(亿元|亿|万元|万)", text):
+        amount = float(raw)
+        yuan = amount * (100_000_000.0 if unit in {"亿元", "亿"} else 10_000.0)
+        values.append(yuan)
+    if not values:
+        return 1.0
+    largest = max(values)
+    # 1000万约为1倍，1亿约为2倍，10亿封顶约3倍。
+    return min(3.0, max(1.0, 1.0 + math.log10(max(largest, 1.0) / 10_000_000.0)))
+
+
+def _percent_intensity_multiplier(text: str) -> float:
+    values = [float(item) for item in re.findall(r"([0-9]+(?:\.[0-9]+)?)\s*%", text)]
+    if not values:
+        return 1.0
+    largest = max(values)
+    return min(3.0, max(1.0, 1.0 + largest / 3.0))
 
 
 def _fill_missing_numeric(current: pd.Series | None, derived: pd.Series) -> pd.Series:

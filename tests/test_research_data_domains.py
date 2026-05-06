@@ -208,6 +208,83 @@ class ResearchDataDomainsTest(unittest.TestCase):
             float(by_instrument.loc["BBB", "financial_disclosure_positive_score_90d"]),
         )
 
+    def test_derive_fundamental_quality_fields_scores_disclosure_event_intensity(self) -> None:
+        fundamentals = pd.DataFrame(
+            [
+                {
+                    "instrument": "AAA",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-30",
+                    "available_at": "2026-04-30",
+                },
+                {
+                    "instrument": "BBB",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-30",
+                    "available_at": "2026-04-30",
+                },
+                {
+                    "instrument": "CCC",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-30",
+                    "available_at": "2026-04-30",
+                },
+                {
+                    "instrument": "DDD",
+                    "report_period": "2026-03-31",
+                    "announce_date": "2026-04-30",
+                    "available_at": "2026-04-30",
+                },
+            ]
+        )
+        disclosures = pd.DataFrame(
+            [
+                {
+                    "instrument": "AAA",
+                    "event_type": "buyback",
+                    "event_date": "2026-04-28",
+                    "severity": "info",
+                    "title": "关于回购股份方案的公告，回购金额不低于1亿元",
+                },
+                {
+                    "instrument": "BBB",
+                    "event_type": "buyback",
+                    "event_date": "2026-04-28",
+                    "severity": "info",
+                    "title": "关于回购股份方案的公告，回购金额不低于100万元",
+                },
+                {
+                    "instrument": "CCC",
+                    "event_type": "shareholder_reduction",
+                    "event_date": "2026-04-28",
+                    "severity": "risk",
+                    "title": "股东拟减持公司股份不超过3%",
+                },
+                {
+                    "instrument": "DDD",
+                    "event_type": "shareholder_reduction",
+                    "event_date": "2026-04-28",
+                    "severity": "risk",
+                    "title": "股东拟减持公司股份不超过0.3%",
+                },
+            ]
+        )
+
+        result = derive_fundamental_quality_fields(fundamentals, disclosures=disclosures)
+        by_instrument = result.set_index("instrument")
+
+        self.assertIn("financial_disclosure_positive_intensity_score_90d", result.columns)
+        self.assertIn("financial_disclosure_negative_intensity_score_90d", result.columns)
+        self.assertIn("financial_disclosure_net_intensity_score_90d", result.columns)
+        self.assertGreater(
+            float(by_instrument.loc["AAA", "financial_disclosure_positive_intensity_score_90d"]),
+            float(by_instrument.loc["BBB", "financial_disclosure_positive_intensity_score_90d"]),
+        )
+        self.assertLess(
+            float(by_instrument.loc["CCC", "financial_disclosure_net_intensity_score_90d"]),
+            float(by_instrument.loc["DDD", "financial_disclosure_net_intensity_score_90d"]),
+        )
+
     def test_normalize_fundamental_quality_derives_ratios_from_price_when_raw_ratios_missing(self) -> None:
         raw = pd.DataFrame(
             [
