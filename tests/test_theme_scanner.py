@@ -15,6 +15,118 @@ from qlib_factor_lab.theme_scanner import (
 
 
 class ThemeScannerTests(unittest.TestCase):
+    def test_build_theme_candidates_outputs_business_scores_tiers_and_reasons(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            theme_path = Path(tmp) / "theme.yaml"
+            theme_path.write_text(
+                """
+theme_id: ai_semiconductor
+display_name: AI产业链
+members:
+  - instrument: SH688981
+    name: 中芯国际
+    supply_chain_role: 晶圆代工
+    sub_chain: foundry
+    theme_exposure: 1.0
+  - instrument: SZ300456
+    name: 赛微电子
+    supply_chain_role: 半导体设备
+    sub_chain: semiconductor_equipment
+    theme_exposure: 0.7
+  - instrument: SZ002261
+    name: 拓维信息
+    supply_chain_role: 整机集成
+    sub_chain: compute_integration
+    theme_exposure: 0.4
+""",
+                encoding="utf-8",
+            )
+            universe = load_theme_universe(theme_path)
+
+        signal = pd.DataFrame(
+            [
+                {
+                    "date": "2026-04-30",
+                    "instrument": "SH688981",
+                    "ensemble_score": 0.95,
+                    "family_quality_score": 0.8,
+                    "family_growth_improvement_score": 0.7,
+                    "quiet_breakout_20_contribution": 0.6,
+                    "family_event_catalyst_score": 0.5,
+                    "event_blocked": False,
+                    "risk_flags": "",
+                    "top_factor_1": "family_quality",
+                    "top_factor_2": "quiet_breakout_20",
+                },
+                {
+                    "date": "2026-04-30",
+                    "instrument": "SZ300456",
+                    "ensemble_score": 0.7,
+                    "family_quality_score": 0.4,
+                    "family_growth_improvement_score": 0.9,
+                    "quiet_breakout_20_contribution": 0.3,
+                    "family_event_catalyst_score": 0.2,
+                    "event_blocked": False,
+                    "risk_flags": "",
+                    "top_factor_1": "family_growth_improvement",
+                    "top_factor_2": "family_quality",
+                },
+                {
+                    "date": "2026-04-30",
+                    "instrument": "SZ002261",
+                    "ensemble_score": 0.85,
+                    "family_quality_score": 0.3,
+                    "family_growth_improvement_score": 0.5,
+                    "quiet_breakout_20_contribution": 0.7,
+                    "family_event_catalyst_score": -0.4,
+                    "event_blocked": True,
+                    "risk_flags": "event_blocked",
+                    "top_factor_1": "quiet_breakout_20",
+                },
+            ]
+        )
+
+        candidates = build_theme_candidates(signal, universe, top_k=10)
+
+        for column in [
+            "sub_chain",
+            "theme_score",
+            "quality_score",
+            "growth_score",
+            "momentum_score",
+            "event_score",
+            "risk_penalty",
+            "total_score",
+            "tier",
+            "reason",
+        ]:
+            self.assertIn(column, candidates.columns)
+
+        smic = candidates[candidates["instrument"] == "SH688981"].iloc[0]
+        blocked = candidates[candidates["instrument"] == "SZ002261"].iloc[0]
+        self.assertEqual(smic["tier"], "A重点研究")
+        self.assertEqual(blocked["tier"], "C风险复核")
+        self.assertGreater(smic["total_score"], blocked["total_score"])
+        self.assertIn("晶圆代工", smic["reason"])
+        self.assertIn("事件/交易风险", blocked["reason"])
+
+    def test_ai_semiconductor_theme_config_loads_required_sub_chains(self):
+        universe = load_theme_universe(Path("configs/themes/ai_semiconductor.yaml"))
+
+        self.assertEqual(universe.theme_id, "ai_semiconductor")
+        self.assertIn("非投资建议", universe.thesis)
+        sub_chains = set(universe.members["sub_chain"].astype(str))
+        for expected in {
+            "chip_design",
+            "foundry",
+            "semiconductor_equipment",
+            "semiconductor_materials",
+            "memory_storage",
+            "advanced_packaging_interconnect",
+            "compute_integration",
+        }:
+            self.assertIn(expected, sub_chains)
+
     def test_build_theme_candidates_enriches_signal_with_supply_chain_roles(self):
         with tempfile.TemporaryDirectory() as tmp:
             theme_path = Path(tmp) / "theme.yaml"

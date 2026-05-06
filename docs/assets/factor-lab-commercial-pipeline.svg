@@ -62,13 +62,13 @@
   <g transform="translate(70,58)">
     <text class="kicker" x="0" y="0">FACTOR LAB DAILY PIPELINE</text>
     <text class="h1" x="0" y="50">A 股 AI 投研流水线</text>
-    <text class="sub" x="0" y="86">从可信数据到因子信号、组合门禁、专家复核与纸面执行，每日沉淀可审计的研究资产。</text>
+    <text class="sub" x="0" y="86">从可信数据到因子信号与主题研究候选，每日沉淀可审计的研究资产。</text>
   </g>
 
   <g transform="translate(1190,54)">
     <rect x="0" y="0" width="320" height="92" rx="8" fill="url(#navy)" filter="url(#softShadow)"/>
     <text class="whiteSub" x="24" y="30">Operating Principle</text>
-    <text class="whiteTitle" x="24" y="61">先治理，再研究；先复核，再执行</text>
+    <text class="whiteTitle" x="24" y="61">先治理，再研究；只输出信号</text>
   </g>
 
   <g transform="translate(66,170)">
@@ -148,25 +148,25 @@
 
     <g transform="translate(34,424)">
       <rect width="286" height="118" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
-      <text class="cardTitle" x="18" y="30">研究组合生成</text>
-      <text class="body" x="18" y="56">交易过滤后按综合分生成候选</text>
+      <text class="cardTitle" x="18" y="30">主题信号生成</text>
+      <text class="body" x="18" y="56">按主题、质量、成长、动量分档</text>
       <text class="body" x="18" y="80">保留 top drivers 与 family contribution</text>
-      <text class="small" x="18" y="102">输出：research_portfolio.csv</text>
+      <text class="small" x="18" y="102">输出：theme_scans/*.csv</text>
     </g>
     <g transform="translate(370,424)">
       <rect width="286" height="118" rx="8" fill="#fff7ed" stroke="#fed7aa"/>
-      <text class="cardTitle" x="18" y="30">专家复核包</text>
-      <text class="body" x="18" y="56">组合、因子诊断、股票卡片、证据库</text>
-      <text class="body" x="18" y="80">LLM/人工复核 caution 或 reject</text>
-      <text class="small" x="18" y="102">输出：expert_review_packet.md</text>
+      <text class="cardTitle" x="18" y="30">证据解释包</text>
+      <text class="body" x="18" y="56">因子诊断、公告证据、主题理由</text>
+      <text class="body" x="18" y="80">标记 watch / risk / blocked 线索</text>
+      <text class="small" x="18" y="102">输出：theme_scans/*.md</text>
     </g>
 
     <path class="flow" d="M320 483 H362"/>
 
     <g transform="translate(34,584)">
       <rect width="286" height="64" rx="8" fill="#fef2f2" stroke="#fecaca"/>
-      <text class="cardTitle" x="18" y="27">组合风险门禁</text>
-      <text class="body" x="18" y="50">行业 / family / logic / 换手 / vendor gate</text>
+      <text class="cardTitle" x="18" y="27">信号质量门禁</text>
+      <text class="body" x="18" y="50">覆盖率 / stale / family / 事件风险</text>
     </g>
     <g transform="translate(370,584)">
       <rect width="286" height="64" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
@@ -190,20 +190,20 @@
 
     <g transform="translate(26,112)">
       <rect width="284" height="86" rx="8" fill="#f0fdf4" stroke="#bbf7d0"/>
-      <text class="cardTitle" x="18" y="30">执行组合</text>
-      <text class="body" x="18" y="56">expert gate 后生成目标组合</text>
-      <text class="small" x="18" y="76">target_portfolio.csv</text>
+      <text class="cardTitle" x="18" y="30">当日信号</text>
+      <text class="body" x="18" y="56">approved 因子合成解释型 signal</text>
+      <text class="small" x="18" y="76">runs/YYYYMMDD/signals.csv</text>
     </g>
     <g transform="translate(26,216)">
       <rect width="284" height="86" rx="8" fill="#eff6ff" stroke="#bfdbfe"/>
-      <text class="cardTitle" x="18" y="30">纸面执行</text>
-      <text class="body" x="18" y="56">生成订单、成交、预期仓位</text>
-      <text class="small" x="18" y="76">orders.csv / fills.csv</text>
+      <text class="cardTitle" x="18" y="30">AI产业链信号</text>
+      <text class="body" x="18" y="56">芯片 / 半导体 / 存储主题分档</text>
+      <text class="small" x="18" y="76">ai_semiconductor_YYYYMMDD.csv</text>
     </g>
     <g transform="translate(26,320)">
       <rect width="284" height="108" rx="8" fill="#f8fafc" stroke="#dbe4ef"/>
       <text class="cardTitle" x="18" y="30">复盘与留痕</text>
-      <text class="body" x="18" y="56">风险报告、组合解释、运行摘要</text>
+      <text class="body" x="18" y="56">数据质量、因子解释、主题理由</text>
       <text class="body" x="18" y="80">每轮实验可追溯、可复查、可回放</text>
     </g>
     <g transform="translate(26,464)">
@@ -211,7 +211,7 @@
       <text class="whiteSub" x="22" y="34">Business Value</text>
       <text class="whiteTitle" x="22" y="66">更快覆盖，更少误判</text>
       <text class="whiteSub" x="22" y="94">让 AI 负责阅读、归因与初筛</text>
-      <text class="whiteSub" x="22" y="116">让门禁与人工负责最后控制</text>
+      <text class="whiteSub" x="22" y="116">让门禁负责信号质量控制</text>
     </g>
   </g>
 
@@ -220,6 +220,6 @@
 
   <g transform="translate(70,890)">
     <rect x="0" y="-38" width="1460" height="64" rx="8" fill="#0f172a" filter="url(#softShadow)"/>
-    <text x="26" y="2" style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif; font-size: 18px; font-weight: 740; fill: #ffffff; letter-spacing: 0;">Daily Pipeline = 可信数据资产 -> 因子信号 -> 研究组合 -> 专家复核 -> 风险门禁 -> 目标组合 -> 纸面执行 -> 审计归档</text>
+    <text x="26" y="2" style="font-family: Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif; font-size: 18px; font-weight: 740; fill: #ffffff; letter-spacing: 0;">Daily Pipeline = 可信数据资产 -> 因子信号 -> AI产业链主题信号 -> 证据解释 -> 质量门禁 -> 审计归档</text>
   </g>
 </svg>

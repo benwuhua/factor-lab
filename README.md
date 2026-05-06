@@ -2,26 +2,28 @@
 
 Qlib Factor Lab is a lightweight research scaffold for A-share factor work. It keeps factor definitions, data-building scripts, single-factor evaluation, event backtests, and model workflow generation in one small Python package.
 
+The current supported product surface is **signal-only research**. Factor Lab currently produces governed factor signals and theme research candidates; portfolio construction, paper trading, broker adapters, and live execution are kept as historical/experimental modules and are not part of the default workflow.
+
 The current project focuses on:
 
 - Formula-style price, volume, turnover, volatility, reversal, and pattern factors.
 - CSI500 and CSI300 local research datasets built from AkShare.
 - JoinQuant factor-library migration candidates that can be expressed with local OHLCV and turnover fields.
-- A factor-to-live-trading design note under `docs/superpowers/specs/`.
+- AI industry-chain theme scans that turn approved signals into research candidates, not investment advice.
 
 ## Platform Loop
 
 ![Factor Lab commercial research pipeline](docs/assets/factor-lab-commercial-pipeline.svg)
 
-Factor Lab follows one conservative daily operating loop: govern the data first, turn approved factor families into signals, build a research portfolio, then pass every candidate through expert review and risk gates before paper execution. Each run writes an auditable package under `runs/YYYYMMDD/`.
+Factor Lab follows one conservative daily operating loop: govern the data first, turn approved factor families into explainable signals, then optionally project those signals into a focused theme universe such as AI chips, semiconductors, and memory. Each run writes auditable signal artifacts under `runs/YYYYMMDD/` and theme scan reports under `reports/theme_scans/`.
 
 Generated market data, Qlib binaries, MLflow records, and backtest reports are intentionally ignored by Git. See [docs/data-and-artifacts.md](docs/data-and-artifacts.md).
 
 For a compact command-by-command example, see [docs/factor-research-path.md](docs/factor-research-path.md).
 
-For the unified North-Star blueprint covering data governance, multi-lane autoresearch, stock cards, family-first portfolios, and expert review, see [docs/factor-lab-north-star-blueprint.md](docs/factor-lab-north-star-blueprint.md).
+For the unified North-Star blueprint covering data governance, multi-lane autoresearch, stock cards, family-first portfolios, and expert review, see [docs/factor-lab-north-star-blueprint.md](docs/factor-lab-north-star-blueprint.md). The current workbench intentionally exposes a narrower signal-only subset.
 
-For the current repo evolution roadmap from alpha research to daily signal, paper trading, and manual-live readiness, see [docs/superpowers/plans/2026-04-23-factor-lab-evolution-blueprint.md](docs/superpowers/plans/2026-04-23-factor-lab-evolution-blueprint.md).
+Older roadmap documents discuss paper trading and manual-live readiness. Those modules are not the active product scope; the active path is data governance -> factor research -> daily signal -> theme signal.
 
 ## Project Layout
 
@@ -78,7 +80,7 @@ Start the local Streamlit research workbench:
 make workbench
 ```
 
-The workbench is a read-only local UI. It reads existing artifacts such as autoresearch ledgers, approved factors, target portfolios, risk reports, and exposure attribution outputs. It does not execute trading or research commands from the browser.
+The workbench is a read-only local UI for signal research. It reads existing artifacts such as autoresearch ledgers, approved factors, daily signals, theme scans, and evidence files. It does not execute trading commands from the browser, and the default navigation does not expose portfolio or paper-trading workflows.
 
 Check the local Qlib environment after data has been downloaded or built:
 
@@ -204,43 +206,29 @@ The public Qlib CN sample data has no industry or market-cap fields. The project
 The project includes a lightweight AlphaPurify-inspired layer without adding AlphaPurify as a dependency:
 
 - `qlib_factor_lab.factor_purification`: MAD winsorization, z-score standardization, rank standardization, and OLS residual neutralization by daily cross-section.
-- `qlib_factor_lab.exposure_attribution`: factor-family, industry, and style exposure reports for a daily signal or target portfolio.
+- `qlib_factor_lab.exposure_attribution`: factor-family, industry, and style exposure reports for a daily signal. Target-portfolio usage is historical and outside the current signal-only workflow.
 
-Build an attribution report after generating a target portfolio:
-
-```bash
-make exposure-attribution EXPOSURE_INPUT=reports/target_portfolio_20260420.csv
-```
-
-Build stock research cards for human review:
+Build the daily explainable signal:
 
 ```bash
-make stock-cards TARGET_PORTFOLIO=reports/target_portfolio_20260420.csv RUN_DATE=20260420
+make daily-signal RUN_DATE=20260430
 ```
 
-Stock cards are JSONL evidence packets that combine target weights, factor drivers, event evidence, trading state, gate context, and audit fields.
-
-Daily pipeline bundles now separate research and execution semantics:
-
-- `research_portfolio.csv`: factor-driven research candidates.
-- `execution_portfolio.csv`: post-review, post-gate execution candidates.
-- `target_portfolio.csv`: legacy alias for the execution portfolio.
-
-See `docs/portfolio-construction-reading-spine.md` for the portfolio construction reference spine.
-
-Build the formal intraday execution-performance attribution:
+Scan the AI chips / semiconductor / storage theme:
 
 ```bash
-make portfolio-intraday-performance RUN_DATE=20260430
+make theme-scan THEME_CONFIG=configs/themes/ai_semiconductor.yaml SIGNAL_CSV=runs/20260430/signals.csv
 ```
 
-The report reads `reports/approved_factors.yaml` when available so factor drivers such as `top_factor_1` and `top_factor_2` can be grouped by approved factor family. Outputs are written under `reports/exposure_attribution/`.
+Theme scans produce tiered research candidates with theme, quality, growth, momentum, event, and risk components. They are signals and research prompts, not orders.
 
-The portfolio risk gate can also enforce exposure maturity checks from `configs/risk.yaml`:
+Current signal artifacts:
 
-- `max_industry_weight`: blocks portfolios too concentrated in one industry.
-- `min_factor_family_count`: blocks portfolios driven by too few factor families.
-- `max_factor_family_concentration`: blocks portfolios where one factor family contributes too much of the absolute driver contribution.
+- `runs/YYYYMMDD/signals.csv`: governed daily factor signal.
+- `reports/theme_scans/ai_semiconductor_YYYYMMDD.csv`: focused AI industry-chain signal candidates.
+- `reports/theme_scans/ai_semiconductor_YYYYMMDD.md`: human-readable theme report.
+
+Portfolio construction, risk gates, paper orders, and execution-performance attribution remain in the repository for prior experiments, but they are not part of the active Factor Lab product loop.
 
 ## Candidate Mining
 

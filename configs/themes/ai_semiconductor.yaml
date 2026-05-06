@@ -1,0 +1,182 @@
+theme_id: ai_semiconductor
+display_name: AI产业链：芯片 / 半导体 / 存储
+as_of_date: 2026-05-06
+thesis: >
+  聚焦 AI 算力产业链中更容易和国产算力、芯片制造、先进封装、存储、
+  光互连和整机集成交叉验证的 A 股研究对象。该主题池只用于研究候选筛选，
+  输出必须继续经过因子、事件风险、流动性、组合门禁和人工复核；这是研究候选，
+  非投资建议。
+
+score:
+  signal_weight: 0.65
+  theme_weight: 0.35
+
+sources:
+  - local CSI300/CSI500 signal table
+  - local security master and announcement evidence
+  - researcher-maintained AI semiconductor supply-chain taxonomy
+
+members:
+  - instrument: SH688256
+    name: 寒武纪
+    supply_chain_role: AI芯片设计
+    sub_chain: chip_design
+    theme_exposure: 1.0
+    confidence: medium
+    notes: AI accelerator design; keep risk-review if impairment or disclosure risk appears.
+  - instrument: SH688041
+    name: 海光信息
+    supply_chain_role: AI芯片设计
+    sub_chain: chip_design
+    theme_exposure: 0.95
+    confidence: medium
+  - instrument: SH688008
+    name: 澜起科技
+    supply_chain_role: 存储接口芯片
+    sub_chain: chip_design
+    theme_exposure: 0.9
+    confidence: medium
+  - instrument: SZ002049
+    name: 紫光国微
+    supply_chain_role: 特种集成电路
+    sub_chain: chip_design
+    theme_exposure: 0.75
+    confidence: medium
+  - instrument: SH688981
+    name: 中芯国际
+    supply_chain_role: 晶圆代工
+    sub_chain: foundry
+    theme_exposure: 1.0
+    confidence: high
+  - instrument: SH688347
+    name: 华虹公司
+    supply_chain_role: 晶圆代工
+    sub_chain: foundry
+    theme_exposure: 0.85
+    confidence: medium
+  - instrument: SH688469
+    name: 芯联集成
+    supply_chain_role: 晶圆代工
+    sub_chain: foundry
+    theme_exposure: 0.7
+    confidence: medium
+  - instrument: SZ002371
+    name: 北方华创
+    supply_chain_role: 半导体设备
+    sub_chain: semiconductor_equipment
+    theme_exposure: 1.0
+    confidence: high
+  - instrument: SH688012
+    name: 中微公司
+    supply_chain_role: 半导体设备
+    sub_chain: semiconductor_equipment
+    theme_exposure: 0.95
+    confidence: high
+  - instrument: SH688120
+    name: 华海清科
+    supply_chain_role: 半导体设备
+    sub_chain: semiconductor_equipment
+    theme_exposure: 0.8
+    confidence: medium
+  - instrument: SZ300604
+    name: 长川科技
+    supply_chain_role: 半导体设备
+    sub_chain: semiconductor_equipment
+    theme_exposure: 0.75
+    confidence: medium
+  - instrument: SH688037
+    name: 芯源微
+    supply_chain_role: 半导体设备
+    sub_chain: semiconductor_equipment
+    theme_exposure: 0.7
+    confidence: medium
+  - instrument: SZ300346
+    name: 南大光电
+    supply_chain_role: 半导体材料
+    sub_chain: semiconductor_materials
+    theme_exposure: 0.8
+    confidence: medium
+  - instrument: SH688019
+    name: 安集科技
+    supply_chain_role: 半导体材料
+    sub_chain: semiconductor_materials
+    theme_exposure: 0.8
+    confidence: medium
+  - instrument: SZ002409
+    name: 雅克科技
+    supply_chain_role: 半导体材料
+    sub_chain: semiconductor_materials
+    theme_exposure: 0.7
+    confidence: medium
+  - instrument: SH605358
+    name: 立昂微
+    supply_chain_role: 半导体材料
+    sub_chain: semiconductor_materials
+    theme_exposure: 0.65
+    confidence: medium
+  - instrument: SH603986
+    name: 兆易创新
+    supply_chain_role: 存储芯片
+    sub_chain: memory_storage
+    theme_exposure: 1.0
+    confidence: high
+  - instrument: SZ301308
+    name: 江波龙
+    supply_chain_role: 存储模组
+    sub_chain: memory_storage
+    theme_exposure: 0.75
+    confidence: medium
+  - instrument: SZ000021
+    name: 深科技
+    supply_chain_role: 存储封测与制造服务
+    sub_chain: memory_storage
+    theme_exposure: 0.6
+    confidence: medium
+  - instrument: SH600584
+    name: 长电科技
+    supply_chain_role: 先进封装
+    sub_chain: advanced_packaging_interconnect
+    theme_exposure: 0.9
+    confidence: high
+  - instrument: SZ002156
+    name: 通富微电
+    supply_chain_role: 先进封装
+    sub_chain: advanced_packaging_interconnect
+    theme_exposure: 0.8
+    confidence: high
+  - instrument: SZ002185
+    name: 华天科技
+    supply_chain_role: 集成电路封测
+    sub_chain: advanced_packaging_interconnect
+    theme_exposure: 0.65
+    confidence: medium
+  - instrument: SZ002436
+    name: 兴森科技
+    supply_chain_role: IC载板 / 封装基板
+    sub_chain: advanced_packaging_interconnect
+    theme_exposure: 0.65
+    confidence: medium
+  - instrument: SZ000988
+    name: 华工科技
+    supply_chain_role: 光模块
+    sub_chain: advanced_packaging_interconnect
+    theme_exposure: 0.7
+    confidence: medium
+  - instrument: SZ002281
+    name: 光迅科技
+    supply_chain_role: 光通信器件
+    sub_chain: advanced_packaging_interconnect
+    theme_exposure: 0.65
+    confidence: medium
+  - instrument: SZ002261
+    name: 拓维信息
+    supply_chain_role: 整机集成 / AI服务器生态
+    sub_chain: compute_integration
+    theme_exposure: 0.65
+    confidence: medium
+  - instrument: SZ000034
+    name: 神州数码
+    supply_chain_role: 整机集成 / 算力基础设施
+    sub_chain: compute_integration
+    theme_exposure: 0.55
+    confidence: medium

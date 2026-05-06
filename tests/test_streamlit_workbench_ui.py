@@ -26,11 +26,8 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
             ("02 数据治理", "数据治理"),
             ("03 因子研究", "因子研究"),
             ("04 自动挖掘", "自动挖掘"),
-            ("05 组合门禁", "组合门禁"),
-            ("06 专家复核", "组合门禁"),
-            ("07 纸面执行", "纸面执行"),
-            ("08 证据库", "证据库"),
-            ("09 个股卡片", "个股卡片"),
+            ("05 AI产业链", "AI产业链主题研究"),
+            ("06 证据库", "证据库"),
         ]
 
         for page, expected_text in pages:
@@ -46,14 +43,13 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
             "02 数据治理",
             "03 因子研究",
             "04 自动挖掘",
-            "05 组合门禁",
-            "06 专家复核",
-            "07 纸面执行",
-            "08 证据库",
-            "09 个股卡片",
+            "05 AI产业链",
+            "06 证据库",
         ]:
             with self.subTest(page=page):
                 self.assertIn(page, labels)
+        self.assertNotIn("07 纸面执行", labels)
+        self.assertNotIn("05 组合门禁", labels)
 
     def test_sidebar_navigation_uses_native_buttons(self):
         app = self.run_page("04 自动挖掘")
@@ -67,7 +63,7 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
         text = _app_text(app)
 
         self.assertIn("最新 Smoke / 多车道结果", text)
-        self.assertIn("组合模式与数据缺口", text)
+        self.assertIn("信号模式与数据缺口", text)
         self.assertIn("Offensive", text)
         self.assertIn("Multilane Summary", text)
         self.assertIn("Run · 开始因子研究", _button_labels(app))
@@ -94,21 +90,16 @@ class StreamlitWorkbenchUiTests(unittest.TestCase):
         self.assertIn("Run · 多车道挖掘", labels)
         self.assertIn("Queue · 启动自动挖掘", labels)
 
-    def test_portfolio_evidence_and_execution_pages_show_gate_workflow(self):
-        portfolio = self.run_page("05 组合门禁")
-        evidence = self.run_page("08 证据库")
-        execution = self.run_page("07 纸面执行")
+    def test_ai_theme_page_and_evidence_page_focus_on_signal_outputs(self):
+        theme = self.run_page("05 AI产业链")
+        evidence = self.run_page("06 证据库")
 
-        self.assertIn("为什么被 caution / reject", _app_text(portfolio))
-        self.assertIn("研究组合 vs 执行组合", _app_text(portfolio))
-        self.assertIn("今日涨跌归因", _app_text(portfolio))
-        self.assertIn("门禁趋势", _app_text(portfolio))
-        self.assertIn("交易逻辑桶暴露", _app_text(portfolio))
-        self.assertIn("专家硬复核名单", _app_text(portfolio))
-        self.assertIn("Run · 今日涨跌归因", _button_labels(portfolio))
-        self.assertIn("Confirm · 人工确认放行", _button_labels(portfolio))
+        self.assertIn("AI产业链主题研究", _app_text(theme))
+        self.assertIn("A重点研究", _app_text(theme))
+        self.assertIn("非投资建议", _app_text(theme))
+        self.assertIn("theme-scan", _app_text(theme))
         self.assertIn("刷新证据库", _app_text(evidence))
-        self.assertIn("纸面执行动作", _app_text(execution))
+        self.assertNotIn("纸面执行动作", _app_text(theme))
 
 
 def _button_labels(app: AppTest) -> list[str]:

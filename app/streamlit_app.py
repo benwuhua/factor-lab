@@ -11,6 +11,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 APP_ICON = ROOT / "app/assets/factor_lab_icon.png"
+WORKBENCH_PAGES = ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 AI产业链", "06 证据库"]
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
@@ -69,12 +70,12 @@ st.set_page_config(page_title="Factor Lab Workbench", page_icon=str(APP_ICON), l
 
 def main() -> None:
     _style()
-    pages = ["01 总览仪表盘", "02 数据治理", "03 因子研究", "04 自动挖掘", "05 组合门禁", "06 专家复核", "07 纸面执行", "08 证据库", "09 个股卡片"]
+    pages = WORKBENCH_PAGES
     page = _resolve_nav_page(st.query_params.get("page", ""), pages)
     if APP_ICON.exists():
         st.sidebar.image(str(APP_ICON), width=64)
     st.sidebar.title("Factor Lab")
-    st.sidebar.caption("AI 辅助 A 股因子投研工作台\n从候选因子到组合复核")
+    st.sidebar.caption("AI 辅助 A 股因子投研工作台\n从候选因子到研究信号")
     st.sidebar.markdown('<div class="native-nav">', unsafe_allow_html=True)
     for nav_page in pages:
         if st.sidebar.button(
@@ -92,7 +93,7 @@ def main() -> None:
     st.sidebar.caption("数据边界")
     st.sidebar.write("CSI300 / CSI500")
     st.sidebar.caption("当前模式")
-    st.sidebar.write("只读研究工作台")
+    st.sidebar.write("Signal-only 研究工作台")
 
     if page == "02 数据治理":
         render_data_governance()
@@ -100,14 +101,10 @@ def main() -> None:
         render_factor_research()
     elif page == "04 自动挖掘":
         render_autoresearch_queue()
-    elif page in {"05 组合门禁", "06 专家复核"}:
-        render_portfolio_gate()
-    elif page == "07 纸面执行":
-        render_paper_execution()
-    elif page == "08 证据库":
+    elif page == "05 AI产业链":
+        render_ai_semiconductor_theme()
+    elif page == "06 证据库":
         render_evidence_library()
-    elif page == "09 个股卡片":
-        render_stock_cards()
     else:
         render_dashboard()
 
@@ -115,18 +112,18 @@ def main() -> None:
 def render_dashboard() -> None:
     snapshot = load_workbench_snapshot(ROOT)
     queue = load_autoresearch_queue(ROOT)
-    gate = load_portfolio_gate_explanation(ROOT)
-    execution_card = load_execution_gate_card(ROOT)
-    pipeline = _pipeline_rows(gate.decision)
+    pipeline = _pipeline_rows()
+    latest_signal = _latest_signal_path()
+    latest_theme = _latest_ai_theme_scan_path()
 
     st.markdown(
         """
         <div class="topbar">
           <div>
             <h1>投研业务流总览</h1>
-            <div class="subtitle">固定沪深300和中证500数据边界，使用受控 autoresearch 扩展候选因子，通过净化、评价、暴露归因、风险门禁和专家复核后进入纸面执行。</div>
+            <div class="subtitle">固定沪深300和中证500数据边界，使用受控 autoresearch 扩展候选因子，通过净化、评价和主题扫描产出 explainable signal。当前阶段只产出研究信号，不进入组合、纸面交易或后续执行。</div>
           </div>
-          <div class="controls"><span>沪深300</span><span>中证500</span><span>5D / 20D</span><span>Export</span></div>
+          <div class="controls"><span>沪深300</span><span>中证500</span><span>Signal Only</span><span>Export</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -136,20 +133,19 @@ def render_dashboard() -> None:
             ("Approved Factors", snapshot.approved_factor_count),
             ("Autoresearch Status", "Review"),
             ("Purification", "MAD + Z"),
-            ("Portfolio Gate", gate.decision.upper()),
-            ("Paper Bundle", "Ready" if snapshot.latest_run_dir else "No run"),
+            ("Latest Signal", latest_signal.name if latest_signal else "No signal"),
+            ("AI Theme Scan", latest_theme.name if latest_theme else "No scan"),
         ]
     )
 
     main_col, rail_col = st.columns([3.1, 1.05], gap="large")
     with main_col:
-        _execution_gate_panel(execution_card)
         _pipeline_ops_cards(pipeline)
         _render_workflow_task_buttons(pipeline, "dashboard")
         _flow_map()
 
-        st.subheader("今日投研队列")
-        st.caption("把 nightly 研究、专家复核、portfolio gate 和纸面订单串成一个可追踪状态流。")
+        st.subheader("今日信号队列")
+        st.caption("把数据治理、因子研究、自动挖掘、daily signal 和 AI 产业链主题扫描串成一个可追踪状态流。")
         st.dataframe(build_research_pipeline_status(ROOT), width="stretch", hide_index=True)
 
         st.subheader("产物新鲜度")
@@ -163,17 +159,12 @@ def render_dashboard() -> None:
                 hide_index=True,
             )
 
-        left, right = st.columns([1.15, 0.85])
-        with left:
-            st.subheader("Portfolio Gate 快照")
-            st.dataframe(_gate_frame(gate.checks), width="stretch", hide_index=True)
-        with right:
-            st.subheader("Autoresearch 状态")
-            summary = summarize_autoresearch_queue(queue)
-            st.bar_chart(pd.Series(summary, name="count"))
-            st.caption("来源: reports/autoresearch/expression_results.tsv")
+        st.subheader("Autoresearch 状态")
+        summary = summarize_autoresearch_queue(queue)
+        st.bar_chart(pd.Series(summary, name="count"))
+        st.caption("来源: reports/autoresearch/expression_results.tsv")
     with rail_col:
-        _right_rail(gate)
+        _signal_right_rail(latest_signal, latest_theme)
 
 
 def render_data_governance() -> None:
@@ -229,7 +220,7 @@ def render_data_governance() -> None:
             st.dataframe(domain_health["rows"], width="stretch", hide_index=True)
 
         st.markdown(_section_header_html("Tushare 数据覆盖", "vendor-backed PIT, dividend and disclosure domains"), unsafe_allow_html=True)
-        st.caption("展示当前已接入的权威/准权威数据域: PIT 主数据、分红派息、财报披露日期和公告证据。它们决定基本面因子、事件证据和组合复核能不能进入 active 状态。")
+        st.caption("展示当前已接入的权威/准权威数据域: PIT 主数据、分红派息、财报披露日期和公告证据。它们决定基本面因子、事件证据和主题信号能不能进入 active 状态。")
         st.markdown(_tushare_data_coverage_cards_html(tushare_coverage["cards"]), unsafe_allow_html=True)
         st.dataframe(tushare_coverage["rows"], width="stretch", hide_index=True)
 
@@ -256,7 +247,7 @@ def render_data_governance() -> None:
                     ("stale", _fresh_count(freshness, "stale")),
                     ("missing", _fresh_count(freshness, "missing")),
                 ],
-                note="超过 freshness SLA 的产物会在后续组合环节被视为待复核输入。",
+                note="超过 freshness SLA 的产物会在后续 signal 环节被视为待复核输入。",
             )
             + _detail_card_html(
                 "Lane Domains",
@@ -298,7 +289,7 @@ def render_factor_research() -> None:
     st.markdown(
         _page_topbar_html(
             "因子研究",
-            "把候选因子、迁移因子和 nightly 挖掘结果沉淀到 approved 因子清单，再进入单因子评价和组合构建。",
+            "把候选因子、迁移因子和 nightly 挖掘结果沉淀到 approved 因子清单，再进入单因子评价和 signal 构建。",
             ["Registry", "Approved", "Diagnostics", "Export"],
         ),
         unsafe_allow_html=True,
@@ -320,7 +311,7 @@ def render_factor_research() -> None:
         st.markdown(_workflow_card_grid_html(factor_rows), unsafe_allow_html=True)
         _render_workflow_task_buttons(factor_rows, "factor-research")
 
-        st.markdown(_section_header_html("组合模式与数据缺口", "Defensive / Balanced / Offensive profiles"), unsafe_allow_html=True)
+        st.markdown(_section_header_html("信号模式与数据缺口", "Defensive / Balanced / Offensive signal profiles"), unsafe_allow_html=True)
         st.caption("Offensive 模式依赖 momentum、volume_confirm、quiet_breakout 和 growth_improvement；若 revenue_growth_yoy、net_profit_growth_yoy 或 cashflow 覆盖不足，系统会把对应基本面进攻项标为 data-gated。")
         if combo_profiles.empty:
             st.info("还没有 combo spec。")
@@ -388,15 +379,15 @@ def render_factor_research() -> None:
                     ("discard", summary.get("discard_candidate", 0)),
                     ("crash", summary.get("crash", 0)),
                 ],
-                note="因子研究页只展示通过治理后的候选，不直接把 nightly 结果塞进组合。",
+                note="因子研究页只展示通过治理后的候选，不直接把 nightly 结果当成可交易结论。",
             )
             + _detail_card_html(
                 "Factor Families",
                 [("count", int(family_counts.size)), ("top", str(family_counts.index[0]) if not family_counts.empty else "n/a")],
-                note="后续 portfolio gate 会检查因子族集中度，避免组合只押单一量价逻辑。",
+                note="signal 解释会检查因子族集中度，避免候选只来自单一量价逻辑。",
             )
             + _detail_card_html(
-                "Combo Profiles",
+                "Signal Profiles",
                 [
                     ("profiles", int(len(combo_profiles))),
                     (
@@ -408,9 +399,9 @@ def render_factor_research() -> None:
                         int((combo_profiles["posture"] == "defensive").sum()) if not combo_profiles.empty else 0,
                     ),
                 ],
-                note="进攻型组合现在是独立 spec，不再和红利/价值防御组合混在一起评价。",
+                note="进攻型信号现在是独立 spec，不再和红利/价值防御信号混在一起评价。",
             )
-            + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">make select-factors<br>make daily-signal<br>make exposure-attribution</div></section>'
+            + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">make select-factors<br>make daily-signal<br>make theme-scan</div></section>'
             + "</aside>",
             unsafe_allow_html=True,
         )
@@ -733,7 +724,7 @@ def render_evidence_library() -> None:
     st.markdown(
         _page_topbar_html(
             "证据库",
-            "集中查看公告、监管、异动和证券主数据证据，为组合门禁和专家复核提供可追溯上下文。",
+            "集中查看公告、监管、异动和证券主数据证据，为 signal 解释和主题候选复核提供可追溯上下文。",
             ["Events", "Severity", "Sources", "Export"],
         ),
         unsafe_allow_html=True,
@@ -817,7 +808,7 @@ def render_evidence_library() -> None:
                 ],
                 note="公告证据块来自 data/announcement_evidence.csv，可用于后续 RAG 和专家复核。",
             )
-            + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">python scripts/build_research_context_data.py<br>make target-portfolio<br>make exposure-attribution</div></section>'
+            + '<section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">python scripts/build_research_context_data.py<br>make daily-signal<br>make theme-scan</div></section>'
             + "</aside>",
             unsafe_allow_html=True,
         )
@@ -878,6 +869,95 @@ def render_stock_cards() -> None:
     selected = st.selectbox("查看卡片详情", frame["instrument"].astype(str).tolist())
     selected_idx = frame.index[frame["instrument"].astype(str) == selected][0]
     st.json(cards[selected_idx], expanded=False)
+
+
+def render_ai_semiconductor_theme() -> None:
+    latest = _latest_ai_theme_scan_path()
+    candidates = pd.read_csv(latest) if latest is not None and latest.exists() else pd.DataFrame()
+
+    st.markdown(
+        _page_topbar_html(
+            "AI产业链主题研究",
+            "聚焦芯片、半导体、存储、先进封装和算力整机链条；输出是研究信号和复核线索，非投资建议。",
+            ["芯片", "半导体", "存储", "Signal Only"],
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if candidates.empty:
+        _metric_strip([("A重点研究", 0), ("B观察跟踪", 0), ("C风险复核", 0), ("Latest Scan", "missing")])
+        st.info("暂无 AI 产业链主题扫描结果。运行下方命令生成最新研究信号。")
+        st.code(
+            "make theme-scan THEME_CONFIG=configs/themes/ai_semiconductor.yaml "
+            "SIGNAL_CSV=runs/20260430/signals.csv",
+            language="bash",
+        )
+        st.caption("非投资建议。主题扫描只产生 signal，不生成组合、订单或纸面交易。")
+        return
+
+    tier_counts = candidates.get("tier", pd.Series(dtype=str)).fillna("").astype(str).value_counts().to_dict()
+    _metric_strip(
+        [
+            ("A重点研究", tier_counts.get("A重点研究", 0)),
+            ("B观察跟踪", tier_counts.get("B观察跟踪", 0)),
+            ("C风险复核", tier_counts.get("C风险复核", 0)),
+            ("Latest Scan", latest.name),
+        ]
+    )
+
+    st.markdown(_section_header_html("主题候选分档", "theme signal candidates, not advice"), unsafe_allow_html=True)
+    st.caption("分档依据: 主题相关性、质量、成长、动量、事件催化和风险扣分。C档不代表看空，只表示需要先核查事件/交易风险。非投资建议。")
+    display_cols = [
+        "tier",
+        "instrument",
+        "name",
+        "supply_chain_role",
+        "sub_chain",
+        "total_score",
+        "theme_score",
+        "quality_score",
+        "growth_score",
+        "momentum_score",
+        "event_score",
+        "risk_penalty",
+        "reason",
+    ]
+    existing = [column for column in display_cols if column in candidates.columns]
+    st.dataframe(candidates.loc[:, existing], width="stretch", hide_index=True)
+
+    st.markdown(_section_header_html("操作入口", "signal-only handoff"), unsafe_allow_html=True)
+    rows = [
+        {
+            "step": "01 SIGNAL",
+            "title": "生成当日信号",
+            "command": "make daily-signal",
+            "status": "ready",
+            "action": "Run",
+            "task_id": "daily-signal",
+        },
+        {
+            "step": "02 THEME",
+            "title": "扫描AI产业链",
+            "command": "make theme-scan THEME_CONFIG=configs/themes/ai_semiconductor.yaml",
+            "status": "signal-only",
+            "action": "Run",
+            "task_id": "theme-scan",
+            "env_overrides": {
+                "THEME_CONFIG": "configs/themes/ai_semiconductor.yaml",
+                "SIGNAL_CSV": str(_latest_signal_path() or "runs/20260430/signals.csv"),
+            },
+        },
+        {
+            "step": "03 EVIDENCE",
+            "title": "刷新公告证据",
+            "command": "make research-context",
+            "status": "optional",
+            "action": "Run",
+            "task_id": "research-context",
+        },
+    ]
+    st.markdown(_workflow_card_grid_html(rows), unsafe_allow_html=True)
+    _render_workflow_task_buttons(rows, "ai-theme")
 
 
 def render_autoresearch_queue() -> None:
@@ -1680,20 +1760,24 @@ def _evidence_library_rows() -> list[dict[str, object]]:
             "task_id": "research-context",
         },
         {
-            "step": "02 GATE",
-            "title": "重建组合门禁",
-            "command": "make target-portfolio",
-            "status": "guarded",
+            "step": "02 SIGNAL",
+            "title": "重建当日信号",
+            "command": "make daily-signal",
+            "status": "ready",
             "action": "Run",
-            "task_id": "target-portfolio",
+            "task_id": "daily-signal",
         },
         {
-            "step": "03 ATTR",
-            "title": "刷新暴露归因",
-            "command": "make exposure-attribution",
+            "step": "03 THEME",
+            "title": "刷新AI产业链扫描",
+            "command": "make theme-scan THEME_CONFIG=configs/themes/ai_semiconductor.yaml",
             "status": "ready",
-            "action": "Review",
-            "task_id": "exposure-attribution",
+            "action": "Run",
+            "task_id": "theme-scan",
+            "env_overrides": {
+                "THEME_CONFIG": "configs/themes/ai_semiconductor.yaml",
+                "SIGNAL_CSV": str(_latest_signal_path() or "runs/20260430/signals.csv"),
+            },
         },
     ]
 
@@ -1757,6 +1841,17 @@ def _latest_single_factor_diagnostics() -> pd.DataFrame:
     return pd.read_csv(candidates[-1])
 
 
+def _latest_signal_path() -> Path | None:
+    candidates = list((ROOT / "reports").glob("signals_*.csv"))
+    candidates.extend((ROOT / "runs").glob("*/signals.csv"))
+    return max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+
+
+def _latest_ai_theme_scan_path() -> Path | None:
+    candidates = list((ROOT / "reports/theme_scans").glob("ai_semiconductor_*.csv"))
+    return max(candidates, key=lambda path: path.stat().st_mtime) if candidates else None
+
+
 def _read_latest_run_csv(filename: str) -> pd.DataFrame:
     latest = find_latest_run_dir(ROOT)
     path = latest / filename if latest is not None else None
@@ -1793,14 +1888,24 @@ def _metric_strip(items: list[tuple[str, object]]) -> None:
     st.markdown("".join(html), unsafe_allow_html=True)
 
 
-def _pipeline_rows(gate_decision: str) -> list[dict[str, object]]:
+def _pipeline_rows() -> list[dict[str, object]]:
     return [
         {"step": "01 DATA", "title": "检查数据与交易日", "command": "make check-env", "status": "ready", "action": "Run", "task_id": "check-env"},
         {"step": "02 RESEARCH", "title": "启动候选因子挖掘", "command": "make autoresearch-codex-loop", "status": "review", "action": "Queue", "task_id": "autoresearch-codex-loop"},
         {"step": "03 GOVERN", "title": "生成 approved 因子", "command": "make select-factors", "status": "governed", "action": "Open", "task_id": "select-factors"},
         {"step": "04 SIGNAL", "title": "构建当日信号", "command": "make daily-signal", "status": "built", "action": "Run", "task_id": "daily-signal"},
-        {"step": "05 PORTFOLIO", "title": "组合与暴露门禁", "command": "make target-portfolio", "status": gate_decision, "action": "Review", "task_id": "target-portfolio"},
-        {"step": "06 PAPER", "title": "纸面订单与对账", "command": "make paper-orders", "status": "ready", "action": "Stage", "task_id": "paper-orders"},
+        {
+            "step": "05 THEME",
+            "title": "AI产业链主题信号",
+            "command": "make theme-scan THEME_CONFIG=configs/themes/ai_semiconductor.yaml",
+            "status": "signal-only",
+            "action": "Run",
+            "task_id": "theme-scan",
+            "env_overrides": {
+                "THEME_CONFIG": "configs/themes/ai_semiconductor.yaml",
+                "SIGNAL_CSV": str(_latest_signal_path() or "runs/20260430/signals.csv"),
+            },
+        },
     ]
 
 
@@ -1819,8 +1924,8 @@ def _pipeline_ops_cards(rows: list[dict[str, str]]) -> None:
         f"""
         <section class="pipeline-ops">
           <div class="ops-header">
-            <div><h2>流水线操作台</h2><p>把研究、组合、复核和纸面执行放在同一条可审计链路里；每一步都生成本地证据和下一步输入。</p></div>
-            <span class="run-button">Run Daily Pipeline</span>
+            <div><h2>流水线操作台</h2><p>把数据、因子、自动挖掘和主题扫描压成一条 signal 产出链路；当前阶段不生成组合、订单或纸面交易。</p></div>
+            <span class="run-button">Run Signal Pipeline</span>
           </div>
           <div class="ops-grid">{''.join(cards)}</div>
         </section>
@@ -1850,10 +1955,9 @@ def _execution_gate_panel(card: dict) -> None:
 
 def _flow_map() -> None:
     rows = [
-        ("Data", [("locked", "数据池", "CSI300 / CSI500 provider，行情、成交额、换手、证券主数据。"), ("audit", "公告事件", "公司事件、问询函、监管风险、ST 与停牌状态进入风险上下文。"), ("quality", "数据质量", "覆盖率、字段完整性、交易日一致性，失败则停止组合生成。")]),
+        ("Data", [("locked", "数据池", "CSI300 / CSI500 provider，行情、成交额、换手、证券主数据。"), ("audit", "公告事件", "公司事件、问询函、监管风险、ST 与停牌状态进入风险上下文。"), ("quality", "数据质量", "覆盖率、字段完整性、交易日一致性，失败则停止信号发布。")]),
         ("Research", [("registry", "因子池", "手工因子、JoinQuant 迁移因子、盘形事件因子统一进 registry。"), ("agent", "自动挖掘", "Codex CLI 只改候选表达式，contract 固定 provider、horizon、净化和评估器。"), ("purify", "因子净化", "MAD 去极值、z-score、rank 标准化、size proxy 中性化。")]),
-        ("Decision", [("score", "单因子评价", "IC、Rank IC、分层收益、多空收益、换手和年度稳定性。"), ("gate", "组合门禁", "行业集中度、因子族数量、单一因子族贡献集中度、事件风险。"), ("committee", "专家复核", "LLM 投委会前置审查，reject 阻断，caution 降仓或人工确认。")]),
-        ("Execution", [("target", "目标组合", "生成 target_portfolio，保留 top factor driver 和风险解释。"), ("paper", "纸面订单", "订单、模拟成交、手续费、涨跌停与停牌拒单。"), ("review", "对账复盘", "positions_expected、reconciliation、paper batch 复盘指标。")]),
+        ("Signal", [("score", "单因子评价", "IC、Rank IC、分层收益、多空收益、换手和年度稳定性。"), ("daily", "当日信号", "approved 因子合成 daily signal，保留 top factor driver 和风险解释。"), ("theme", "主题信号", "AI产业链候选按主题、质量、成长、动量、事件和风险分档。")]),
     ]
     row_html = []
     for lane, steps in rows:
@@ -1865,7 +1969,7 @@ def _flow_map() -> None:
     st.markdown(
         f"""
         <section class="section">
-          <div class="section-header"><h2>端到端流程地图</h2><span>from data to paper execution</span></div>
+          <div class="section-header"><h2>端到端流程地图</h2><span>from governed data to explainable signal</span></div>
           <div class="flow">{''.join(row_html)}</div>
         </section>
         """,
@@ -1873,25 +1977,16 @@ def _flow_map() -> None:
     )
 
 
-def _right_rail(gate) -> None:
-    checks = _gate_frame(gate.checks)
-    gate_rows = []
-    display_checks = [
-        ("单票权重", "max_single_weight"),
-        ("行业集中", "max_industry_weight"),
-        ("因子族集中", "max_factor_family_concentration"),
-        ("公告事件", "event_blocked_positions"),
-    ]
-    for label, check in display_checks:
-        matched = checks.loc[checks["check"] == check] if not checks.empty and "check" in checks.columns else pd.DataFrame()
-        status = "Pass" if matched.empty else str(matched.iloc[0].get("decision_level", matched.iloc[0].get("status", "pass"))).title()
-        gate_rows.append(f'<div class="gate"><span>{_html(label)}</span><b>{_html(status)}</b></div>')
+def _signal_right_rail(latest_signal: Path | None, latest_theme: Path | None) -> None:
     st.markdown(
         f"""
         <aside class="right-rail">
-          <section class="rail-panel"><h3>Portfolio Gate</h3>{''.join(gate_rows)}</section>
-          <section class="rail-panel"><h3>Expert Review</h3><div class="decision">当前建议进入人工确认。组合不是被阻断，而是需要解释为何动量和反转暴露同时升高。</div></section>
-          <section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">make autoresearch-codex-loop<br>make select-factors<br>make daily-signal<br>make target-portfolio<br>make exposure-attribution</div></section>
+          <section class="rail-panel"><h3>Signal Boundary</h3>
+            <div class="gate"><span>latest signal</span><b>{_html(latest_signal.name if latest_signal else "missing")}</b></div>
+            <div class="gate"><span>AI theme</span><b>{_html(latest_theme.name if latest_theme else "missing")}</b></div>
+          </section>
+          <section class="rail-panel"><h3>Scope</h3><div class="decision">当前版本只产出 signal 和研究候选，不生成组合、订单、纸面交易或实盘执行。</div></section>
+          <section class="rail-panel"><h3>CLI Handoff</h3><div class="terminal">make autoresearch-codex-loop<br>make select-factors<br>make daily-signal<br>make theme-scan</div></section>
         </aside>
         """,
         unsafe_allow_html=True,
