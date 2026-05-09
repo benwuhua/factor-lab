@@ -335,7 +335,14 @@ def _lane_factor_names(lane_name: str, lane_factor_name_overrides: dict[str, lis
     if lane_factor_name_overrides and lane_name in lane_factor_name_overrides:
         return {str(name) for name in lane_factor_name_overrides[lane_name] if str(name).strip()}
     if lane_name == "pattern_event":
-        return {"wangji-ignition-setup", "wangji-factor1", "wangji-reversal20-combo", "quiet_breakout_20", "quiet_breakout_60"}
+        return {
+            "wangji-ignition-setup",
+            "wangji-factor1",
+            "wangji-factor2",
+            "wangji-reversal20-combo",
+            "quiet_breakout_20",
+            "quiet_breakout_60",
+        }
     if lane_name == "emotion_atmosphere":
         return {
             "instrument_emotion_score",

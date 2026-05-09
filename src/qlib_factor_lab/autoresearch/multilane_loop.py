@@ -32,6 +32,7 @@ NON_REVERSAL_PRIORITY_LANES = {"emotion_atmosphere", "liquidity_microstructure",
 DEFAULT_ROTATION_FACTOR_NAMES: dict[str, list[str]] = {
     "pattern_event": [
         "wangji-factor1",
+        "wangji-factor2",
         "wangji-ignition-setup",
         "wangji-reversal20-combo",
         "quiet_breakout_20",

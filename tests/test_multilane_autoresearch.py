@@ -200,6 +200,7 @@ class MultilaneAutoresearchTests(unittest.TestCase):
                         "templates": [
                             {"name": "wangji-ignition-setup", "expression": "$close", "direction": 1},
                             {"name": "wangji-factor1", "expression": "$close", "direction": 1},
+                            {"name": "wangji-factor2", "expression": "$close", "direction": 1},
                             {"name": "wangji-reversal20-combo", "expression": "$close", "direction": 1},
                             {"name": "quiet_breakout_{window}", "expression": "$close", "windows": [20, 60], "direction": 1},
                         ]
@@ -211,6 +212,9 @@ class MultilaneAutoresearchTests(unittest.TestCase):
             specs = _event_factor_specs(root, mining_config, "pattern_event")
 
             self.assertIn("wangji-ignition-setup", [spec["name"] for spec in specs])
+            self.assertIn("wangji-factor2", [spec["name"] for spec in specs])
+            self.assertNotIn("wangji-factor2-strict", [spec["name"] for spec in specs])
+            self.assertNotIn("wangji-factor2-continuation", [spec["name"] for spec in specs])
 
     def test_runner_serializes_qlib_oracle_execution(self):
         with tempfile.TemporaryDirectory() as tmp:

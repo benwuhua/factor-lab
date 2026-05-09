@@ -34,6 +34,12 @@ class TwoStageEventBacktestConfig:
     confirmation_min_percentile: float | None = None
 
 
+@dataclass(frozen=True)
+class IndependentEventBacktestConfig:
+    horizons: tuple[int, ...] = (3, 5, 10, 20)
+    signal_threshold: float = 0.5
+
+
 def build_event_trades(
     frame: pd.DataFrame,
     signal_col: str,
@@ -62,6 +68,29 @@ def build_two_stage_event_trades(
         for bucket_low, bucket_high in config.buckets:
             trades.extend(_build_two_stage_bucket_trades(prepared, horizon, bucket_low, bucket_high, config))
     return pd.DataFrame(trades, columns=_two_stage_trade_columns())
+
+
+def build_independent_event_trades(
+    frame: pd.DataFrame,
+    signal_col: str,
+    factor_name: str,
+    trade_side: str,
+    config: IndependentEventBacktestConfig = IndependentEventBacktestConfig(),
+    signal_direction: int = 1,
+) -> pd.DataFrame:
+    prepared = _prepare_backtest_frame(frame, signal_col, signal_direction)
+    trades: list[dict[str, float | int | str | pd.Timestamp]] = []
+    for horizon in config.horizons:
+        trades.extend(
+            _build_independent_trades(
+                prepared,
+                horizon=horizon,
+                signal_threshold=config.signal_threshold,
+                factor_name=factor_name,
+                trade_side=trade_side,
+            )
+        )
+    return pd.DataFrame(trades, columns=_independent_trade_columns())
 
 
 def summarize_trades(
@@ -249,6 +278,48 @@ def _build_two_stage_bucket_trades(
     return trades
 
 
+def _build_independent_trades(
+    frame: pd.DataFrame,
+    horizon: int,
+    signal_threshold: float,
+    factor_name: str,
+    trade_side: str,
+) -> list[dict[str, float | int | str | pd.Timestamp]]:
+    trades: list[dict[str, float | int | str | pd.Timestamp]] = []
+    for instrument, instrument_frame in frame.groupby("instrument", sort=False):
+        data = instrument_frame.reset_index(drop=True)
+        for signal_idx, row in data.iterrows():
+            if float(row["rank_signal"]) <= signal_threshold:
+                continue
+            entry_idx = signal_idx + 1
+            exit_idx = signal_idx + horizon
+            if exit_idx >= len(data):
+                break
+
+            path = data.iloc[entry_idx : exit_idx + 1]
+            entry_open = float(data.loc[entry_idx, "open"])
+            exit_close = float(data.loc[exit_idx, "close"])
+            trades.append(
+                {
+                    "factor": factor_name,
+                    "trade_side": trade_side,
+                    "horizon": horizon,
+                    "instrument": instrument,
+                    "signal_date": row["datetime"],
+                    "entry_date": data.loc[entry_idx, "datetime"],
+                    "exit_date": data.loc[exit_idx, "datetime"],
+                    "score": float(row["signal"]),
+                    "rank_signal": float(row["rank_signal"]),
+                    "entry_open": entry_open,
+                    "exit_close": exit_close,
+                    "return": exit_close / entry_open - 1.0,
+                    "mfe": float(path["high"].max()) / entry_open - 1.0,
+                    "mae": float(path["low"].min()) / entry_open - 1.0,
+                }
+            )
+    return trades
+
+
 def _passes_two_stage_confirmation(row: pd.Series, config: TwoStageEventBacktestConfig) -> bool:
     if config.confirmation_min_score is not None and float(row["confirm_rank_signal"]) < config.confirmation_min_score:
         return False
@@ -349,6 +420,25 @@ def _two_stage_trade_columns() -> list[str]:
         "confirmation_score",
         "confirmation_score_pct",
         *columns[insertion_idx:],
+    ]
+
+
+def _independent_trade_columns() -> list[str]:
+    return [
+        "factor",
+        "trade_side",
+        "horizon",
+        "instrument",
+        "signal_date",
+        "entry_date",
+        "exit_date",
+        "score",
+        "rank_signal",
+        "entry_open",
+        "exit_close",
+        "return",
+        "mfe",
+        "mae",
     ]
 
 

@@ -7,12 +7,15 @@ import shutil
 import sys
 from pathlib import Path
 
+import yaml
+
 from _bootstrap import add_src_to_path, project_root, suppress_runtime_warnings
 
 suppress_runtime_warnings()
 add_src_to_path()
 
 from qlib_factor_lab.akshare_data import (
+    UniverseSpec,
     dump_csvs_to_qlib,
     fetch_universe_symbols,
     read_latest_qlib_calendar_date,
@@ -26,7 +29,12 @@ from qlib_factor_lab.tushare_data import download_tushare_history_csvs, resolve_
 def main() -> int:
     root = project_root()
     parser = argparse.ArgumentParser(description="Build a current CN daily Qlib dataset from Tushare Pro.")
-    parser.add_argument("--universe", default="csi500", choices=["csi300", "csi500"])
+    parser.add_argument("--universe", default="csi500", choices=["csi300", "csi500", "csi1000", "ai_chain"])
+    parser.add_argument(
+        "--theme-config",
+        default=str(root / "configs/themes/ai_semiconductor.yaml"),
+        help="Theme YAML used when --universe ai_chain.",
+    )
     parser.add_argument("--start", default="20150101", help="Start date in YYYYMMDD format.")
     parser.add_argument("--end", default=today_for_daily_data().replace("-", ""), help="Requested end date in YYYYMMDD format.")
     parser.add_argument("--source-dir", default=str(root / "data/tushare/source"))
@@ -47,7 +55,7 @@ def main() -> int:
     args = parser.parse_args()
 
     fallback_qlib_dir = root / "data/qlib/cn_data"
-    spec = fetch_universe_symbols(args.universe, fallback_qlib_dir=fallback_qlib_dir)
+    spec = _load_universe_spec(args.universe, root=root, fallback_qlib_dir=fallback_qlib_dir, theme_config=args.theme_config)
     symbols = spec.symbols[: args.limit] if args.limit else spec.symbols
     provider_qlib_dir = Path(args.qlib_dir).expanduser()
     qlib_dir = provider_qlib_dir.resolve()
@@ -137,6 +145,28 @@ def _effective_source_dir(source_dir: str, universe: str, start: str, end: str, 
     if not incremental:
         return base
     return base / f"{universe}_{start}_{end}"
+
+
+def _load_universe_spec(
+    universe: str,
+    *,
+    root: Path,
+    fallback_qlib_dir: Path,
+    theme_config: str,
+) -> UniverseSpec:
+    normalized = str(universe).strip().lower()
+    if normalized != "ai_chain":
+        return fetch_universe_symbols(normalized, fallback_qlib_dir=fallback_qlib_dir)
+
+    config_path = Path(theme_config).expanduser()
+    if not config_path.is_absolute():
+        config_path = root / config_path
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    members = data.get("members") or []
+    symbols = sorted({str(item.get("instrument", "")).strip().upper() for item in members if item.get("instrument")})
+    if not symbols:
+        raise ValueError(f"theme config has no members: {config_path}")
+    return UniverseSpec("ai_chain_current", "SH000852", symbols)
 
 
 if __name__ == "__main__":

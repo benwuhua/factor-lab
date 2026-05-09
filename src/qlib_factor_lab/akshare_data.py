@@ -68,7 +68,7 @@ INDUSTRY_OVERRIDE_COLUMNS = [
     "更新截止",
 ]
 
-FIXED_RESEARCH_UNIVERSES = ("csi300", "csi500")
+FIXED_RESEARCH_UNIVERSES = ("csi300", "csi500", "csi1000")
 
 
 @dataclass(frozen=True)
@@ -81,7 +81,7 @@ class UniverseSpec:
 def validate_research_universe(universe: str) -> str:
     normalized = str(universe).strip().lower()
     if normalized not in FIXED_RESEARCH_UNIVERSES:
-        raise ValueError("factor-lab data layer only supports csi300 and csi500")
+        raise ValueError("factor-lab data layer only supports csi300, csi500, and csi1000")
     return normalized
 
 
@@ -511,7 +511,7 @@ def _get_akshare():
 
 def fetch_universe_symbols(universe: str, fallback_qlib_dir: str | Path | None = None) -> UniverseSpec:
     universe = validate_research_universe(universe)
-    benchmark = {"csi300": "SH000300", "csi500": "SH000905"}[universe]
+    benchmark = {"csi300": "SH000300", "csi500": "SH000905", "csi1000": "SH000852"}[universe]
     try:
         ak = _get_akshare()
         if universe == "csi300":
@@ -519,6 +519,9 @@ def fetch_universe_symbols(universe: str, fallback_qlib_dir: str | Path | None =
             symbols = [qlib_symbol_from_code(code) for code in _extract_symbol_column(raw)]
         elif universe == "csi500":
             raw = ak.index_stock_cons_csindex(symbol="000905")
+            symbols = [qlib_symbol_from_code(code) for code in _extract_symbol_column(raw)]
+        elif universe == "csi1000":
+            raw = ak.index_stock_cons_csindex(symbol="000852")
             symbols = [qlib_symbol_from_code(code) for code in _extract_symbol_column(raw)]
         else:
             raise ValueError(f"unsupported universe: {universe}")

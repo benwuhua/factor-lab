@@ -4,8 +4,10 @@ import pandas as pd
 
 from qlib_factor_lab.event_backtest import (
     EventBacktestConfig,
+    IndependentEventBacktestConfig,
     TwoStageEventBacktestConfig,
     build_event_trades,
+    build_independent_event_trades,
     build_two_stage_event_trades,
     summarize_trades,
 )
@@ -167,6 +169,55 @@ class EventBacktestTests(unittest.TestCase):
         self.assertEqual(trades["instrument"].tolist(), ["A"])
         self.assertAlmostEqual(trades.iloc[0]["confirmation_score_pct"], 1.0)
 
+    def test_build_independent_event_trades_uses_absolute_binary_signal_without_cooldown(self):
+        frame = self._independent_frame()
+
+        trades = build_independent_event_trades(
+            frame,
+            "signal",
+            factor_name="wangji-factor1",
+            trade_side="left",
+            config=IndependentEventBacktestConfig(horizons=(3,), signal_threshold=0.5),
+        )
+
+        self.assertEqual(trades["instrument"].tolist(), ["A", "A", "A", "A"])
+        self.assertEqual(trades["signal_date"].tolist(), list(pd.date_range("2026-01-01", periods=4, freq="D")))
+        trade = trades.iloc[0]
+        self.assertEqual(trade["factor"], "wangji-factor1")
+        self.assertEqual(trade["trade_side"], "left")
+        self.assertEqual(trade["entry_date"], pd.Timestamp("2026-01-02"))
+        self.assertEqual(trade["exit_date"], pd.Timestamp("2026-01-04"))
+        self.assertAlmostEqual(trade["return"], 14 / 11 - 1)
+        self.assertAlmostEqual(trade["mfe"], 15 / 11 - 1)
+        self.assertAlmostEqual(trade["mae"], 9 / 11 - 1)
+
+    def test_summarize_independent_event_trades_groups_by_factor_side_and_horizon(self):
+        frame = self._independent_frame()
+
+        first = build_independent_event_trades(
+            frame,
+            "signal",
+            factor_name="wangji-factor1",
+            trade_side="left",
+            config=IndependentEventBacktestConfig(horizons=(3,), signal_threshold=0.5),
+        )
+        second = build_independent_event_trades(
+            frame.rename(columns={"signal": "diamond"}),
+            "diamond",
+            factor_name="wangji-factor2",
+            trade_side="right",
+            config=IndependentEventBacktestConfig(horizons=(5,), signal_threshold=0.5),
+        )
+        trades = pd.concat([first, second], ignore_index=True)
+
+        summary = summarize_trades(trades, group_cols=("factor", "trade_side", "horizon"))
+
+        self.assertEqual(summary[["factor", "trade_side", "horizon"]].values.tolist(), [
+            ["wangji-factor1", "left", 3],
+            ["wangji-factor2", "right", 5],
+        ])
+        self.assertEqual(summary["trade_count"].tolist(), [4, 3])
+
     def test_summarize_trades_reports_return_quality_metrics(self):
         trades = pd.DataFrame(
             {
@@ -197,6 +248,18 @@ class EventBacktestTests(unittest.TestCase):
         index = pd.MultiIndex.from_product([dates, instruments], names=["datetime", "instrument"])
         frame = pd.DataFrame(index=index)
         frame["signal"] = [2, 1, 3, 1, 3, 1, 3, 1, 4, 1, 4, 1, 4, 1, 4, 1]
+        frame["open"] = [10, 20, 11, 20, 12, 20, 13, 20, 14, 20, 15, 20, 16, 20, 17, 20]
+        frame["close"] = [10, 20, 11, 20, 12, 20, 14, 20, 15, 20, 16, 20, 17, 20, 18, 20]
+        frame["high"] = [10, 20, 12, 20, 15, 20, 14, 20, 16, 20, 17, 20, 18, 20, 19, 20]
+        frame["low"] = [10, 20, 10, 20, 9, 20, 13, 20, 14, 20, 14, 20, 16, 20, 17, 20]
+        return frame
+
+    def _independent_frame(self):
+        dates = pd.date_range("2026-01-01", periods=8, freq="D")
+        instruments = ["A", "B"]
+        index = pd.MultiIndex.from_product([dates, instruments], names=["datetime", "instrument"])
+        frame = pd.DataFrame(index=index)
+        frame["signal"] = [1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         frame["open"] = [10, 20, 11, 20, 12, 20, 13, 20, 14, 20, 15, 20, 16, 20, 17, 20]
         frame["close"] = [10, 20, 11, 20, 12, 20, 14, 20, 15, 20, 16, 20, 17, 20, 18, 20]
         frame["high"] = [10, 20, 12, 20, 15, 20, 14, 20, 16, 20, 17, 20, 18, 20, 19, 20]

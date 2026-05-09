@@ -77,7 +77,7 @@ class FactorMiningTests(unittest.TestCase):
             }.issubset(categories)
         )
 
-    def test_default_mining_config_includes_wangji_factor1_soft_14_day_pattern(self):
+    def test_default_mining_config_includes_wangji_factor1_binary_14_day_match(self):
         root = Path(__file__).resolve().parents[1]
 
         factors = generate_candidate_factors(load_mining_config(root / "configs/factor_mining.yaml"))
@@ -85,16 +85,22 @@ class FactorMiningTests(unittest.TestCase):
 
         factor = factor_by_name["wangji-factor1"]
         self.assertEqual(factor.category, "candidate_pattern")
-        self.assertIn("4 - Abs((Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1) - 0.08) / 0.04", factor.expression)
-        self.assertIn("Less(Ref($close, 3) / Ref($close, 4) - 1, 0.12) / 0.06", factor.expression)
-        self.assertIn("Less(Ref($close, 3) / Ref($open, 3) - 1, 0.12) / 0.06", factor.expression)
-        self.assertIn("Less(Ref($volume, 3) / (Mean(Ref($volume, 4), 10) + 1), 2.5) / 1.5", factor.expression)
-        self.assertIn("Abs(Ref($close, 2) / Ref($close, 3) - 1)", factor.expression)
-        self.assertIn("2.2 * ((Ref($volume, 2) + Ref($volume, 1) + $volume)", factor.expression)
-        self.assertNotIn("If(", factor.expression)
+        self.assertTrue(factor.expression.startswith("If("))
+        self.assertTrue(factor.expression.endswith(", 1, 0)"))
+        self.assertIn("Le(Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1, 0.06)", factor.expression)
+        self.assertIn("Ge(Ref($close, 3) / Ref($close, 4) - 1, 0.07)", factor.expression)
+        self.assertIn("Gt(Ref($close, 3), Ref($open, 3))", factor.expression)
+        self.assertIn("Ge(Ref($volume, 3) / (Mean(Ref($volume, 4), 10) + 1), 2.0)", factor.expression)
+        self.assertIn("Gt(Ref($close, 2) / Ref($close, 3) - 1, -0.03)", factor.expression)
+        self.assertIn("Lt(Ref($close, 2) / Ref($close, 3) - 1, 0)", factor.expression)
+        self.assertIn("Lt(Ref($volume, 2), Ref($volume, 3))", factor.expression)
+        self.assertIn("Lt($volume, Ref($volume, 3))", factor.expression)
+        self.assertNotIn("4 - Abs(", factor.expression)
+        self.assertNotIn("/ 0.06", factor.expression)
+        self.assertNotIn("2.2 *", factor.expression)
         self.assertNotIn("Ref(Max($high, 120), 30)", factor.expression)
-        self.assertIn("confirmed", factor.description)
-        self.assertIn("days 12-14", factor.description)
+        self.assertIn("binary", factor.description)
+        self.assertIn("full match", factor.description)
 
     def test_default_mining_config_includes_wangji_ignition_setup(self):
         root = Path(__file__).resolve().parents[1]
@@ -122,12 +128,60 @@ class FactorMiningTests(unittest.TestCase):
 
         factor = factor_by_name["wangji-reversal20-combo"]
         self.assertEqual(factor.category, "candidate_pattern")
-        self.assertIn("If(And(Gt(", factor.expression)
+        self.assertIn("If(And(", factor.expression)
+        self.assertTrue(factor.expression.endswith(", 1, 0)"))
         self.assertIn("Ref($close, 20) / $close - 1", factor.expression)
-        self.assertIn("Greater(Less(Ref($close, 20) / $close - 1, 0.30), 0)", factor.expression)
-        self.assertIn("4 - Abs((Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1) - 0.08) / 0.04", factor.expression)
-        self.assertIn("- 10", factor.expression)
+        self.assertIn("Ge(Ref($close, 20) / $close - 1, 0.03)", factor.expression)
+        self.assertIn("Le(Max(Ref($close, 4), 10) / Min(Ref($close, 4), 10) - 1, 0.06)", factor.expression)
+        self.assertNotIn("4 - Abs(", factor.expression)
+        self.assertNotIn("- 10", factor.expression)
         self.assertEqual(factor.direction, 1)
+
+    def test_default_mining_config_includes_wangji_factor2_2b_pullback_confirmation(self):
+        root = Path(__file__).resolve().parents[1]
+
+        factors = generate_candidate_factors(load_mining_config(root / "configs/factor_mining.yaml"))
+        factor_by_name = {factor.name: factor for factor in factors}
+        wangji_factor2_names = [factor.name for factor in factors if factor.name.startswith("wangji-factor2")]
+
+        self.assertEqual(wangji_factor2_names, ["wangji-factor2"])
+        factor = factor_by_name["wangji-factor2"]
+        self.assertEqual(factor.category, "candidate_pattern")
+        self.assertEqual(factor.direction, 1)
+        self.assertTrue(factor.expression.startswith("If("))
+        self.assertTrue(factor.expression.endswith(", 1, 0)"))
+        self.assertIn("Gt(Mean($close, 5), Mean(Ref($close, 5), 5))", factor.expression)
+        self.assertIn("Gt(Mean(Ref($close, 5), 5), Mean(Ref($close, 10), 5))", factor.expression)
+        self.assertIn("Gt(Mean(Ref($close, 10), 5), Mean(Ref($close, 15), 5))", factor.expression)
+        self.assertIn("Gt(Mean(Ref($close, 15), 5), Mean(Ref($close, 20), 5))", factor.expression)
+        self.assertIn("Gt($close, Mean($close, 21))", factor.expression)
+        self.assertIn("Max(Ref(And(Gt($close, Mean($close, 21)), And(Gt(Mean($close, 5), Mean($close, 13))", factor.expression)
+        self.assertIn("Ge($close / (Min(Ref($low, 1), 20) + 0.000001) - 1, 0.08)", factor.expression)
+        self.assertIn("Gt(Mean($close, 13), Ref(Mean($close, 13), 3)", factor.expression)
+        self.assertIn("), 10), 51), 1)", factor.expression)
+        self.assertIn("Gt($close, Mean($close, 60))", factor.expression)
+        self.assertIn("Gt(Mean($close, 5), Mean($close, 13))", factor.expression)
+        self.assertIn("Gt(Mean($close, 13), Mean($close, 21))", factor.expression)
+        self.assertIn("Gt(Max(Ref($close, 3), 20), Max(Ref($high, 23), 60))", factor.expression)
+        self.assertIn("Le(Min(Ref($low, 1), 10) / (Mean($close, 21) + 0.000001), 1.04)", factor.expression)
+        self.assertIn("Ge(Min(Ref($close, 1), 10) / (Mean($close, 21) + 0.000001), 0.93)", factor.expression)
+        self.assertIn("Le(Mean(Ref($volume, 1), 5) / (Mean(Ref($volume, 10), 10) + 1), 1.35)", factor.expression)
+        self.assertIn("Ge($close / Ref($close, 1) - 1, 0.02)", factor.expression)
+        self.assertIn("Ge($close / $open - 1, 0.02)", factor.expression)
+        self.assertIn("Gt($close, Mean($close, 5))", factor.expression)
+        self.assertIn("Gt($close, Mean($close, 13))", factor.expression)
+        self.assertIn("Ge($volume / (Mean(Ref($volume, 1), 10) + 1), 1.1)", factor.expression)
+        self.assertIn("Gt($close, Max(Ref($close, 1), 10))", factor.expression)
+        self.assertNotIn("Le($close / (Mean($close, 5) + 0.000001), 1.08)", factor.expression)
+        self.assertNotIn("Gt($close, Max(Ref($high, 1), 120))", factor.expression)
+        self.assertNotIn("Ref($close, 0)", factor.expression)
+        self.assertNotIn("Ref($open, 0)", factor.expression)
+        self.assertNotIn("Ref(Mean($close, 5), 0)", factor.expression)
+        self.assertIn("2B pullback confirmation", factor.description)
+        self.assertIn("prior golden buy", factor.description)
+        self.assertIn("weekly bullish", factor.description)
+        self.assertIn("space-open breakout", factor.description)
+        self.assertIn("10-day close high", factor.description)
 
     def test_default_mining_config_includes_joinquant_factorlib_migrations(self):
         root = Path(__file__).resolve().parents[1]
